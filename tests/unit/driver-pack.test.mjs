@@ -17,10 +17,18 @@ describe('bundled driver packs', () => {
     }
   })
 
-  it('loads the mysql2 pack and exposes createConnection', async () => {
-    const pack = manifest.packs.find((entry) => entry.id === 'mysql2')
-    expect(pack).toBeDefined()
-    const module = await import(pathToFileURL(pack.file).href)
-    expect(typeof module.createConnection).toBe('function')
+  it('loads every pack and exposes its expected API', async () => {
+    const expected = {
+      mysql2: ['createConnection'],
+      pg: ['Client', 'types'],
+      tedious: ['Connection', 'Request'],
+      'oracledb-thin': ['getConnection', 'DATE'],
+    }
+    for (const [id, names] of Object.entries(expected)) {
+      const pack = manifest.packs.find((entry) => entry.id === id)
+      expect(pack, id).toBeDefined()
+      const module = await import(pathToFileURL(pack.file).href)
+      for (const name of names) expect(typeof module[name], `${id}.${name}`).not.toBe('undefined')
+    }
   })
 })

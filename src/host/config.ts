@@ -332,14 +332,15 @@ export class ConfigStore {
       const secretName = typeof raw.secretName === 'string' && raw.secretName !== '' ? raw.secretName : undefined
       const ssh = sanitizeSsh(raw.ssh)
       const tls = sanitizeTls(raw.tls)
+      const hostOptional = preset?.hostOptional === true
       return [{
         id,
         name: asString(raw.name, 'connection.name', NAME_MAX, true),
         driver,
         ...(customDriverId === undefined ? {} : { customDriverId }),
         dialect,
-        host: asString(raw.host, 'connection.host', TEXT_MAX, true),
-        port: asPort(raw.port, 'connection.port', 0),
+        host: asString(raw.host, 'connection.host', TEXT_MAX, !hostOptional),
+        port: hostOptional ? asPortOptional(raw.port, 'connection.port', 0) : asPort(raw.port, 'connection.port', 0),
         user: asString(raw.user, 'connection.user', 128),
         ...(secretName === undefined ? {} : { secretName }),
         hasPassword: typeof secretName === 'string' && this.secrets.has(secretName),
@@ -455,7 +456,7 @@ export class ConfigStore {
     // The read-only flag is decided when the connection is created and is immutable
     // afterwards: edits always keep the stored value, even if a caller sends another.
     const readOnly = existing === undefined ? draft.readOnly === true : existing.readOnly
-    const nativeEngine = driver === 'mysql' && draft.nativeEngine === true
+    const nativeEngine = draft.nativeEngine === true && ['mysql', 'mariadb', 'postgres', 'sqlite', 'mssql', 'oracle'].includes(driver)
     const ssh = sanitizeSsh(draft.ssh)
     const tls = sanitizeTls(draft.tls)
 

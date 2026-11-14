@@ -10,6 +10,7 @@ import type {
   SchemaInfo,
   SchemaObject,
   ServerInfo,
+  SqlDialect,
   TableDescription,
 } from '../../shared/types.js'
 
@@ -63,7 +64,7 @@ export interface EngineDescriptor {
   apiVersion: 1
   kind: string
   label: string
-  dialect: 'mysql'
+  dialect: SqlDialect
   defaultPort: number
   driverId: string
   capabilities: EngineCapabilities

@@ -11,6 +11,39 @@
       "file": "drivers/mysql2-3.24.6.mjs",
       "sha256": "25014237d35707e1e215924f57d6fba6978ed9ff09dbaf1858fc1c5a75ea9bd1",
       "bytes": 1396050
+    },
+    {
+      "id": "pg",
+      "engine": "postgres",
+      "kind": "js",
+      "version": "8.23.1",
+      "delivery": "bundled",
+      "license": "MIT",
+      "file": "drivers/pg-8.23.1.mjs",
+      "sha256": "2107f5d6c8807080121b3eda94fad6e0638817a531ce0e0dce383faa13deec39",
+      "bytes": 184099
+    },
+    {
+      "id": "tedious",
+      "engine": "mssql",
+      "kind": "js",
+      "version": "20.3.9",
+      "delivery": "bundled",
+      "license": "MIT",
+      "file": "drivers/tedious-20.3.9.mjs",
+      "sha256": "a5c706d7d7978425adae42401f1253253278a8a97106c2253e102e88373d7d95",
+      "bytes": 3205301
+    },
+    {
+      "id": "oracledb-thin",
+      "engine": "oracle",
+      "kind": "js",
+      "version": "6.10.0",
+      "delivery": "bundled",
+      "license": "Apache-2.0 OR UPL-1.0",
+      "file": "drivers/oracledb-6.10.0.mjs",
+      "sha256": "f318509c3ab1fe27f449a3821c16f3786d55310d7263f3f531445a9ec7cbd53a",
+      "bytes": 1067679
     }
   ]
 }

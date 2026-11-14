@@ -24,7 +24,8 @@ import type { ConfigStore } from './config.js'
 import { DbError, errorMessage } from './errors.js'
 import type { DriverManager, ResolvedJdbcDriver } from './drivers.js'
 import type { JavaLocator } from './java.js'
-import { NativeMysqlService } from './native.js'
+import { NativeSqlService } from './native.js'
+import { nativeKindFor } from './db/catalog.js'
 import { DriverManager as NativeDriverManager } from './drivers/manager.js'
 import type { PluginPaths } from './paths.js'
 import type { SecretStore } from './secrets.js'
@@ -341,7 +342,7 @@ export class SqlService {
   private bridgeJavaPath = ''
   private bridgeStarting: Promise<BridgeClient> | undefined
   private readonly connected = new Map<string, Connected>()
-  private readonly native: NativeMysqlService
+  private readonly native: NativeSqlService
 
   constructor(
     private readonly paths: PluginPaths,
@@ -352,7 +353,7 @@ export class SqlService {
     private readonly log: (message: string) => void = () => {},
     nativeDrivers?: NativeDriverManager,
   ) {
-    this.native = new NativeMysqlService(paths, config, secrets, nativeDrivers ?? new NativeDriverManager(paths, log), log)
+    this.native = new NativeSqlService(paths, config, secrets, nativeDrivers ?? new NativeDriverManager(paths, log), log)
   }
 
   isConnected(connId: string): boolean {
@@ -369,7 +370,7 @@ export class SqlService {
 
   private isNative(connId: string): boolean {
     const connection = this.config.connection(connId)
-    return connection?.nativeEngine === true && connection.driver === 'mysql'
+    return connection?.nativeEngine === true && nativeKindFor(connection.driver) !== undefined
   }
 
   private requireConnection(connId: string): ConnectionConfig {

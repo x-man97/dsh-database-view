@@ -2,11 +2,12 @@
 
 [English](README.md) | **简体中文**
 
-> **状态：M0 垂直切片已完成。** 本仓库 fork 自
+> **状态：SQL Engine 已实现；M1/M2 预览已运行。** 本仓库 fork 自
 > [`qwq1999/dsh-ide-database`](https://github.com/qwq1999/dsh-ide-database)，正在改造成一个
 > Java-free、内置 SSH 隧道、驱动随包内置的 DSH 数据库插件。
-> 目前可用：包名/插件 ID 改名、原生 MySQL Engine、SSH 传输、内置 MySQL 驱动、连接 UI，以及通过现有右侧栏完成
-> Schema/表/DDL/查询。PostgreSQL/SQLite/SQL Server/Oracle、硬化和视觉验收仍在后面。
+> 目前可用：包名/插件 ID 改名、原生 MySQL/PostgreSQL/SQLite/SQL Server/Oracle Engine、SSH 传输、
+> 内置驱动 pack、连接 UI，以及通过现有右侧栏完成 Schema/表/DDL/查询。
+> MySQL、PostgreSQL、SQLite 已真实联调；SQL Server/Oracle 已实现但还需要真实实例验证。硬化和完整视觉验收仍在后面。
 
 `dsh-database-view` 是一个计划中的 DeepSeek Harness（DSH）插件：在右侧栏浏览数据库结构、预览表数据，
 风格接近 JetBrains Database 工具窗；同时提供只读的 Agent 工具，用于列出连接、描述表、执行有上限的

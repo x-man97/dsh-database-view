@@ -45,6 +45,8 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+const NATIVE_DRIVERS = new Set(['mysql', 'mariadb', 'postgres', 'sqlite', 'mssql', 'oracle'])
+
 export function ConnectionModal(props: ConnectionModalProps): ReactElement | null {
   const [choice, setChoice] = useState<string>('mysql')
   const [name, setName] = useState('')
@@ -135,8 +137,8 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
   const fileBased = preset?.hostOptional === true
   const dialect = isCustom ? customDriver?.dialect : preset?.dialect
   const isRedis = dialect === 'redis'
-  const supportsNativeMysql = !isCustom && choice === 'mysql'
-  const useNative = supportsNativeMysql && nativeEngine
+  const supportsNative = !isCustom && NATIVE_DRIVERS.has(choice)
+  const useNative = supportsNative && nativeEngine
 
   const driverOptions = [
     ...PRESET_ORDER.map((id) => ({
@@ -156,7 +158,8 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     }
     const spec = presetOf(value)
     if (spec) setPort(String(spec.defaultPort))
-    setNativeEngine(value === 'mysql')
+    setNativeEngine(NATIVE_DRIVERS.has(value))
+    if (value === 'sqlite') setSshEnabled(false)
   }
 
   const buildDraft = (): ConnectionDraft => ({
@@ -177,7 +180,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     // always keeps the stored value (the switch is disabled for existing rows).
     readOnly: editing ? editing.readOnly : readOnly,
     ...(useNative ? { nativeEngine: true } : {}),
-    ...(useNative && sshEnabled
+    ...(useNative && sshEnabled && !fileBased
       ? {
           ssh: {
             enabled: true as const,
@@ -190,8 +193,8 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
           },
         }
       : {}),
-    ...(useNative && sshEnabled && sshPassword !== '' ? { sshPassword } : {}),
-    ...(useNative && sshEnabled && sshPassphrase !== '' ? { sshPassphrase } : {}),
+    ...(useNative && sshEnabled && !fileBased && sshPassword !== '' ? { sshPassword } : {}),
+    ...(useNative && sshEnabled && !fileBased && sshPassphrase !== '' ? { sshPassphrase } : {}),
   })
 
   const validate = (draft: ConnectionDraft): string => {
@@ -204,7 +207,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     }
     if (hostOptional && draft.database === '') return '请填写数据库文件路径'
     if (isCustom && !customDriver) return '请选择或先新增一个自定义驱动'
-    if (useNative && sshEnabled) {
+    if (useNative && sshEnabled && !fileBased) {
       if (draft.ssh?.host === undefined || draft.ssh.host === '') return '请填写 SSH 主机'
       if (!Number.isInteger(draft.ssh.port) || draft.ssh.port < 1 || draft.ssh.port > 65535) return 'SSH 端口需在 1-65535 之间'
       if (draft.ssh.user === '') return '请填写 SSH 用户名'
@@ -300,12 +303,12 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
           <Field label="驱动" required span hint={dialect ? `方言：${dialectLabel(dialect)}` : undefined}>
             <Select options={driverOptions} value={choice} onValueChange={changeChoice} />
           </Field>
-          {supportsNativeMysql ? (
+          {supportsNative ? (
             <div className="dshdb-span-2 dshdb-list">
               <Switch
                 checked={nativeEngine}
                 onChange={setNativeEngine}
-                label="使用内置 MySQL 引擎（无需 Java；支持 SSH 隧道）"
+                label={fileBased ? '使用内置 SQLite 引擎（无需 Java）' : '使用内置引擎（无需 Java；支持 SSH 隧道）'}
               />
             </div>
           ) : null}
@@ -362,12 +365,12 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
               />
             </Field>
           )}
-          {useNative ? (
+          {useNative && !fileBased ? (
             <div className="dshdb-span-2 dshdb-list">
               <Switch checked={sshEnabled} onChange={setSshEnabled} label="通过 SSH 隧道连接" />
             </div>
           ) : null}
-          {useNative && sshEnabled ? (
+          {useNative && sshEnabled && !fileBased ? (
             <>
               <Field label="SSH 主机" required>
                 <TextInput value={sshHost} onChange={(event) => setSshHost(event.target.value)} placeholder="bastion.example.com" />

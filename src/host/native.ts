@@ -16,7 +16,7 @@ import type {
 } from '../shared/types.js'
 import type { ConfigStore } from './config.js'
 import type { DriverManager } from './drivers/manager.js'
-import { coreEngines } from './db/catalog.js'
+import { coreEngines, nativeKindFor } from './db/catalog.js'
 import { EngineRegistry } from './db/registry.js'
 import type { DatabaseEngine } from './db/types.js'
 import {
@@ -40,12 +40,22 @@ function probeId(): string {
   return `probe-${randomBytes(4).toString('hex')}`
 }
 
+function dialectFor(driver: string): ConnectionConfig['dialect'] {
+  switch (driver) {
+    case 'postgres': return 'postgres'
+    case 'sqlite': return 'sqlite'
+    case 'mssql': return 'mssql'
+    case 'oracle': return 'oracle'
+    default: return 'mysql'
+  }
+}
+
 function draftConfig(draft: ConnectionDraft, id: string): ConnectionConfig {
   return {
     id,
     name: draft.name,
-    driver: 'mysql',
-    dialect: 'mysql',
+    driver: draft.driver,
+    dialect: dialectFor(draft.driver),
     host: draft.host,
     port: draft.port,
     user: draft.user,
@@ -62,11 +72,11 @@ function draftConfig(draft: ConnectionDraft, id: string): ConnectionConfig {
 }
 
 /**
- * Transitional native MySQL service. It owns Java-free MySQL sessions and is
- * called by SqlService for connections with nativeEngine=true; JDBC remains in
- * place for the other presets until their engines land.
+ * Native SQL service. It owns Java-free sessions and is called by SqlService
+ * for connections with nativeEngine=true; JDBC remains in place for presets
+ * that are not migrated yet.
  */
-export class NativeMysqlService {
+export class NativeSqlService {
   private readonly sessions = new Map<string, Session>()
   private readonly engines = new EngineRegistry()
 
@@ -108,8 +118,13 @@ export class NativeMysqlService {
         const local = await transport.forwardTo(config.host, config.port)
         endpoint = { host: local.host, port: local.port }
       }
-      await this.drivers.ensure('mysql2')
-      const engine = this.engines.create('mysql')
+      const kind = nativeKindFor(config.driver)
+      if (kind === undefined) throw new DbError('unsupported', `该数据库尚未启用内置引擎：${config.driver}`)
+      if (config.driver === 'sqlite' && config.ssh !== undefined) throw new DbError('unsupported', 'SQLite 不支持 SSH 隧道')
+      const contribution = this.engines.get(kind)
+      if (contribution === undefined) throw new DbError('unsupported', `内置引擎未注册：${kind}`)
+      if (!contribution.descriptor.driverId.startsWith('node:')) await this.drivers.ensure(contribution.descriptor.driverId)
+      const engine = this.engines.create(kind)
       const server = await engine.connect({
         connection: config,
         endpoint,
@@ -165,7 +180,7 @@ export class NativeMysqlService {
   async connect(id: string): Promise<ServerInfo> {
     const config = this.config.connection(id)
     if (config === undefined) throw new DbError('not-found', `连接不存在：${id}`)
-    if (config.nativeEngine !== true || config.driver !== 'mysql') throw new DbError('unsupported', '该连接未启用内置 MySQL 引擎')
+    if (config.nativeEngine !== true || nativeKindFor(config.driver) === undefined) throw new DbError('unsupported', '该连接未启用内置引擎')
     const session = this.sessions.get(id)
     if (session !== undefined) return session.server
     const password = this.passwordFor(config)
