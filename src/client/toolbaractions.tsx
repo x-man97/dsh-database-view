@@ -7,28 +7,29 @@
  */
 import { useEffect, useState, type ReactElement } from 'react'
 import { orderToolbarActions, type ToolbarActionId } from '../shared/toolbaractions'
+import { t } from './i18n'
 import { EditIcon, PlusIcon, RecycleIcon, RefreshIcon, SettingsIcon, TerminalIcon, TrashIcon } from './icons'
 
-export const TOOLBAR_ACTION_LABEL: Record<ToolbarActionId, string> = {
-  add: '新增',
-  edit: '编辑',
-  refresh: '刷新',
-  delete: '删除',
-  console: '控制台',
-  trash: '回收站',
-  settings: '设置',
-}
+export const TOOLBAR_ACTION_LABEL = {
+  get add() { return t('app.add') },
+  get edit() { return t('app.edit') },
+  get refresh() { return t('app.refresh') },
+  get delete() { return t('app.delete') },
+  get console() { return t('app.console') },
+  get trash() { return t('app.trash') },
+  get settings() { return t('app.settings') },
+} as Record<ToolbarActionId, string>
 
 /** Tooltip / accessible name of each toolbar button. */
-export const TOOLBAR_ACTION_TITLE: Record<ToolbarActionId, string> = {
-  add: '新增数据源',
-  edit: '编辑选中的数据源',
-  refresh: '刷新选中的数据源',
-  delete: '删除选中的数据源',
-  console: '查询控制台',
-  trash: '回收站',
-  settings: '设置',
-}
+export const TOOLBAR_ACTION_TITLE = {
+  get add() { return t('app.addTitle') },
+  get edit() { return t('app.editTitle') },
+  get refresh() { return t('app.refreshTitle') },
+  get delete() { return t('app.deleteTitle') },
+  get console() { return t('app.consoleTitle') },
+  get trash() { return t('app.trashTitle') },
+  get settings() { return t('app.settingsTitle') },
+} as Record<ToolbarActionId, string>
 
 export function toolbarActionIcon(id: ToolbarActionId, size = 14): ReactElement {
   switch (id) {

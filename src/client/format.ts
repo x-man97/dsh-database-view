@@ -1,4 +1,5 @@
 import { DIALECT_LABEL } from '../shared/presets'
+import { t } from './i18n'
 import type { CellValue, Dialect, ObjectKind } from '../shared/types'
 
 export function dialectLabel(dialect: Dialect | undefined): string {
@@ -246,13 +247,7 @@ export function looksLikeRedisWrite(command: string): boolean {
 }
 
 export function objectKindLabel(kind: ObjectKind): string {
-  if (kind === 'table') return '表'
-  if (kind === 'view') return '视图'
-  if (kind === 'procedure') return '存储过程'
-  if (kind === 'function') return '函数'
-  if (kind === 'sequence') return '序列'
-  if (kind === 'trigger') return '触发器'
-  return '对象'
+  return t(`object.${kind === 'table' || kind === 'view' || kind === 'procedure' || kind === 'function' || kind === 'sequence' || kind === 'trigger' ? kind : 'other'}`)
 }
 
 export function stringifyJson(value: unknown): string {

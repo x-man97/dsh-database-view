@@ -9,6 +9,7 @@ import type {
 } from '../../shared/types'
 import { DIALECT_LABEL } from '../../shared/presets'
 import { relativeTime } from '../relativetime'
+import { t } from '../i18n'
 import { matchesFilteredObject, parseFilter } from '../treefilter'
 import { redisTtlLabel } from '../redisvalue'
 import { OBJECT_PAGE, objectWindow } from './objectlimit'
@@ -428,8 +429,8 @@ function appendSchema(context: BuildContext, connection: ClientConnection, schem
         pageKey: folderKey,
         label:
           pageWindow.hidden > OBJECT_PAGE
-            ? `再显示 ${OBJECT_PAGE} 个（还有 ${pageWindow.hidden} 个）`
-            : `显示剩余 ${pageWindow.hidden} 个`,
+            ? t('tree.showMore', { page: OBJECT_PAGE, hidden: pageWindow.hidden })
+            : t('tree.showRest', { hidden: pageWindow.hidden }),
       })
     }
   }
@@ -471,11 +472,11 @@ function appendObject(
   if (!open) return
 
   if (loading && description === undefined) {
-    note(rows, `${objectKey}#loading`, '正在读取结构…', 4, true)
+    note(rows, `${objectKey}#loading`, t('tree.loadingStructure'), 4, true)
     return
   }
   if (!loading && description === undefined) {
-    note(rows, `${objectKey}#offline`, '未连接数据源，连接后可查看结构', 4)
+    note(rows, `${objectKey}#offline`, t('tree.offline'), 4)
     return
   }
   if (description === undefined) return
@@ -496,7 +497,7 @@ function appendObject(
     connectionId: connection.id,
     schema: schema.name,
     object,
-    label: '列',
+    label: t('tree.columns'),
     meta: String(description.columns.length),
     count: description.columns.length,
   })
@@ -539,7 +540,7 @@ function appendObject(
       connectionId: connection.id,
       schema: schema.name,
       object,
-      label: '键',
+      label: t('tree.keys'),
       meta: String(keys.length),
       count: keys.length,
     })
@@ -557,7 +558,7 @@ function appendObject(
           connectionId: connection.id,
           schema: schema.name,
           object,
-          label: index.primary ? '主键' : index.name,
+          label: index.primary ? t('tree.primaryKey') : index.name,
           meta: index.columns.join(', '),
         })
       }
@@ -581,7 +582,7 @@ function appendObject(
       connectionId: connection.id,
       schema: schema.name,
       object,
-      label: '索引',
+      label: t('tree.indexes'),
       meta: String(description.indexes.length),
       count: description.indexes.length,
     })

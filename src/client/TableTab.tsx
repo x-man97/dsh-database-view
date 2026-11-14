@@ -980,39 +980,39 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const exportGroups: MenuGroupSpec[] = [
     {
       id: 'page',
-      label: '导出当前页',
+      label: t('table.export.page'),
       leaves: [
-        { id: 'page-csv', label: `当前页 CSV（${formatCount(rows.length)} 行）`, onSelect: () => void exportRows('csv', 'page') },
-        { id: 'page-json', label: `当前页 JSON（${formatCount(rows.length)} 行）`, onSelect: () => void exportRows('json', 'page') },
-        { id: 'page-sql', label: `当前页 SQL（${formatCount(rows.length)} 行）`, onSelect: () => void exportRows('sql', 'page') },
-        { id: 'page-md', label: `当前页 Markdown（${formatCount(rows.length)} 行）`, onSelect: () => void exportRows('md', 'page') },
+        { id: 'page-csv', label: `${t('table.export.page')} CSV (${formatCount(rows.length)} ${t('table.rows')})`, onSelect: () => void exportRows('csv', 'page') },
+        { id: 'page-json', label: `${t('table.export.page')} JSON (${formatCount(rows.length)} ${t('table.rows')})`, onSelect: () => void exportRows('json', 'page') },
+        { id: 'page-sql', label: `${t('table.export.page')} SQL (${formatCount(rows.length)} ${t('table.rows')})`, onSelect: () => void exportRows('sql', 'page') },
+        { id: 'page-md', label: `${t('table.export.page')} Markdown (${formatCount(rows.length)} ${t('table.rows')})`, onSelect: () => void exportRows('md', 'page') },
       ],
     },
     ...(selectedRows.size > 0
       ? [
           {
             id: 'selected',
-            label: '导出已选',
+            label: t('table.export.selected'),
             leaves: [
-              { id: 'selected-csv', label: `已选 CSV（${selectedRows.size} 行）`, onSelect: () => exportSelected('csv') },
-              { id: 'selected-json', label: `已选 JSON（${selectedRows.size} 行）`, onSelect: () => exportSelected('json') },
-              { id: 'selected-sql', label: `已选 SQL（${selectedRows.size} 行）`, onSelect: () => exportSelected('sql') },
-              { id: 'selected-md', label: `已选 Markdown（${selectedRows.size} 行）`, onSelect: () => exportSelected('md') },
+              { id: 'selected-csv', label: `${t('table.export.selected')} CSV (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('csv') },
+              { id: 'selected-json', label: `${t('table.export.selected')} JSON (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('json') },
+              { id: 'selected-sql', label: `${t('table.export.selected')} SQL (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('sql') },
+              { id: 'selected-md', label: `${t('table.export.selected')} Markdown (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('md') },
             ],
           },
         ]
       : []),
     {
       id: 'copy-page',
-      label: '复制当前页',
+      label: t('table.copy.page'),
       leaves: [
-        { id: 'copy-page-md', label: '复制当前页 Markdown', onSelect: () => void copyText(toMarkdown(displayColumns, rows)).then(noteCopied('Markdown')) },
-        { id: 'copy-page-csv', label: '复制当前页 CSV', onSelect: () => void copyText(toCsv(displayColumns, rows)).then(noteCopied('CSV')) },
-        { id: 'copy-page-tsv', label: '复制当前页 TSV', onSelect: () => void copyText(toTsv(displayColumns, rows)).then(noteCopied('TSV')) },
-        { id: 'copy-page-json', label: '复制当前页 JSON', onSelect: () => void copyText(toJson(displayColumns, rows)).then(noteCopied('JSON')) },
+        { id: 'copy-page-md', label: `${t('table.copy.page')} Markdown`, onSelect: () => void copyText(toMarkdown(displayColumns, rows)).then(noteCopied('Markdown')) },
+        { id: 'copy-page-csv', label: `${t('table.copy.page')} CSV`, onSelect: () => void copyText(toCsv(displayColumns, rows)).then(noteCopied('CSV')) },
+        { id: 'copy-page-tsv', label: `${t('table.copy.page')} TSV`, onSelect: () => void copyText(toTsv(displayColumns, rows)).then(noteCopied('TSV')) },
+        { id: 'copy-page-json', label: `${t('table.copy.page')} JSON`, onSelect: () => void copyText(toJson(displayColumns, rows)).then(noteCopied('JSON')) },
         {
           id: 'copy-page-sql',
-          label: '复制当前页 SQL',
+          label: `${t('table.copy.page')} SQL`,
           onSelect: () =>
             void copyText(insertStatements(connection?.dialect ?? 'mysql', params.schema, params.table, displayColumns, rows)).then(noteCopied('SQL')),
         },
@@ -1022,20 +1022,20 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
       ? [
           {
             id: 'copy-selected',
-            label: '复制已选',
+            label: t('table.copy.selected'),
             leaves: [
-              { id: 'copy-selected-md', label: '复制已选 Markdown', onSelect: () => copySelected('md') },
-              { id: 'copy-selected-csv', label: '复制已选 CSV', onSelect: () => copySelected('csv') },
-              { id: 'copy-selected-tsv', label: '复制已选 TSV', onSelect: () => copySelected('tsv') },
-              { id: 'copy-selected-json', label: '复制已选 JSON', onSelect: () => copySelected('json') },
-              { id: 'copy-selected-sql', label: '复制已选 SQL', onSelect: () => copySelected('sql') },
+              { id: 'copy-selected-md', label: `${t('table.copy.selected')} Markdown`, onSelect: () => copySelected('md') },
+              { id: 'copy-selected-csv', label: `${t('table.copy.selected')} CSV`, onSelect: () => copySelected('csv') },
+              { id: 'copy-selected-tsv', label: `${t('table.copy.selected')} TSV`, onSelect: () => copySelected('tsv') },
+              { id: 'copy-selected-json', label: `${t('table.copy.selected')} JSON`, onSelect: () => copySelected('json') },
+              { id: 'copy-selected-sql', label: `${t('table.copy.selected')} SQL`, onSelect: () => copySelected('sql') },
             ],
           },
         ]
       : []),
     {
       id: 'all',
-      label: '导出全部',
+      label: t('table.export.all'),
       leaves: [
         { id: 'all-csv', label: '全部 CSV', onSelect: () => void exportRows('csv', 'all') },
         { id: 'all-json', label: '全部 JSON', onSelect: () => void exportRows('json', 'all') },
@@ -1455,7 +1455,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
       )}
 
       <div className="dshdb-pager">
-        {loading ? <Tag tone="business">查询中</Tag> : null}
+        {loading ? <Tag tone="business">{t('table.querying')}</Tag> : null}
         {sqlText !== '' ? (
           <>
             <span className="dshdb-pager-sql" title={sqlText}>
@@ -1476,8 +1476,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <button
           type="button"
           className="dshdb-pager-btn"
-          title="第一页"
-          aria-label="第一页"
+          title={t('table.first')}
+          aria-label={t('table.first')}
           onClick={() => apply({ page: 0 })}
           disabled={!hasPrevious || loading}
         >
@@ -1486,8 +1486,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <button
           type="button"
           className="dshdb-pager-btn"
-          title="上一页"
-          aria-label="上一页"
+          title={t('table.previous')}
+          aria-label={t('table.previous')}
           onClick={() => apply({ page: Math.max(page - 1, 0) })}
           disabled={!hasPrevious || loading}
         >
@@ -1502,7 +1502,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
             type="number"
             min={1}
             inputMode="numeric"
-            aria-label="页码"
+            aria-label={t('table.page')}
             title="输入页码后回车跳到该页"
             value={pageDraft}
             disabled={loading}
@@ -1517,7 +1517,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         </span>
         <select
           className="dshdb-select dshdb-select-inline dshdb-pager-size"
-          aria-label="每页行数"
+          aria-label={t('table.rowsPerPage')}
           value={String(pageSize)}
           disabled={loading}
           onChange={(event) => {
@@ -1534,14 +1534,14 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           ))}
         </select>
         {countUnknown ? (
-          <Tag tone="warn" title="行数统计失败（可能是权限或超时），页码只能按已取到的行数往后翻">行数未知</Tag>
+          <Tag tone="warn" title="行数统计失败（可能是权限或超时），页码只能按已取到的行数往后翻">{t('table.unknownCount')}</Tag>
         ) : null}
         <span className="dshdb-pager-total">{totalText}</span>
         <button
           type="button"
           className="dshdb-pager-btn"
-          title="下一页"
-          aria-label="下一页"
+          title={t('table.next')}
+          aria-label={t('table.next')}
           onClick={() => apply({ page: page + 1 })}
           disabled={!hasNext || loading}
         >
@@ -1550,8 +1550,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <button
           type="button"
           className="dshdb-pager-btn"
-          title="最后一页"
-          aria-label="最后一页"
+          title={t('table.last')}
+          aria-label={t('table.last')}
           onClick={() => apply({ page: lastPage ?? page })}
           disabled={lastPage === undefined || loading || page >= lastPage}
         >

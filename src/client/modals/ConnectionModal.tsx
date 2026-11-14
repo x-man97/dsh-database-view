@@ -327,28 +327,28 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
           ) : null}
           {supportsSsh && sshEnabled ? (
             <>
-              <Field label="SSH 主机" required>
+              <Field label={t('conn.sshHost')} required>
                 <TextInput value={sshHost} onChange={(event) => setSshHost(event.target.value)} placeholder="bastion.example.com" />
               </Field>
-              <Field label="SSH 端口" required>
+              <Field label={t('conn.sshPort')} required>
                 <TextInput value={sshPort} inputMode="numeric" onChange={(event) => setSshPort(event.target.value.replace(/[^0-9]/g, ''))} />
               </Field>
-              <Field label="SSH 用户名" required>
+              <Field label={t('conn.sshUser')} required>
                 <TextInput value={sshUser} onChange={(event) => setSshUser(event.target.value)} placeholder="ops" />
               </Field>
-              <Field label="SSH 认证">
+              <Field label={t('conn.sshAuth')}>
                 <Select
                   value={sshAuth}
                   options={[
-                    { value: 'password', label: '密码' },
-                    { value: 'key', label: '私钥' },
-                    { value: 'agent', label: 'ssh-agent' },
+                    { value: 'password', label: t('conn.authPassword') },
+                    { value: 'key', label: t('conn.authKey') },
+                    { value: 'agent', label: t('conn.authAgent') },
                   ]}
                   onValueChange={(value) => setSshAuth(value as 'password' | 'key' | 'agent')}
                 />
               </Field>
               {sshAuth === 'password' ? (
-                <Field label="SSH 密码" hint={editing?.hasSshPassword ? '已保存，留空则保持不变' : undefined}>
+                <Field label={t('conn.sshPassword')} hint={editing?.hasSshPassword ? '已保存，留空则保持不变' : undefined}>
                   <TextInput
                     type="password"
                     value={sshPassword}
@@ -360,10 +360,10 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
               ) : null}
               {sshAuth === 'key' ? (
                 <>
-                  <Field label="私钥路径" required>
+                  <Field label={t('conn.privateKey')} required>
                     <TextInput value={sshKeyPath} onChange={(event) => setSshKeyPath(event.target.value)} placeholder="~/.ssh/id_ed25519" />
                   </Field>
-                  <Field label="私钥口令">
+                  <Field label={t('conn.passphrase')}>
                     <TextInput
                       type="password"
                       value={sshPassphrase}
@@ -387,18 +387,18 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
                 <Select
                   value={tlsMode}
                   options={[
-                    { value: 'verify-full', label: 'verify-full（校验证书与主机名）' },
-                    { value: 'verify-ca', label: 'verify-ca（校验证书，不校验主机名）' },
-                    { value: 'require', label: 'require（只加密，不校验证书）' },
+                    { value: 'verify-full', label: t('conn.tlsVerifyFull') },
+                    { value: 'verify-ca', label: t('conn.tlsVerifyCa') },
+                    { value: 'require', label: t('conn.tlsRequire') },
                   ]}
                   onValueChange={(value) => setTlsMode(value as 'verify-full' | 'verify-ca' | 'require')}
                 />
               </Field>
-              <Field label="CA 证书路径" hint="留空使用系统 CA">
+              <Field label={t('conn.caPath')} hint={t('conn.caHint')}>
                 <TextInput value={tlsCaPath} onChange={(event) => setTlsCaPath(event.target.value)} placeholder="~/.dsh/certs/ca.pem" />
               </Field>
               <div className="dshdb-span-2 dshdb-list">
-                <Switch checked={tlsAllowInvalid} onChange={setTlsAllowInvalid} label="允许无效主机名（仅测试环境，不安全）" />
+                <Switch checked={tlsAllowInvalid} onChange={setTlsAllowInvalid} label={t('conn.allowInvalid')} />
               </div>
             </>
           ) : null}

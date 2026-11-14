@@ -53,12 +53,12 @@ function ShortcutRow(props: {
     }
     const next = bindingFromEvent(event)
     if (next === null) {
-      setProblem('要带 Ctrl/⌘ 或 Alt，功能键（F1–F12）可以单独用')
+      setProblem(t('shortcut.invalid'))
       return
     }
     const taken = conflictingShortcut(def.id, next, overrides)
     if (taken !== null) {
-      setProblem(`与「${shortcutDef(taken).label}」冲突`)
+      setProblem(t('shortcut.conflict', { label: t(`shortcut.${taken}`) }))
       return
     }
     setProblem('')
@@ -70,13 +70,13 @@ function ShortcutRow(props: {
   return (
     <div className="dshdb-driver-row">
       <div className="dshdb-driver-main">
-        <div className="dshdb-driver-name">{def.label}</div>
+        <div className="dshdb-driver-name">{t(`shortcut.${def.id}`)}</div>
         {problem !== '' ? <div className="dshdb-field-error">{problem}</div> : null}
       </div>
       <TextInput
         readOnly
         style={{ width: 168, textAlign: 'center' }}
-        aria-label={`${def.label} 的快捷键`}
+        aria-label={t(`shortcut.${def.id}`)}
         title="点一下再按新的组合键（Esc 取消，Delete 恢复默认）"
         value={recording ? '按下组合键…' : formatBinding(binding, IS_MAC)}
         onFocus={() => {
@@ -222,12 +222,10 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
         }
         bodyClassName="dshdb-panel-body-pad"
       >
-        <div className="dshdb-muted" style={{ fontSize: 11.5, lineHeight: 1.6 }}>
-          点一下组合键框，再按下新的组合键即可（Esc 取消，Delete 恢复这一项的默认）。组合键要带 Ctrl/⌘ 或 Alt，功能键可以单独用；同一区域里不能重复，改完点「保存」。
-        </div>
+        <div className="dshdb-muted" style={{ fontSize: 11.5, lineHeight: 1.6 }}>{t('shortcut.hint')}</div>
         {SHORTCUT_SCOPES.map((scope) => (
           <div key={scope} style={{ marginTop: 8 }}>
-            <div className="dshdb-qfilter-label">{SHORTCUT_SCOPE_LABEL[scope]}</div>
+            <div className="dshdb-qfilter-label">{t(`shortcut.scope.${scope}`)}</div>
             <div className="dshdb-list">
               {SHORTCUTS.filter((def) => def.scope === scope).map((def) => (
                 <ShortcutRow
