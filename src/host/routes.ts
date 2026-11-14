@@ -26,6 +26,7 @@ import type {
 } from '../shared/types.js'
 import type { ConfigStore } from './config.js'
 import type { DriverManager } from './drivers.js'
+import type { DriverManager as NativeDriverManager } from './drivers/manager.js'
 import { DbError, toWireError } from './errors.js'
 import type { JavaLocator } from './java.js'
 import type { JreManager } from './jre.js'
@@ -46,6 +47,7 @@ export interface RouteDeps {
   config: ConfigStore
   secrets: SecretStore
   drivers: DriverManager
+  nativeDrivers?: NativeDriverManager
   java: JavaLocator
   jre: JreManager
   sql: SqlService
@@ -229,6 +231,7 @@ async function handle(deps: RouteDeps, request: IncomingMessage, response: Serve
         data: {
           config: deps.config.snapshot(),
           drivers: deps.drivers.statuses(),
+          driverPacks: deps.nativeDrivers?.list() ?? [],
           env: envStatus(deps),
           prefetch: deps.prefetch?.progress() ?? [],
         },
@@ -248,7 +251,10 @@ async function handle(deps: RouteDeps, request: IncomingMessage, response: Serve
       // new settings. Renaming alone keeps the cache (offline browsing works).
       if (previous !== undefined) {
         const credentialsChanged =
-          (typeof data.password === 'string' && data.password !== '') || data.clearPassword === true
+          (typeof data.password === 'string' && data.password !== '') ||
+          (typeof data.sshPassword === 'string' && data.sshPassword !== '') ||
+          (typeof data.sshPassphrase === 'string' && data.sshPassphrase !== '') ||
+          data.clearPassword === true
         const targetChanged =
           previous.driver !== saved.driver ||
           previous.customDriverId !== saved.customDriverId ||
@@ -258,7 +264,10 @@ async function handle(deps: RouteDeps, request: IncomingMessage, response: Serve
           previous.database !== saved.database ||
           previous.redisDb !== saved.redisDb ||
           previous.readOnly !== saved.readOnly ||
-          JSON.stringify(previous.params) !== JSON.stringify(saved.params)
+          previous.nativeEngine !== saved.nativeEngine ||
+          JSON.stringify(previous.params) !== JSON.stringify(saved.params) ||
+          JSON.stringify(previous.ssh) !== JSON.stringify(saved.ssh) ||
+          JSON.stringify(previous.tls) !== JSON.stringify(saved.tls)
         if (credentialsChanged || targetChanged) {
           deps.prefetch?.cancel(saved.id)
           await deps.sql.disconnect(saved.id)
@@ -583,6 +592,18 @@ async function handle(deps: RouteDeps, request: IncomingMessage, response: Serve
       // A freshly unpacked runtime has to win over the cached "missing" result.
       deps.java.invalidate()
       sendJson(response, 200, { ok: true, data: envStatus(deps) })
+      return
+    }
+    case '/drivers/packs/list': {
+      sendJson(response, 200, { ok: true, data: { drivers: deps.nativeDrivers?.list() ?? [] } })
+      return
+    }
+    case '/drivers/packs/download': {
+      const driverId = typeof data.driverId === 'string' ? data.driverId : ''
+      if (driverId === '') throw new DbError('invalid', '缺少 driverId')
+      if (deps.nativeDrivers === undefined) throw new DbError('unsupported', '未启用内置驱动管理')
+      const status = await deps.nativeDrivers.download(driverId)
+      sendJson(response, 200, { ok: true, data: status })
       return
     }
     case '/drivers/download': {

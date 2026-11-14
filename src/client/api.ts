@@ -9,6 +9,7 @@ import type {
   DdlResult,
   DescribeResult,
   DriverConfig,
+  DriverPackStatus,
   DriverStatus,
   EnvStatus,
   ExplainResult,
@@ -71,6 +72,7 @@ async function post<T>(path: string, body: unknown = {}): Promise<T> {
 export interface StatusSnapshot {
   config: ClientConfig
   drivers: DriverStatus[]
+  driverPacks: DriverPackStatus[]
   env: EnvStatus
   /** Background description walks currently running on the host. */
   prefetch: PrefetchProgress[]
@@ -137,6 +139,7 @@ export const api = {
     post<RedisCommandResult>('/redis/command', { id, command, allowWrite, ...(db === undefined ? {} : { db }) }),
 
   downloadDriver: (driverId: string) => post<DriverStatus>('/drivers/download', { driverId }),
+  downloadDriverPack: (driverId: string) => post<DriverPackStatus>('/drivers/packs/download', { driverId }),
   /** Downloads and unpacks a JRE into the data directory; resolves with the refreshed env. */
   downloadJava: () => post<EnvStatus>('/java/download'),
   saveCustomDriver: (driver: Partial<DriverConfig> & { jars?: unknown }) =>

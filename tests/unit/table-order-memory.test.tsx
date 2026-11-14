@@ -58,7 +58,7 @@ const settings = {
 }
 
 const tab = () => ({ tab: { navigation: { params: { connectionId: 'mysql-1', schema: 'shop', table: 'orders' } } } })
-const ORDER_KEY = 'dsh-ide-database.table-order.v1:shop.orders'
+const ORDER_KEY = 'dsh-database-view.table-order.v1:shop.orders'
 
 function pageSqls(): string[] {
   return mocks.query.mock.calls

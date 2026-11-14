@@ -19,8 +19,8 @@ export interface HistoryEntry {
   elapsedMs?: number
 }
 
-const KEY = 'dsh-ide-database.history.v1'
-const PIN_KEY = 'dsh-ide-database.history.pinned.v1'
+const KEY = 'dsh-database-view.history.v1'
+const PIN_KEY = 'dsh-database-view.history.pinned.v1'
 const LIMIT = 50
 const PIN_LIMIT = 20
 

@@ -111,7 +111,7 @@ describe('column filter row focus', () => {
   })
 
   it('opens the filter row again on the next visit', async () => {
-    window.localStorage.setItem('dsh-ide-database.table.filters-open.v1', '1')
+    window.localStorage.setItem('dsh-database-view.table.filters-open.v1', '1')
     render(
       <TableTab useTabInfo={() => ({ tab: { navigation: { params: { connectionId: 'mysql-1', schema: 'shop', table: 'orders' } } } })} />,
     )

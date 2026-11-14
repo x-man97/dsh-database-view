@@ -3,13 +3,13 @@
  *
  * The popup floats names the user picked before above equally good matches; the
  * list is small, stays on this machine (localStorage) and is never sent
- * anywhere. The debug switch (`dsh-ide-database:completion-debug` = '1') only
+ * anywhere. The debug switch (`dsh-database-view:completion-debug` = '1') only
  * turns on local console.debug timing lines for development.
  */
 
-const STORAGE_KEY = 'dsh-ide-database:completion-history'
-const FREQUENCY_KEY = 'dsh-ide-database:completion-frequency'
-const DEBUG_KEY = 'dsh-ide-database:completion-debug'
+const STORAGE_KEY = 'dsh-database-view:completion-history'
+const FREQUENCY_KEY = 'dsh-database-view:completion-frequency'
+const DEBUG_KEY = 'dsh-database-view:completion-debug'
 /** Enough for the usual handful of tables without turning into a log. */
 const MAX_ENTRIES = 100
 /** Pick counts for the names actually used, capped so the map stays small. */

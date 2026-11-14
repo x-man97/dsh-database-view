@@ -29,7 +29,7 @@ describe('tableDumpText', () => {
   it('writes a header, the CREATE statement and one INSERT per row', () => {
     const text = tableDumpText(dump())
     const lines = text.split(LF)
-    expect(lines.slice(0, 2)).toEqual(['-- shop.orders', '-- 由 dsh-ide-database 导出'])
+    expect(lines.slice(0, 2)).toEqual(['-- shop.orders', '-- 由 dsh-database-view 导出'])
     expect(text).toContain('CREATE TABLE `orders` (')
     expect(text).toContain('PRIMARY KEY (`id`)')
     expect(text).toContain(');')

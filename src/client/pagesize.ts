@@ -9,8 +9,8 @@
 
 import { readAllowedNumber, writeNumber } from './prefs'
 
-export const CONSOLE_PAGE_KEY = 'dsh-ide-database.page-size.console.v1'
-export const TABLE_PAGE_KEY = 'dsh-ide-database.page-size.table.v1'
+export const CONSOLE_PAGE_KEY = 'dsh-database-view.page-size.console.v1'
+export const TABLE_PAGE_KEY = 'dsh-database-view.page-size.table.v1'
 
 /** The stored size when it is still one of the offered values, else fallback. */
 export function readPageSize(key: string, allowed: readonly number[], fallback: number): number {

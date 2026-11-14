@@ -97,7 +97,15 @@ export class SecretStore {
 
   /** New connections get a stable, env-safe variable name derived from their id. */
   static nameForConnection(connectionId: string): string {
-    return `DSH_IDE_DB_${connectionId.replace(/[^A-Za-z0-9]/g, '_').toUpperCase()}`
+    return `DSH_DB_${connectionId.replace(/[^A-Za-z0-9]/g, '_').toUpperCase()}`
+  }
+
+  static nameForSshPassword(connectionId: string): string {
+    return `DSH_DB_SSH_PASSWORD_${connectionId.replace(/[^A-Za-z0-9]/g, '_').toUpperCase()}`
+  }
+
+  static nameForSshPassphrase(connectionId: string): string {
+    return `DSH_DB_SSH_PASSPHRASE_${connectionId.replace(/[^A-Za-z0-9]/g, '_').toUpperCase()}`
   }
 
   describe(): { dataDirFile: string; mode: string; entries: number } {

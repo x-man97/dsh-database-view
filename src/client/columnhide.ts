@@ -7,7 +7,7 @@
  */
 import type { CellValue, ColumnInfo, Row } from '../shared/types'
 
-export const HIDDEN_STORAGE_PREFIX = 'dsh-ide-database.hidden.v1:'
+export const HIDDEN_STORAGE_PREFIX = 'dsh-database-view.hidden.v1:'
 
 export function isHidden(hidden: string[] | null, name: string): boolean {
   return hidden !== null && hidden.includes(name)

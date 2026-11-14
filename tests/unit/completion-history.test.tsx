@@ -9,9 +9,9 @@ import {
   rememberCompletion,
 } from '../../src/client/completionhistory'
 
-const HISTORY_KEY = 'dsh-ide-database:completion-history'
-const FREQUENCY_KEY = 'dsh-ide-database:completion-frequency'
-const DEBUG_KEY = 'dsh-ide-database:completion-debug'
+const HISTORY_KEY = 'dsh-database-view:completion-history'
+const FREQUENCY_KEY = 'dsh-database-view:completion-frequency'
+const DEBUG_KEY = 'dsh-database-view:completion-debug'
 
 describe('completion history', () => {
   beforeEach(() => localStorage.clear())

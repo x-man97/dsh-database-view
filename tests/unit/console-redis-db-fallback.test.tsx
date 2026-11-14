@@ -23,7 +23,7 @@ vi.mock('../../src/client/api', () => ({
 import { ConsoleTab } from '../../src/client/ConsoleTab'
 import { waitForConsoleSource } from '../stubs/console-ready'
 
-const KEY = 'dsh-ide-database.redis-db.v1:redis-1'
+const KEY = 'dsh-database-view.redis-db.v1:redis-1'
 
 beforeEach(() => {
   window.localStorage.clear()

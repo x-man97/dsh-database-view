@@ -11,7 +11,7 @@ import { readText, writeText } from '../prefs'
 import { orderById } from '../dragorder'
 
 /** Remembered so reopening the panel lands on the same data source. */
-const LAST_CONNECTION_KEY = 'dsh-ide-database.last-connection.v1'
+const LAST_CONNECTION_KEY = 'dsh-database-view.last-connection.v1'
 import type {
   ClientConnection,
   ClientTrashedConnection,
@@ -132,8 +132,8 @@ export interface DataSources {
   dismissSetupError: () => void
 }
 
-const VISIBLE_SCHEMAS_KEY = 'dsh-ide-database:visible-schemas:'
-const VISIBLE_REDIS_DBS_KEY = 'dsh-ide-database:visible-redis-dbs:'
+const VISIBLE_SCHEMAS_KEY = 'dsh-database-view:visible-schemas:'
+const VISIBLE_REDIS_DBS_KEY = 'dsh-database-view:visible-redis-dbs:'
 
 function readStoredList(key: string): string[] | null {
   try {

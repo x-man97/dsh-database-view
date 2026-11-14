@@ -38,7 +38,7 @@ const settings = {
   confirmDestructive: false,
 }
 
-const KEY = 'dsh-ide-database.schema.v1:mysql-1'
+const KEY = 'dsh-database-view.schema.v1:mysql-1'
 
 beforeEach(() => {
   window.localStorage.clear()

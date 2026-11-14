@@ -2,7 +2,7 @@ import { build } from 'esbuild'
 import { mkdir, writeFile } from 'node:fs/promises'
 
 const banner = `window.__ModuleLoader__.load({
-  id: "dsh-ide-database",
+  id: "dsh-database-view",
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;

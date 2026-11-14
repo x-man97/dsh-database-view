@@ -24,6 +24,8 @@ import type { ConfigStore } from './config.js'
 import { DbError, errorMessage } from './errors.js'
 import type { DriverManager, ResolvedJdbcDriver } from './drivers.js'
 import type { JavaLocator } from './java.js'
+import { NativeMysqlService } from './native.js'
+import { DriverManager as NativeDriverManager } from './drivers/manager.js'
 import type { PluginPaths } from './paths.js'
 import type { SecretStore } from './secrets.js'
 
@@ -339,6 +341,7 @@ export class SqlService {
   private bridgeJavaPath = ''
   private bridgeStarting: Promise<BridgeClient> | undefined
   private readonly connected = new Map<string, Connected>()
+  private readonly native: NativeMysqlService
 
   constructor(
     private readonly paths: PluginPaths,
@@ -347,18 +350,26 @@ export class SqlService {
     private readonly drivers: DriverManager,
     private readonly java: JavaLocator,
     private readonly log: (message: string) => void = () => {},
-  ) {}
+    nativeDrivers?: NativeDriverManager,
+  ) {
+    this.native = new NativeMysqlService(paths, config, secrets, nativeDrivers ?? new NativeDriverManager(paths, log), log)
+  }
 
   isConnected(connId: string): boolean {
-    return this.connected.has(connId)
+    return this.connected.has(connId) || this.native.isConnected(connId)
   }
 
   connectedIds(): string[] {
-    return [...this.connected.keys()]
+    return [...new Set([...this.connected.keys(), ...this.native.connectedIds()])]
   }
 
   serverOf(connId: string): ServerInfo | undefined {
-    return this.connected.get(connId)?.server
+    return this.connected.get(connId)?.server ?? this.native.serverOf(connId)
+  }
+
+  private isNative(connId: string): boolean {
+    const connection = this.config.connection(connId)
+    return connection?.nativeEngine === true && connection.driver === 'mysql'
   }
 
   private requireConnection(connId: string): ConnectionConfig {
@@ -445,7 +456,7 @@ export class SqlService {
       case 'postgres':
         // PostgreSQL measures connectTimeout in seconds, matching our setting.
         props.connectTimeout ??= String(settings.connectTimeoutSec)
-        props.ApplicationName ??= 'dsh-ide-database'
+        props.ApplicationName ??= 'dsh-database-view'
         break
       default:
         break
@@ -454,6 +465,7 @@ export class SqlService {
   }
 
   async test(draft: ConnectionDraft): Promise<ConnectionTestResult> {
+    if (draft.nativeEngine === true) return this.native.test(draft)
     const started = Date.now()
     const syntheticId = typeof draft.id === 'string' && draft.id !== '' ? draft.id : `probe-${randomBytes(3).toString('hex')}`
     const existing = this.config.connection(syntheticId)
@@ -510,6 +522,7 @@ export class SqlService {
   }
 
   async connect(connId: string): Promise<ServerInfo> {
+    if (this.isNative(connId)) return this.native.connect(connId)
     const connection = this.requireConnection(connId)
     const driver = this.drivers.resolveDriver(connection.driver, connection.customDriverId)
     this.drivers.assertJarsPresent(driver)
@@ -542,6 +555,10 @@ export class SqlService {
   }
 
   async disconnect(connId: string): Promise<void> {
+    if (this.isNative(connId) || this.native.isConnected(connId)) {
+      await this.native.disconnect(connId)
+      return
+    }
     this.connected.delete(connId)
     if (this.bridge === undefined) return
     await this.bridge.request('disconnect', { connId }, 15_000).catch(() => undefined)
@@ -554,6 +571,7 @@ export class SqlService {
   }
 
   async schemas(connId: string, filter = ''): Promise<SchemaInfo[]> {
+    if (this.isNative(connId)) return this.native.schemas(connId, filter)
     this.requireConnected(connId)
     const bridge = await this.ensureBridge()
     const reply = await bridge.request<{ schemas?: SchemaInfo[] }>('schemas', { connId, filter }, 60_000)
@@ -562,6 +580,7 @@ export class SqlService {
   }
 
   async objects(connId: string, schema: string): Promise<SchemaObject[]> {
+    if (this.isNative(connId)) return this.native.objects(connId, schema)
     this.requireConnected(connId)
     const bridge = await this.ensureBridge()
     const reply = await bridge.request<{ objects?: SchemaObject[] }>('objects', { connId, schema }, 60_000)
@@ -570,12 +589,14 @@ export class SqlService {
   }
 
   async setSchema(connId: string, schema: string): Promise<void> {
+    if (this.isNative(connId)) return this.native.setSchema(connId, schema)
     this.requireConnected(connId)
     const bridge = await this.ensureBridge()
     await bridge.request('setSchema', { connId, schema }, 30_000)
   }
 
   async describe(connId: string, schema: string, table: string, kind: ObjectKind = 'table'): Promise<TableDescription> {
+    if (this.isNative(connId)) return this.native.describe(connId, schema, table, kind)
     this.requireConnected(connId)
     // Columns/indexes only exist for relations; routines, sequences and triggers
     // are listed in the tree but have no table structure to read.
@@ -604,6 +625,7 @@ export class SqlService {
    * reconstruct from).
    */
   async ddl(connId: string, dialect: SqlDialect, schema: string, table: string, kind: ObjectKind = 'table'): Promise<DdlResult> {
+    if (this.isNative(connId)) return this.native.ddl(connId, schema, table, kind)
     this.requireConnected(connId)
     const supported: ObjectKind[] = ['table', 'view', 'procedure', 'function', 'sequence', 'trigger']
     if (!supported.includes(kind)) {
@@ -709,6 +731,7 @@ export class SqlService {
 
   /** Fetch the execution plan (EXPLAIN) of a statement without running it. */
   async explain(connId: string, statement: string, options: QueryOptions = {}): Promise<ExplainResult> {
+    if (this.isNative(connId)) return this.native.explain(connId, statement)
     const connection = this.requireConnection(connId)
     if (connection.dialect === 'redis') {
       throw new DbError('unsupported', 'Redis 连接没有执行计划')
@@ -781,12 +804,14 @@ export class SqlService {
    * statement (only a PL/SQL block opener).
    */
   async transaction(connId: string, action: 'start' | 'commit' | 'rollback'): Promise<void> {
+    if (this.isNative(connId)) return this.native.transaction(connId, action === 'start' ? 'begin' : action)
     this.requireConnected(connId)
     const bridge = await this.ensureBridge()
     await bridge.request('tx', { connId, action }, 30_000)
   }
 
   async query(connId: string, sql: string, options: QueryOptions = {}): Promise<QueryResult> {
+    if (this.isNative(connId)) return this.native.query(connId, sql, options)
     this.requireConnected(connId)
     const statement = sql.trim()
     if (statement === '') throw new DbError('invalid', 'SQL 不能为空')
@@ -834,18 +859,21 @@ export class SqlService {
   }
 
   async cancel(stmtKey: string): Promise<boolean> {
-    if (this.bridge === undefined) return false
+    const nativeCancelled = await this.native.cancel(stmtKey)
+    if (this.bridge === undefined) return nativeCancelled
     const reply = await this.bridge.request<{ cancelled?: boolean }>('cancel', { stmtKey }, 15_000)
-    return reply.cancelled === true
+    return nativeCancelled || reply.cancelled === true
   }
 
   async ping(): Promise<{ bridge: number; java: string; vm: string; threads: number }> {
+    if (this.native.connectedIds().length > 0) return this.native.ping()
     const bridge = await this.ensureBridge()
     return bridge.request('ping', {}, 15_000)
   }
 
   async dispose(): Promise<void> {
     this.connected.clear()
+    await this.native.dispose()
     if (this.bridge === undefined) return
     const bridge = this.bridge
     this.bridge = undefined

@@ -124,7 +124,7 @@ describe('Redis key filters', () => {
     await screen.findByText('user:forever')
 
     fireEvent.click(screen.getByLabelText('只看有 TTL'))
-    await waitFor(() => expect(window.localStorage.getItem('dsh-ide-database.redis.ttl-only.v1')).toBe('1'))
+    await waitFor(() => expect(window.localStorage.getItem('dsh-database-view.redis.ttl-only.v1')).toBe('1'))
 
     cleanup()
     render(<ConsoleTab {...props()} />)

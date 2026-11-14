@@ -1,6 +1,6 @@
 # DSH 数据库表预览插件设计方案（B + 可选 C）
 
-> 版本：v1.2（设计稿，本轮纳入 SQL Server / Oracle）  
+> 版本：v1.3（设计稿，本轮驱动随包内置）  
 > 日期：2026-11-14  
 > 前置文档：[可行性研究报告](feasibility.md)  
 > 范围：Fork `dsh-ide-database`，保留右侧栏 UI，替换为 Java-free 数据访问层；内置 SSH 隧道；JDBC 作为独立可选扩展包（C）。  
@@ -57,19 +57,19 @@ Fork 现有插件
 | D8 | 保留 `db_*` 工具名，增加 `toolPrefix` 配置与冲突检测 | 降低迁移成本；与旧插件共存时不静默覆盖 |
 | D9 | 数据目录用新名字 `dsh-database-view`，提供从旧插件导入 | 避免两个插件互相写坏配置 |
 | D10 | 默认只读，写操作显式开启 + 二次确认 + 数据库只读账号建议 | 数据库工具的风险主要在误写/误删 |
-| D11 | **统一 DriverManager**：所有 SQL 驱动默认按需下载，JDBC jar 沿用原 Maven 下载模式；另提供可选 offline/bundled 包 | 严格对齐原 JDBC 插件的「缺驱动→下载→缓存→重试」体验；核心包更小，许可/体积可控 |
+| D11 | **统一 DriverManager**：本轮 SQL 驱动随包内置；保留 download 模式给后续可选驱动；JDBC jar 仍沿用原 Maven 下载模式（后续） | 驱动只有几 MB，内置后首次连接即可用；下载能力保留，不锁死后续扩展 |
 | D12 | JS 驱动以**自包含 Driver Pack**（esbuild bundle + SHA-256）交付，不在运行时跑 npm/pnpm 安装 | 避免传递依赖解析、构建脚本、版本漂移；离线/审计更可控 |
 
 ### 0.3 MVP 与后续
 
 | 范围 | 内容 |
 |---|---|
-| **本轮（主流）** | MySQL、MariaDB、PostgreSQL、SQLite、SQL Server、Oracle（Thin）；SSH（密码/私钥/agent，主机密钥确认）；**统一驱动下载/缓存**；连接管理、树、表预览、DDL、只读 SQL 控制台、结构缓存、只读 Agent 工具 |
+| **本轮（主流）** | MySQL、MariaDB、PostgreSQL、SQLite、SQL Server、Oracle（Thin）；SSH（密码/私钥/agent，主机密钥确认）；**驱动随包内置 + 加载校验**；连接管理、树、表预览、DDL、只读 SQL 控制台、结构缓存、只读 Agent 工具 |
 | **后续（本轮不做）** | 达梦（许可允许时）、Redis 走 SSH、OceanBase、JDBC 扩展包、第三方 Engine 包、多跳 SSH、数据编辑 |
 
 > 本轮支持 5 个 Engine：MySQL（含 MariaDB）、PostgreSQL、SQLite、SQL Server、Oracle。达梦/OceanBase/JDBC/第三方只保留 Engine SPI、目录结构、文档和扩展点，不写对应 Engine 实现。
 >
-> 工作量：本轮约 **10–14 人周**（含 SPI、DriverManager、SSH、SQL Server/Oracle 元数据与测试）；若没有现成的 Driver Pack 发布流水线，按 **11–15 人周** 估算。后续达梦/OceanBase/JDBC 约再加 4–6 人周。
+> 工作量：本轮约 **10–14 人周**（含 SPI、DriverManager、SSH、SQL Server/Oracle 元数据与测试）；若没有现成的 Driver Pack 构建流程，按 **11–15 人周** 估算。后续达梦/OceanBase/JDBC 约再加 4–6 人周。
 
 ---
 
@@ -90,19 +90,19 @@ Fork 现有插件
 
 | Tier | Engine | 驱动交付 | 目标 | 选择理由 | 验收门槛 |
 |---|---|---|---|---|---|
-| **T1** | MySQL、MariaDB | `download` mysql2（可选 bundled） | MVP | 使用量最大；`mysql2` 成熟；协议/元数据清晰 | 真实实例 + SSH + 中文 + 事务 + 取消 |
-| **T1** | PostgreSQL | `download` pg（可选 bundled） | MVP | 使用量第二；`pg` 成熟 | 真实实例 + SSH + `information_schema`/`pg_catalog` |
+| **T1** | MySQL、MariaDB | `bundled` mysql2 | MVP | 使用量最大；`mysql2` 成熟；协议/元数据清晰 | 真实实例 + SSH + 中文 + 事务 + 取消 |
+| **T1** | PostgreSQL | `bundled` pg | MVP | 使用量第二；`pg` 成熟 | 真实实例 + SSH + `information_schema`/`pg_catalog` |
 | **T1** | SQLite | `builtin` node:sqlite | MVP | 无需服务端；`node:sqlite` 内置 | 文件/内存 + 大文本 + `EXPLAIN QUERY PLAN` |
-| **T2** | SQL Server | `download` tedious | **本轮** | 企业常见；`tedious` 纯 JS | 真实实例 + TLS + `SHOWPLAN` |
-| **T2** | Oracle | `download` oracledb Thin | **本轮** | 企业常见；`oracledb` Thin | 真实实例 + `DBMS_METADATA` + `EXPLAIN PLAN` |
+| **T2** | SQL Server | `bundled` tedious | **本轮** | 企业常见；`tedious` 纯 JS | 真实实例 + TLS + `SHOWPLAN` |
+| **T2** | Oracle | `bundled` oracledb Thin | **本轮** | 企业常见；`oracledb` Thin | 真实实例 + `DBMS_METADATA` + `EXPLAIN PLAN` |
 | **T2** | 达梦 DM | `user-provided` dmdb / JDBC | 后续 | 国内政企常见；`dmdb` 可用但许可受限 | 许可确认 + 真实实例 |
 | **T2** | Redis | `dependency` ioredis | 现有保留 | 现有功能；ioredis 纯 JS | 现有功能；SSH 后续 |
-| **T3** | OceanBase MySQL | `download` mysql2 | 后续 | 协议兼容 MySQL；先复用 | 真实租户 |
-| **T3** | OceanBase Oracle | `download` JDBC jar | 后续 | 协议特殊；JDBC 或实验驱动 | 明确标注实验性 |
-| **T3** | 任意 JDBC 库 | `download` JDBC jar | 后续 | 长尾 | 安装 `dsh-database-view-jdbc` 后可用 |
+| **T3** | OceanBase MySQL | 后续（可复用 mysql2） | 后续 | 协议兼容 MySQL；先复用 | 真实租户 |
+| **T3** | OceanBase Oracle | 后续（JDBC） | 后续 | 协议特殊；JDBC 或实验驱动 | 明确标注实验性 |
+| **T3** | 任意 JDBC 库 | 后续（JDBC jar） | 后续 | 长尾 | 安装 `dsh-database-view-jdbc` 后可用 |
 | **T3** | 第三方 Engine | 由 Engine 包声明 | 后续 | 社区 PR | 通过契约测试 + 安全审查 |
 
-> `bundled` = 随可选 offline 包/手动导入携带的自包含 driver pack，离线可用；`download` = 首次连接时从发布源下载并校验；`builtin` = Node 内置；`user-provided` = 因许可证/体积原因由用户提供文件；`jdbc` 见第 8 章。
+> `bundled` = 随核心插件包携带的自包含 driver pack，离线可用；`download` = 后续可选的按需下载模式；`builtin` = Node 内置；`user-provided` = 因许可证/体积原因由用户提供文件；`jdbc` 见第 8 章。
 >
 > **本轮范围**：MySQL、MariaDB、PostgreSQL、SQLite、SQL Server、Oracle。达梦/OceanBase/JDBC/第三方只留占位，不进入本轮验收。
 
@@ -892,42 +892,41 @@ export function apply(ctx) {
 
 这样核心不会被长尾拖慢，社区也有明确 PR 路径。
 
-### 4.10 驱动管理（对齐原 JDBC 下载模式）
+### 4.10 驱动管理（本轮随包内置）
 
-> 用户明确要求：所需驱动参考原 JDBC 插件的「缺驱动 → 下载 → 缓存 → 重试」模式。  
-> 本节把「JS 驱动包」和「JDBC jar」统一到同一个 DriverManager / manifest / UI / 工具。
+> 本轮决定：**驱动 pack 直接随插件包内置**。这样首次连接即可用、离线可用、不需要 npm/网络步骤；  
+> DriverManager 仍保留 `download` 能力，供后续可选驱动或企业内部分发使用。JDBC jar 仍走原 Maven 下载模式（后续）。
 
 #### 4.10.1 目标体验
 
-1. 用户新建 SQL Server 连接，点击「测试连接」。
-2. 插件发现 `tedious` 驱动未安装，返回 `driver-missing`，并给出：驱动名、版本、大小、许可证、下载按钮。
-3. 用户点击「下载驱动」→ 下载、SHA-256 校验、写入缓存 → 自动重试连接。
-4. 之后离线可用；设置页可查看已安装驱动、更新、删除、手动导入。
-5. JDBC 连接同理，只是驱动是 Maven jar；达梦因许可证走「用户提供文件」模式。
+1. 用户新建 MySQL 连接，点击「测试连接」。
+2. 插件直接从包内 `drivers/` 加载 `mysql2` pack，校验 SHA-256，连接数据库。
+3. 不需要下载、不需要 npm install；安装插件后即可用。
+4. 设置页可查看驱动版本、许可证、大小、校验状态；文件缺失/损坏时提示「重新安装插件」。
+5. 后续新增的可选驱动可以标记为 `download`，复用同一套状态/下载/校验 UI。
 
 #### 4.10.2 交付模式
 
 | 模式 | 含义 | 例子 | 网络 |
 |---|---|---|---|
-| `builtin` | 运行时/Node 内置，无需下载 | SQLite 的 `node:sqlite` | 无 |
-| `bundled` | 随可选 offline 包/手动导入携带的自包含 `.mjs`，首次使用即可用 | offline 包里的 mysql2、pg、tedious 等；Redis 的 ioredis 作为核心 dependency | 无 |
-| `download` | 核心只带 manifest，首次使用时从发布源下载 | mysql2、pg、tedious、oracledb Thin（默认） | 需要 |
-| `user-provided` | 因许可/体积/合规原因，由用户提供文件 | dmdb（达梦） | 无（用户自备） |
-| `jdbc` | JDBC jar 从 Maven 下载，沿用原逻辑 | MySQL/PG/Oracle/DM JDBC | 需要 |
+| `builtin` | 运行时/Node 内置 | SQLite 的 `node:sqlite` | 无 |
+| `bundled` | 随核心 npm 包携带的自包含 `.mjs`，首次使用即可用 | mysql2、pg、tedious、oracledb Thin、ioredis | 无 |
+| `download` | 核心只带 manifest，首次使用时从发布源下载 | 后续可选驱动/企业内部分发 | 需要 |
+| `user-provided` | 因许可/体积/合规原因，由用户提供文件 | dmdb（达梦，后续） | 无（用户自备） |
+| `jdbc` | JDBC jar 从 Maven 下载，沿用原逻辑 | MySQL/PG/Oracle/DM JDBC（后续） | 需要 |
 
-**为什么默认用 download：**
+**为什么本轮内置：**
 
-- 严格对齐原 JDBC 插件：首次使用某引擎时才下载对应驱动，装完插件不背所有驱动；
-- 核心 npm 包更小，许可证/体积/平台差异留在下载阶段处理；
-- T1 驱动只有几百 KB，下载成本低；失败时可以重试/换镜像/手动导入；
-- 企业/离线环境可以导入可选的 **offline 驱动包**（zip：`drivers/*.mjs` + `drivers.json`），或在设置页手动导入单个驱动；
-- 所有模式共用同一套状态、UI、校验、缓存，用户感知一致。
+- 驱动体积可控：mysql2 pack 约 1.4 MB；SQL Server/Oracle/PG 全量预计仍是个位数 MB；
+- 首次连接零网络、零 npm，桌面/内网体验最好；
+- 版本固定、SHA-256 可审计；不会出现「同一插件不同用户装到不同驱动版本」；
+- 下载模式保留在 DriverManager 里，后续可选驱动/离线包/企业镜像仍可复用。
 
-> 如果产品决定「T1 开箱即用」，把 manifest 的 `delivery` 从 `download` 改成 `bundled` 并随包携带 `drivers/*.mjs` 即可，代码路径不变。
+> 如果后续希望减小安装包，把 manifest 的 `delivery` 从 `bundled` 改成 `download` 并提供 URL 即可，代码路径不变。
 
 #### 4.10.3 Manifest
 
-核心包携带 `drivers.json`（只读，随版本发布）：
+核心包携带 `drivers.json`（只读，随版本发布）和 `drivers/*.mjs`：
 
 ```jsonc
 {
@@ -938,49 +937,48 @@ export function apply(ctx) {
       "engine": "mysql",
       "kind": "js",
       "version": "3.24.6",
-      "delivery": "download",
-      "urls": [
-        "https://github.com/<org>/dsh-database-view/releases/download/drivers-v1/mysql2-3.24.6.mjs"
-      ],
+      "delivery": "bundled",
+      "license": "MIT",
+      "file": "drivers/mysql2-3.24.6.mjs",
       "sha256": "…",
-      "bytes": 412345,
-      "license": "MIT"
+      "bytes": 1396050
     },
     {
       "id": "tedious",
       "engine": "mssql",
       "kind": "js",
       "version": "20.3.9",
-      "delivery": "download",
-      "urls": [
-        "https://github.com/<org>/dsh-database-view/releases/download/drivers-v1/tedious-20.3.9.mjs",
-        "https://cdn.jsdelivr.net/gh/<org>/dsh-database-view@drivers-v1/drivers/tedious-20.3.9.mjs"
-      ],
+      "delivery": "bundled",
+      "license": "MIT",
+      "file": "drivers/tedious-20.3.9.mjs",
       "sha256": "…",
-      "bytes": 612345,
-      "license": "MIT"
+      "bytes": 0
     },
     {
       "id": "oracledb-thin",
       "engine": "oracle",
       "kind": "js",
       "version": "6.10.0",
-      "delivery": "download",
-      "urls": ["…"],
+      "delivery": "bundled",
+      "license": "Apache-2.0 OR UPL-1.0",
+      "file": "drivers/oracledb-6.10.0.mjs",
       "sha256": "…",
-      "bytes": 987654,
-      "license": "Apache-2.0 OR UPL-1.0"
-    },
-    {
-      "id": "dmdb",
-      "engine": "dameng",
-      "kind": "js",
-      "version": "1.0.52452",
-      "delivery": "user-provided",
-      "license": "Commercial",
-      "instructions": "达梦驱动为商业许可，请从达梦官方获取 dmdb 包后在此导入。"
+      "bytes": 0
     }
   ]
+}
+```
+
+后续可选驱动可以使用：
+
+```jsonc
+{
+  "id": "clickhouse",
+  "delivery": "download",
+  "urls": ["https://…/clickhouse-1.0.0.mjs"],
+  "sha256": "…",
+  "bytes": 123456,
+  "license": "Apache-2.0"
 }
 ```
 
@@ -1004,7 +1002,7 @@ export interface DriverArtifact {
   instructions?: string
 }
 
-export interface DriverStatus {
+export interface DriverPackStatus {
   id: string
   engine: string
   version: string
@@ -1023,78 +1021,66 @@ export interface DriverStatus {
 export class DbDrivers extends Service<DbDrivers> {
   static readonly apiVersion = 1
 
-  list(): DriverStatus[]
-  status(id: string): DriverStatus
+  list(): DriverPackStatus[]
+  status(id: string): DriverPackStatus
   register(artifact: DriverArtifact): Disposer
 
-  /** 确保可用；缺失时抛 DriverMissingError（带可下载信息） */
-  async ensure(id: string): Promise<DriverStatus>
+  /** 确保可用；缺失/校验失败时抛 driver-missing */
+  async ensure(id: string): Promise<DriverPackStatus>
 
-  /** 下载并校验；成功后可被 ensure 使用 */
-  async download(id: string, options?: { signal?: AbortSignal }): Promise<DriverStatus>
+  /** 可选：仅 download/user-provided 模式需要 */
+  async download(id: string, options?: { signal?: AbortSignal }): Promise<DriverPackStatus>
 
-  /** 用户手动导入（dmdb / 离线包 / 企业内部分发） */
-  async import(id: string, filePath: string): Promise<DriverStatus>
-
+  async import(id: string, filePath: string): Promise<DriverPackStatus>
   async remove(id: string): Promise<void>
 }
 ```
 
 - 核心提供 `dbDrivers` 服务；JDBC 扩展包 `inject: ['dbDrivers']` 并注册自己的 artifacts。
-- `status` 必须实际检查文件存在/大小/哈希，不能只看 manifest；内置/下载/导入文件缺失或损坏时 `installed:false` 并给出 `error`。
-- `ensure` 在 `DbService.connect` 之前调用；缺失时返回可操作的 `driver-missing`，而不是让 Engine 抛 `MODULE_NOT_FOUND`。
-- 已加载的 driver module 按 `id@version+sha` 缓存；下载新版本后需重连/重启 Engine。
+- `status` 必须实际检查文件存在/大小/哈希；内置文件缺失/损坏时 `installed:false` 并给出 `error`。
+- `ensure` 在 `DbService.connect` 之前调用；缺失时返回可操作的 `driver-missing`。
+- 已加载的 driver module 按 `id@version+sha` 缓存；升级插件后重新加载。
 
 #### 4.10.5 加载、下载、导入
 
 **加载**：
 
 ```ts
-const file = status.source === 'bundled'
-  ? join(dataDir, 'drivers', 'offline', artifact.file ?? `${id}-${version}.mjs`)
+const file = artifact.delivery === 'bundled'
+  ? join(pluginRoot, artifact.file ?? `drivers/${id}-${version}.mjs`)
   : join(dataDir, 'drivers', 'js', `${id}-${version}.mjs`)
 const mod = await import(pathToFileURL(file).href + `?sha=${artifact.sha256}`)
 ```
 
-- 只从 `<data>/drivers/offline/`（离线包）或 `<data>/drivers/js/`（下载/导入）加载；不从 workspace、`node_modules` 或用户任意路径自动发现。
-- 单文件 pack 直接 `import()`；目录包读取 `package.json.main`/`index.js` 后 `import()`；依赖必须已随目录提供，不在运行时解析 npm 依赖。
-- 加载前校验 SHA-256（下载/导入）；包内文件随 npm 完整性校验。
+- 只从包内 `drivers/` 或 `<data>/drivers/js/` 加载；不从 workspace、`node_modules` 或任意用户路径自动发现。
+- 单文件 pack 直接 `import()`；目录包读取 `package.json.main`/`index.js` 后 `import()`。
+- 加载前校验 SHA-256；包内文件随 npm 完整性校验。
 - 校验导出：`mysql2` 必须有 `createConnection`，`pg` 必须有 `Client`，`tedious` 必须有 `Connection`；缺失则 `driver-invalid`。
-- 缓存 module；版本变更后使用新 URL/查询参数避免 ESM 缓存旧模块。
+- ESM bundle 使用 `createRequire(import.meta.url)` banner 兼容 CJS 内置模块 require（mysql2 需要）。
 
-**下载**：
+**下载（后续/可选）**：
 
 - `fetch` + `AbortSignal.timeout(120s)`；跟随重定向；限制最大字节（如 50 MB）。
 - 校验 HTTP 状态、`content-length`（若提供）、SHA-256；不匹配则删除临时文件。
 - 原子写：`<file>.tmp-<pid>` → rename；目录 0700，文件 0600。
 - 多 URL 顺序重试；镜像可配置；失败信息包含 URL、HTTP 状态、校验结果。
-- 代理：尊重 `HTTPS_PROXY`/`HTTP_PROXY`（Node 24 可用 `NODE_USE_ENV_PROXY=1`）；企业内网镜像走 manifest 的 URL。
-- 不做「运行时 npm/pnpm install」；避免传递依赖、构建脚本、lockfile 漂移。
+- 代理：尊重 `HTTPS_PROXY`/`HTTP_PROXY`；企业内网镜像走 manifest 的 URL。
+- 不做「运行时 npm/pnpm install」。
 
-**手动导入**：
+**手动导入（后续/可选）**：
 
-- `POST /drivers/import {id, path}`；路径由用户在系统文件选择器中选择（或手填）。
-- 支持三种形态：
-  1. 单文件 `.mjs`/`.cjs`（自包含 pack）；
-  2. 单文件 `.tgz`/`.tar.gz`（解压到 `<data>/drivers/js/<id>-<version>/`，拒绝路径穿越）；
-  3. npm 包目录（含 `index.js`/`package.json` 及其依赖），复制到 `<data>/drivers/js/<id>-<version>/`。
-- 校验：manifest 提供 SHA-256 时必须匹配；目录导入至少校验入口文件与大小，并在 UI 明确「这是可执行代码」。
-- `dmdb` 的 `user-provided` 模式：导入 npm 包目录或 tgz 后状态为 `imported`；加载入口 `package.json.main`/`index.js`；许可证由用户自行确认。
-- JDBC jar 导入同理，交给 JDBC 扩展包加载；jar 只作为 Java classpath，不在 Node 中执行。
-
-**删除/更新**：
-
-- 删除只删缓存文件，不动连接配置；下次连接重新提示下载。
-- 更新：manifest 版本高于已安装时显示 `updateAvailable`；用户确认后下载新文件，成功后切换；旧版本保留一份用于回滚（P2）。
+- `POST /drivers/import {id, path}`；支持单文件 `.mjs`/`.cjs`、`.tgz`、npm 包目录。
+- 校验：manifest 提供 SHA-256 时必须匹配；UI 明确「这是可执行代码」。
+- `dmdb` 的 `user-provided` 模式：导入 npm 包目录或 tgz 后状态为 `imported`；许可证由用户自行确认。
 
 #### 4.10.6 Driver Pack 构建
 
 ```text
 driver-packs/
-  mysql2/entry.ts       // export * from 'mysql2/promise'
-  pg/entry.ts           // export * from 'pg'
-  tedious/entry.ts      // export * from 'tedious'
-  oracledb/entry.ts     // export * from 'oracledb'
+  mysql2/entry.ts       // export createConnection/createPool/... from 'mysql2/promise'
+  pg/entry.ts
+  tedious/entry.ts
+  oracledb/entry.ts
 scripts/build-drivers.mjs
 ```
 
@@ -1106,17 +1092,20 @@ await esbuild.build({
   format: 'esm',
   target: ['node22'],
   external: ['node:*'],
-  outfile: 'dist/drivers/mysql2-3.24.6.mjs',
+  banner: {
+    js: "import { createRequire as __dshCreateRequire } from 'node:module';\nconst require = __dshCreateRequire(import.meta.url);",
+  },
+  outfile: 'drivers/mysql2-3.24.6.mjs',
   legalComments: 'none',
 })
 ```
 
 - 产物是**自包含 ESM**，包含所有传递依赖；不依赖 profile 的 `node_modules`。
 - 生成后计算 SHA-256/字节数，写入 `drivers.json`。
-- CI 发布到 GitHub Release / CDN；核心 npm 包默认只包含 `drivers.json` manifest，可选 offline 包才包含 `drivers/*.mjs`。
+- 核心 npm 包包含 `drivers/` + `drivers.json`；`files` 必须包含它们。
 - `oracledb` 需要特殊处理：Thin 模式纯 JS，但包内有 thick 模式原生二进制与动态 `require`；构建时 external/alias 掉 `.node`，只保留 Thin；M0 必须先做 spike 验证。
 - `ssh2` 不作为 driver pack：它是核心 SSH 功能依赖，随核心安装。
-- `ioredis` 是 Redis 核心功能依赖：作为核心 `dependencies` 安装，保持开箱即用（不强制下载）。
+- `ioredis` 是 Redis 核心功能依赖：作为核心 `dependencies` 安装，保持开箱即用。
 
 **如果某个驱动无法安全 bundle：**
 
@@ -1130,9 +1119,9 @@ await esbuild.build({
 
 ```ts
 driver: {
-  id: 'tedious',
-  version: '20.3.9',
-  delivery: 'download',
+  id: 'mysql2',
+  version: '3.24.6',
+  delivery: 'bundled',
   license: 'MIT',
 }
 ```
@@ -1140,43 +1129,34 @@ driver: {
 Engine 的加载方式：
 
 ```ts
-const tedious = await ctx.drivers.load<typeof import('tedious')>('tedious')
+const mysql = await ctx.drivers.load<typeof import('mysql2/promise')>('mysql2')
 ```
 
 - TypeScript 类型用 `import type`/`typeof import(...)`，编译期有类型；运行期从 driver pack 加载。
-- Engine 不直接 `import 'mysql2'`；否则会被打包进核心，失去按需下载。
+- Engine 不直接 `import 'mysql2'`；否则会被打包进核心，失去统一校验/替换能力。
 - Engine 的 `connect` 前由 `DbService` 调 `ensure(driver.id)`；Engine 内也可防御性调用。
 - `descriptor.available` 由 DriverManager 状态决定；缺失时 `unavailableReason: 'driver-missing'`。
 
 #### 4.10.8 路由、工具、UI
 
-新增/统一路由：
-
 | 路由 | 作用 |
 |---|---|
-| `POST /drivers/list` | 列出驱动状态（安装/缺失/可更新/许可证/大小） |
-| `POST /drivers/download` | 下载并校验；返回新状态 |
-| `POST /drivers/import` | 手动导入（路径） |
-| `POST /drivers/remove` | 删除缓存 |
-| `POST /drivers/check-updates` | 对比 manifest 版本 |
+| `POST /drivers/packs/list` | 列出内置/可选驱动状态（版本/许可证/大小/校验） |
+| `POST /drivers/packs/download` | 可选：下载 download 模式驱动 |
+| `POST /drivers/import` | 可选：手动导入 |
+| `POST /drivers/remove` | 可选：删除缓存 |
 
-- `db_download_driver` Agent 工具保留，参数从 `driverId` 扩展为 manifest id；只允许下载 manifest 中存在的驱动。
-- 连接测试/连接失败返回 `driver-missing`，并带 `driver: DriverStatus`，前端直接渲染下载按钮。
-- 设置页新增「驱动」：
-  - 已安装/可用/缺失分组；
-  - 每项显示版本、许可证、大小、来源（内置/下载/导入）；
-  - 下载/更新/删除/导入；下载中进度/取消；
-  - 「驱动来源」说明：内置、发布源、Maven、用户提供。
-- 连接弹窗引擎下拉：缺驱动的引擎仍可选，但测试时提示下载；或置灰并显示「需下载驱动」。
-- JDBC 扩展包复用同一「驱动」页，增加 Maven 镜像/Java 设置。
+- `db_download_driver` Agent 工具保留，仅对 `download` 模式生效；内置驱动没有下载动作。
+- 连接测试/连接失败返回 `driver-missing`；前端提示「重新安装插件」或（download 模式）「下载驱动」。
+- 设置页「驱动」：已安装/内置分组，显示版本、许可证、大小、来源、校验状态；内置驱动不可删除。
+- 连接弹窗引擎下拉：内置驱动默认可用；download 模式显示「需下载」。
 
 #### 4.10.9 安全、许可、离线
 
-- **只从 manifest URL 下载**；客户端不能传任意 URL；手动导入需用户显式选择文件并警告。
-- **校验强制**：下载必须 SHA-256 匹配；JDBC jar 至少校验 Maven `.sha1`（沿用原逻辑），优先 SHA-256。
+- **校验强制**：加载前校验 SHA-256；下载必须匹配；JDBC jar 至少校验 Maven `.sha1`。
 - **许可证展示**：每个驱动显示 license；达梦为 `Commercial`，必须走用户提供；不打包、不托管。
-- **离线**：bundled/builtin 可用；download 驱动可手动导入；JDBC jar 可手动放入缓存目录（校验后）。
-- **代理/镜像**：支持环境代理与企业镜像；manifest 可配置多 URL。
+- **离线**：本轮内置驱动天然离线可用；后续 download 驱动可手动导入或走企业镜像。
+- **代理/镜像**：download 模式支持环境代理与企业镜像。
 - **供应链**：固定版本 + checksum + lockfile；构建产物可复现；发布源使用 HTTPS。
 - **不执行任意远程代码**：只加载校验通过的 driver pack；用户导入的代码由用户承担风险，UI 明确提示。
 
@@ -1184,31 +1164,28 @@ const tedious = await ctx.drivers.load<typeof import('tedious')>('tedious')
 
 | 场景 | 行为 |
 |---|---|
-| 驱动未安装 | `driver-missing` + 下载按钮；连接不建立 |
+| 内置驱动文件缺失/损坏 | `driver-missing` + 「重新安装插件」；不静默回退 |
+| 内置驱动加载失败 | `driver-invalid`；显示版本/路径/校验信息 |
+| 可选驱动未安装 | `driver-missing` + 下载按钮 |
 | 下载失败 | 保留旧状态；显示 URL/HTTP/校验错误；可重试/换镜像 |
-| 校验失败 | 删除临时文件；不加载；提示可能的镜像/网络问题 |
-| 版本不匹配 | 提示更新；允许继续用旧版本（若 API 兼容）或强制更新 |
-| 驱动加载失败 | `driver-invalid`；回退到上一个可用版本（P2）或提示重装 |
+| 校验失败 | 删除临时文件；不加载；提示镜像/网络问题 |
 | 用户取消下载 | 保持缺失状态；不影响其他连接 |
-| 离线且未安装 | 提示手动导入/使用 offline 驱动包 |
 | DM 许可 | 不提供下载 URL；只提供「导入 dmdb 文件」+ 许可说明 |
 
 #### 4.10.11 与原 JDBC 下载模式对照
 
-| 能力 | 原 JDBC 插件 | 新方案 |
+| 能力 | 原 JDBC 插件 | 新方案（本轮） |
 |---|---|---|
 | 驱动元数据 | 内置 Maven 坐标 | `drivers.json` manifest |
-| 下载源 | Maven Central / 阿里云 | 发布源/CDN + Maven（JDBC） |
-| 校验 | `.sha1`（存在时） | SHA-256（强制）；JDBC 兼容 `.sha1` |
-| 缓存 | `drivers/*.jar` | `drivers/js/*.mjs`、`drivers/jdbc/**/*.jar` |
-| 缺失提示 | 连接时提示下载 | `driver-missing` + 下载对话框 |
-| 手动导入 | 放入 jar 目录 | 单文件/目录/tgz/离线 zip |
-| 自定义驱动 | 驱动类/URL/Maven 坐标 | JDBC 扩展包同原逻辑 |
-| Agent 工具 | `db_download_driver` | 同名，支持所有 manifest id |
-| 设置页 | 驱动下载/Java/Maven | 统一「驱动」页 + JDBC 扩展页 |
-| 离线 | 手动放 jar | offline 驱动包/手动导入 |
-
----
+| 驱动来源 | Maven Central / 阿里云 | 随插件包内置 |
+| 校验 | `.sha1`（存在时） | SHA-256（加载前强制） |
+| 缓存 | `drivers/*.jar` | `drivers/*.mjs`（包内） |
+| 缺失提示 | 连接时提示下载 | 连接时提示重新安装/校验 |
+| 手动导入 | 放入 jar 目录 | 预留 import（download/user-provided） |
+| 自定义驱动 | 驱动类/URL/Maven 坐标 | JDBC 扩展包（后续） |
+| Agent 工具 | `db_download_driver` | 保留，仅 download 模式 |
+| 设置页 | 驱动下载/Java/Maven | 驱动状态 + 内置校验 |
+| 离线 | 手动放 jar | 天然离线 |
 
 ## 5. 连接与查询服务
 
@@ -1362,11 +1339,11 @@ Engine 负责把驱动类型转成上表；核心 `normalizeResult` 再做：
 
 | Engine | driver id | 交付 | 版本策略 | 说明 |
 |---|---|---|---|---|
-| MySQL/MariaDB | `mysql2` | download（可选 bundled） | 固定 + 可更新 | 默认按需下载；offline 包可内置；OceanBase 后续复用 |
-| PostgreSQL | `pg` | download（可选 bundled） | 固定 + 可更新 | 默认按需下载；offline 包可内置 |
+| MySQL/MariaDB | `mysql2` | bundled | 固定 + 可更新 | 随包内置；OceanBase 后续复用 |
+| PostgreSQL | `pg` | bundled | 固定 + 可更新 | 随包内置 |
 | SQLite | `node:sqlite` | builtin | Node/Electron 内置 | 无 driver pack |
-| SQL Server | `tedious` | download | 固定 + 可更新 | 首次使用下载 |
-| Oracle | `oracledb-thin` | download | 固定 + 可更新 | Thin 模式；需 spike 验证 bundle |
+| SQL Server | `tedious` | bundled | 固定 + 可更新 | 首次使用下载 |
+| Oracle | `oracledb-thin` | bundled | 固定 + 可更新 | Thin 模式；需 spike 验证 bundle |
 | 达梦 | `dmdb` | user-provided | 用户自备 | 商业许可；不托管 |
 | Redis | `ioredis` | dependency | 固定 | 随核心 dependency，开箱即用 |
 | JDBC | `jdbc-*` | download | Maven 坐标 | 可选包提供 |
@@ -2222,16 +2199,16 @@ interface SshProbeResult {
 }
 ```
 
-- 运行时**不**从 `node_modules` 加载数据库驱动；驱动来自下载缓存（默认）或 offline 包/手动导入的 `drivers/`。
+- 运行时**不**从 `node_modules` 加载数据库驱动；驱动来自包内 `drivers/*.mjs`，由 DriverManager 校验后加载。
 - `mysql2` / `pg` / `tedious` / `oracledb` 作为 devDependency 仅用于构建 driver pack 与类型；运行时由 DriverManager 动态加载。
 - `ioredis` 是 Redis 核心 dependency（开箱即用），不作为 driver pack。
-- 核心 npm 包默认只带 `drivers.json`，不带 `drivers/*.mjs`；离线场景导入离线驱动包或手动导入单个驱动。
+- 核心 npm 包包含 `drivers/` + `drivers.json`；`files` 已列出。
 - `dmdb` **不**作为 dependency；达梦走用户提供/JDBC，避免许可问题。
 - `node:sqlite` 内置，无依赖。
 - `oracledb` 仅用 Thin 模式；bundle 时不包含/不加载 thick 原生二进制。
 - `ssh2` 是核心 SSH 功能依赖；可选原生加速失败会回退纯 JS。
 - 构建：`build:drivers`（esbuild 自包含 pack + manifest）→ `tsc` Host + `.d.ts` → esbuild Client → 复制 locale/assets/docs。
-- `files`：`lib`, `drivers.json`, `locale`, `assets`, `cordis.patch.yml`, `dsh.plugin.json`, `README.md`, `docs/`（offline 包额外含 `drivers/`）。
+- `files`：`lib`, `drivers/`, `drivers.json`, `locale`, `assets`, `cordis.patch.yml`, `dsh.plugin.json`, `README.md`, `docs/`。
 - `dsh.plugin.json`：工具列表、skills 空。
 
 ### 11.2 可选 JDBC 包
@@ -2250,13 +2227,12 @@ interface SshProbeResult {
 - 安装顺序：核心 → 可选包 → 重启。
 - 不安装时核心包没有 Java/`bridge/`。
 
-### 11.2.1 可选离线驱动包（P3）
+### 11.2.1 可选离线驱动包（后续）
 
-- 发布物是一个 **zip**：`drivers/*.mjs` + `drivers.json`（`delivery:'bundled'`），不是 DSH 插件包。
-- 适用于内网/离线/首次部署；设置页「导入离线驱动包」解压到 `<data>/drivers/offline/`，DriverManager 把 `source` 标为 `bundled`，不访问网络。
-- 与核心同版本发布；升级核心时同步升级离线包。
-- 也可以不发 zip，直接把 `drivers/*.mjs` 和 manifest 放到企业内网镜像，manifest 的 `urls` 指向镜像。
-- 离线包与单个驱动导入共用 `/drivers/import` 的校验/警告逻辑。
+- 本轮驱动已随核心包内置，不需要单独离线包。
+- 后续如果某些驱动改为 `download` 模式，可以发布 zip（`drivers/*.mjs` + `drivers.json`）供内网导入。
+- 该 zip 不是 DSH 插件包；通过设置页「导入离线驱动包」解压到 `<data>/drivers/offline/`。
+- 也可以把 manifest 的 `urls` 指向企业内网镜像，复用 download 模式。
 
 ### 11.3 安装/开发
 
@@ -2268,7 +2244,7 @@ dsh plugin --profile desktop add link:/path/to/dsh-database-view-jdbc
 
 # 开发构建
 npm install
-npm run build:drivers   # 生成 dist/drivers/*.mjs + drivers.json（发布/离线包用）
+npm run build:drivers   # 生成 drivers/*.mjs + drivers.json（随包内置）
 npm run build           # host + client（core 不再 build:bridge）
 npm run pack:offline    # 可选：生成 drivers/*.mjs + drivers.json 的离线 zip
 npm run typecheck
@@ -2354,7 +2330,7 @@ PR 必须通过：
 
 | 里程碑 | 周期 | 内容 | 退出条件 |
 |---|---|---|---|
-| **M0** 骨架 | 1–2 周 | Fork、改名、Engine SPI、Catalog、DriverManager、MySQL driver pack、SSH、连接弹窗（MySQL） | 不装 Java 连 MySQL；删驱动后能提示下载并恢复 |
+| **M0** 骨架 | 1–2 周 | Fork、改名、Engine SPI、Catalog、DriverManager、MySQL driver pack、SSH、连接弹窗（MySQL） | 不装 Java 连 MySQL；内置驱动校验通过 |
 | **M1** 基础库 | 2–3 周 | PostgreSQL、SQLite、元数据/DDL/EXPLAIN、v1 迁移、表预览/缓存 | 基础库契约测试通过；驱动下载/离线导入可用 |
 | **M2** 企业库 | 3–4 周 | SQL Server、Oracle Thin：连接、元数据、DDL、EXPLAIN、TLS、driver pack | SQL Server/Oracle 真实实例通过；TLS/驱动下载通过 |
 | **M3** 体验 | 2 周 | 控制台、导出、Agent 工具、只读限制、错误/主机密钥/驱动下载 UX | 日常只读预览可用 |
@@ -2386,7 +2362,7 @@ PR 必须通过：
 | JDBC 包与核心版本漂移 | 加载失败 | `apiVersion` + peerDependencies + 启动诊断 |
 | 迁移破坏用户连接 | 数据丢失 | 备份 + 预览 + 不修改旧数据 + 失败保留 v1 |
 | Driver Pack bundling 失败（动态 require/native） | 某引擎不可用 | M0 spike；失败则该驱动退回核心 dependency 或 `user-provided` |
-| 下载源不可用/被墙 | 首次使用失败 | 多 URL/镜像、手动导入、可选 offline 包兜底 |
+| 内置驱动文件损坏/缺失 | 首次使用失败 | 加载前 SHA-256 校验；提示重新安装插件；后续可选下载/导入 |
 | 驱动校验/供应链 | 代码执行风险 | HTTPS + SHA-256 + 固定版本 + 发布审计；导入需明确警告 |
 | 驱动版本漂移 | 兼容性 | descriptor 固定版本；更新提示；旧版本保留回滚 |
 | SQL Server/Oracle 测试环境重 | 验证慢 | 提前准备镜像/内存；CI 分层；契约测试先跑 |
@@ -2408,7 +2384,7 @@ PR 必须通过：
 | Q9 | 是否支持 Redis 的 SSH？ | 是，T2；复用 TransportService |
 | Q10 | 是否需要「从旧插件导入」的自动化测试？ | 需要；用 fixture 覆盖 preset/custom/trash |
 | Q11 | Driver Pack 发布在哪里？ | GitHub Release 或独立 npm 包；需要 HTTPS、checksum、可镜像；企业内网可自建 |
-| Q12 | T1 是否也用 download？ | 默认 download（对齐原 JDBC）；离线场景用 offline 包/manifest 改 bundled，代码不变 |
+| Q12 | 是否全部内置？ | 本轮 SQL 驱动随包内置；DriverManager 保留 download 模式，后续可选驱动/企业分发可切换 |
 | Q13 | 达梦驱动如何交付？ | `user-provided` 导入；不托管；JDBC 作为替代；需法务确认 |
 
 ### 14.3 必须在 M0 验证的技术假设

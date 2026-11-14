@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
  * count and the table below it in sync.
  */
 describe('README agent tools', () => {
-  const text = readFileSync('README.md', 'utf8')
+  const text = readFileSync('docs/upstream-readme.zh-CN.md', 'utf8')
 
   it('states the same number of tools as the table lists', () => {
     const stated = /：(\d+) 个 `db_\*` 工具/u.exec(text)

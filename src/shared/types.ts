@@ -1,7 +1,7 @@
 /**
  * Types shared by the host half and the browser half of the plugin.
  * Everything here must stay JSON-serialisable: the same shapes cross the
- * /dsh-ide-database/api boundary and are stored in the profile data file.
+ * /dsh-database-view/api boundary and are stored in the profile data file.
  */
 
 import type { ConsoleActionId } from './consoleactions.js'
@@ -132,6 +132,31 @@ export interface DbSettings {
   toolbarActions?: ToolbarActionId[]
 }
 
+
+export type SshAuth = 'password' | 'key' | 'agent'
+export type SshHostKeyPolicy = 'ask' | 'strict' | 'accept-new'
+
+export interface SshConfig {
+  enabled: true
+  host: string
+  port: number
+  user: string
+  auth: SshAuth
+  privateKeyPath?: string
+  hostKeyPolicy: SshHostKeyPolicy
+  connectTimeoutMs?: number
+  keepaliveIntervalMs?: number
+}
+
+export interface TlsConfig {
+  mode: 'disable' | 'prefer' | 'require' | 'verify-ca' | 'verify-full'
+  caPath?: string
+  certPath?: string
+  keyPath?: string
+  servername?: string
+  allowInvalidHostname?: boolean
+}
+
 export interface ConnectionConfig {
   id: string
   name: string
@@ -150,6 +175,10 @@ export interface ConnectionConfig {
   redisDb: number
   params: Record<string, string>
   readOnly: boolean
+  /** Use the built-in Node.js engine for this connection instead of the JDBC bridge. */
+  nativeEngine?: boolean
+  ssh?: SshConfig
+  tls?: TlsConfig
   createdAt: string
   lastUsedAt?: string
 }
@@ -168,6 +197,11 @@ export interface ClientConnection {
   redisDb: number
   params: Record<string, string>
   readOnly: boolean
+  nativeEngine?: boolean
+  ssh?: SshConfig
+  tls?: TlsConfig
+  hasSshPassword?: boolean
+  hasSshPassphrase?: boolean
   createdAt: string
   lastUsedAt?: string
 }
@@ -196,6 +230,11 @@ export interface ConnectionDraft {
   redisDb: number
   params: Record<string, string>
   readOnly: boolean
+  nativeEngine?: boolean
+  ssh?: SshConfig
+  tls?: TlsConfig
+  sshPassword?: string
+  sshPassphrase?: string
 }
 
 export interface DbConfigFile {
@@ -438,11 +477,25 @@ export interface ServerInfo {
   url?: string
 }
 
+
+export interface DriverPackStatus {
+  id: string
+  engine: string
+  version: string
+  license: string
+  installed: boolean
+  path?: string
+  bytes?: number
+  downloadAvailable: boolean
+  error?: string
+}
+
 export interface ConnectionTestResult {
   ok: boolean
   server?: ServerInfo
   latencyMs: number
   message?: string
+  code?: string
   /** Extra remark shown next to a successful result (for example a SQLite file that will be created). */
   note?: string
 }

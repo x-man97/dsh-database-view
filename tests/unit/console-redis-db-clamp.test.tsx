@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../src/client/api', () => ({ api: mocks }))
 
-const DB_KEY = 'dsh-ide-database.redis-db.v1:redis-1'
+const DB_KEY = 'dsh-database-view.redis-db.v1:redis-1'
 
 function settings() {
   return {

@@ -13,7 +13,7 @@ const cookie = login.headers.getSetCookie?.().map((entry) => entry.split(';')[0]
 if (!cookie) throw new Error(`no auth cookie (status ${login.status})`)
 
 async function api(path, body) {
-  const response = await fetch(`${BASE}/dsh-ide-database/api${path}`, {
+  const response = await fetch(`${BASE}/dsh-database-view/api${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', cookie },
     body: JSON.stringify(body ?? {}),

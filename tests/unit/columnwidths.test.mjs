@@ -42,10 +42,10 @@ describe('列宽记忆', () => {
   })
 
   it('损坏的 JSON 与非法值被忽略', () => {
-    localStorage.setItem('dsh-ide-database.colwidths.v1', '{oops')
+    localStorage.setItem('dsh-database-view.colwidths.v1', '{oops')
     expect(readWidths('console:sql', 1)).toBeNull()
 
-    localStorage.setItem('dsh-ide-database.colwidths.v1', JSON.stringify({ 'console:sql': ['wide'] }))
+    localStorage.setItem('dsh-database-view.colwidths.v1', JSON.stringify({ 'console:sql': ['wide'] }))
     expect(readWidths('console:sql', 1)).toBeNull()
   })
 

@@ -25,7 +25,7 @@ function ddlBlock(ddl: string): string {
 
 export function tableDumpText(dump: TableDump): string {
   const name = dump.schema === '' ? dump.table : `${dump.schema}.${dump.table}`
-  const lines: string[] = [`-- ${name}`, '-- 由 dsh-ide-database 导出']
+  const lines: string[] = [`-- ${name}`, '-- 由 dsh-database-view 导出']
   const ddl = dump.ddl === null ? '' : ddlBlock(dump.ddl)
   if (ddl === '') {
     lines.push('-- 未能取到建表语句，只导出数据')

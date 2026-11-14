@@ -2,9 +2,10 @@
 
 [English](README.md) | **简体中文**
 
-> **状态：设计阶段。** 本仓库 fork 自
+> **状态：M0 进行中。** 本仓库 fork 自
 > [`qwq1999/dsh-ide-database`](https://github.com/qwq1999/dsh-ide-database)，正在改造成一个
-> Java-free、内置 SSH 隧道、驱动按需下载的 DSH 数据库插件。代码改造尚未开始。
+> Java-free、内置 SSH 隧道、驱动随包内置的 DSH 数据库插件。
+> 包名/插件 ID 改名、原生 MySQL Engine、SSH 传输、内置 MySQL 驱动和连接 UI 已完成；其余 Engine 和硬化工作仍在进行。
 
 `dsh-database-view` 是一个计划中的 DeepSeek Harness（DSH）插件：在右侧栏浏览数据库结构、预览表数据，
 风格接近 JetBrains Database 工具窗；同时提供只读的 Agent 工具，用于列出连接、描述表、执行有上限的
@@ -39,7 +40,7 @@ SQL Server、Oracle **已纳入本轮**。达梦、OceanBase、Redis SSH、JDBC 
 
 - **核心不依赖 Java**：数据库访问使用 Node.js 驱动，从自包含的 driver pack 加载。
 - **SSH 属于传输层**：所有 Engine 共享认证、主机密钥校验和端口转发逻辑。
-- **驱动按需下载**：缺驱动 → 明确提示 → SHA-256 校验 → 本地缓存 → 自动重试；支持离线包和手动导入。
+- **驱动随包内置**：所需 driver pack 随插件发布，加载前校验 SHA-256；后续可选驱动仍保留下载模式。
 - **主流优先，长尾靠扩展**：核心只带少量 Engine；新 Engine 通过 `dbEngines` 服务注册，不改路由和 UI。
 - **默认只读**：写操作需要显式开关、二次确认，并建议使用数据库只读账号。
 - **结果有上限**：所有查询都有行数、字节、单元格、超时和并发限制。
@@ -61,7 +62,7 @@ Client（React 右侧栏）
         └── DbService（会话、队列、限流、取消）
               ├── TransportService（直连 / SSH）
               ├── DbEngines（Engine SPI 注册表）
-              ├── DbDrivers（下载、校验、缓存、加载）
+              ├── DbDrivers（校验、加载、可选下载）
               ├── SecretStore / KnownHostsStore
               └── StructureCache
 ```
@@ -72,16 +73,19 @@ Client（React 右侧栏）
 
 ## 驱动交付
 
-所有 SQL 驱动默认**下载优先**：
+本轮所需的驱动 pack **直接随插件包内置**，首次连接即可用，不需要 npm 安装或额外下载。每个 pack 是
+自包含 ESM 模块，带固定版本、SHA-256 和许可证信息；DriverManager 加载前仍会校验文件。
 
 | 模式 | 含义 | 例子 |
 |---|---|---|
 | `builtin` | Node/Electron 内置 | SQLite（`node:sqlite`） |
-| `download` | 首次使用下载、SHA-256 校验、缓存 | mysql2、pg、tedious、oracledb Thin |
+| `bundled` | 随插件包内置 | mysql2、pg、tedious、oracledb Thin |
+| `download` | 可选的后续模式，用于额外/可选驱动 | 本轮不使用 |
 | `user-provided` | 因许可证由用户提供 | 达梦 `dmdb`（后续） |
 | `jdbc` | Maven jar 下载，供可选 JDBC 包使用 | MySQL/Oracle/DM JDBC（后续） |
 
-内网/离线环境可以导入可选的离线驱动包。JDBC 扩展包会复用同一套驱动管理器和状态 UI。
+内置驱动的体积不大：M0 的 MySQL pack 约 1.4 MB；SQL Server/Oracle/PostgreSQL 全部加起来预计仍在个位数 MB。
+JDBC 扩展包会复用同一套驱动管理器和状态 UI。
 
 ## 仓库结构
 
@@ -93,8 +97,7 @@ bridge/      上游 Java 桥（待迁移到 JDBC 扩展包）
 tests/       上游测试（待适配）
 ```
 
-当前源码仍是上游 `dsh-ide-database` 0.4.x。M0 会先把包名、插件 ID、路由前缀、数据目录和 tab ID
-整体切换为 `dsh-database-view`，再开始功能改造。
+源码已切换到 `dsh-database-view`（包名、插件 ID、路由前缀、数据目录和 tab ID）。上游 JDBC 桥仍保留给尚未迁移的 Engine。
 
 ## 路线图
 

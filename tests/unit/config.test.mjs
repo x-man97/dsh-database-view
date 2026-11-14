@@ -51,6 +51,42 @@ describe('ConfigStore', () => {
     expect(secrets.resolve(saved.secretName)?.value).toBe('s3cret')
   })
 
+  it('stores native engine and SSH settings without leaking SSH secrets', () => {
+    const { config, secrets, dir } = store()
+    const saved = config.saveConnection({
+      name: 'SSH MySQL',
+      driver: 'mysql',
+      host: '10.0.0.12',
+      port: 3306,
+      user: 'root',
+      password: 'dbpass',
+      database: 'app',
+      params: {},
+      readOnly: false,
+      nativeEngine: true,
+      ssh: {
+        enabled: true,
+        host: 'bastion.example.com',
+        port: 22,
+        user: 'ops',
+        auth: 'key',
+        privateKeyPath: '~/.ssh/id_ed25519',
+        hostKeyPolicy: 'accept-new',
+      },
+      sshPassphrase: 'ssh-passphrase-value-42',
+    })
+    expect(saved.nativeEngine).toBe(true)
+    expect(saved.ssh?.host).toBe('bastion.example.com')
+    expect(saved.ssh?.privateKeyPath).toBe('~/.ssh/id_ed25519')
+    expect(secrets.has(SecretStore.nameForSshPassphrase(saved.id))).toBe(true)
+    expect(JSON.stringify(config.snapshot())).not.toContain('ssh-passphrase-value-42')
+
+    const reloaded = new ConfigStore(join(dir, 'connections.json'), new SecretStore(join(dir, 'secrets.json')))
+    reloaded.load()
+    expect(reloaded.connection(saved.id)?.nativeEngine).toBe(true)
+    expect(reloaded.connection(saved.id)?.ssh?.user).toBe('ops')
+  })
+
   it('updates an existing connection and can clear its password', () => {
     const { config, secrets } = store()
     const saved = config.saveConnection({

@@ -89,7 +89,7 @@ describe('console history memo', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     globalThis.localStorage.setItem(
-      'dsh-ide-database.history.v1',
+      'dsh-database-view.history.v1',
       JSON.stringify({ sql: [{ statement: 'SELECT 1', at: 1 }], redis: [] }),
     )
     mocks.status.mockResolvedValue({ config: { connections: [mysql], settings, drivers: [] }, drivers: [], env: {} })

@@ -2,10 +2,11 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-> **Status: design stage.** This repository is a fork of
+> **Status: M0 in progress.** This repository is a fork of
 > [`qwq1999/dsh-ide-database`](https://github.com/qwq1999/dsh-ide-database) and is being reshaped into a
-> Java-free DSH database plugin with built-in SSH tunneling and on-demand driver downloads.
-> The code changes have not started yet.
+> Java-free DSH database plugin with built-in SSH tunneling and bundled driver packs.
+> The package rename, native MySQL engine, SSH transport, bundled MySQL driver, and connection UI are in place;
+> the remaining engines and hardening work are still ahead.
 
 `dsh-database-view` is a planned DeepSeek Harness (DSH) plugin for browsing database schemas and previewing
 table data in the right sidebar, in the spirit of the JetBrains Database tool window. It will also expose
@@ -43,8 +44,8 @@ added without changing the core.
 - **No Java in the core.** Database access uses Node.js drivers loaded from self-contained driver packs.
 - **SSH is a transport concern.** All engines share the same authentication, host-key verification, and
   forwarding logic.
-- **Drivers are downloaded on demand.** Missing driver → explicit download prompt → SHA-256 verification →
-  local cache → automatic retry. Offline packs and manual imports are supported.
+- **Drivers are bundled.** Required driver packs ship with the plugin; the DriverManager verifies SHA-256
+  before loading. A download mode remains available for optional drivers in later iterations.
 - **Mainstream first, long tail by extension.** The core ships a small set of engines; additional engines can
   register through the `dbEngines` service without touching routes or UI.
 - **Read-only by default.** Writes require an explicit switch, a second confirmation, and ideally a
@@ -68,7 +69,7 @@ Client (React right sidebar)
         └── DbService (sessions, queue, limits, cancellation)
               ├── TransportService (direct TCP / SSH)
               ├── DbEngines (Engine SPI registry)
-              ├── DbDrivers (download, verify, cache, load)
+              ├── DbDrivers (verify, load, optional download)
               ├── SecretStore / KnownHostsStore
               └── StructureCache
 ```
@@ -79,17 +80,21 @@ The UI is descriptor-driven, so a new engine does not require client changes.
 
 ## Driver delivery
 
-All SQL drivers are **download-first** by default:
+The driver packs required by this iteration are **bundled with the plugin package**, so the first connection
+works offline and does not need npm or a download step. Each pack is a self-contained ESM module with a
+pinned version, SHA-256, and license metadata; the DriverManager still verifies the file before loading it.
 
 | Mode | Meaning | Examples |
 |---|---|---|
 | `builtin` | Provided by Node/Electron | SQLite (`node:sqlite`) |
-| `download` | Fetched on first use, SHA-256 verified, cached | mysql2, pg, tedious, oracledb Thin |
+| `bundled` | Shipped inside the plugin package | mysql2, pg, tedious, oracledb Thin |
+| `download` | Optional future mode for additional/optional drivers | not used in this iteration |
 | `user-provided` | Supplied by the user because of licensing | 达梦 `dmdb` (deferred) |
 | `jdbc` | Maven jar download, used by the optional JDBC pack | MySQL/Oracle/DM JDBC (deferred) |
 
-An optional offline driver bundle can be imported for air-gapped environments. The JDBC extension package
-will reuse the same driver manager and status UI.
+Bundling costs a few MB: the M0 MySQL pack is about 1.4 MB; the full SQL Server/Oracle/PostgreSQL set is
+expected to remain in the single-digit MB range. The JDBC extension package will reuse the same driver
+manager and status UI.
 
 ## Repository layout
 
@@ -101,8 +106,8 @@ bridge/      upstream Java bridge (to be moved to the JDBC extension)
 tests/       upstream tests (to be adapted)
 ```
 
-The current source is still upstream `dsh-ide-database` 0.4.x. M0 will rename the package, plugin ID, route
-prefix, data directory, and tab IDs to `dsh-database-view` before feature work starts.
+The source has been renamed to `dsh-database-view` (package, plugin ID, route prefix, data directory, and tab
+IDs). The upstream JDBC bridge is still present for the yet-to-be-migrated engines.
 
 ## Roadmap
 

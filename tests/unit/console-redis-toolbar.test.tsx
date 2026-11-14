@@ -84,7 +84,7 @@ describe('Redis console toolbar', () => {
   })
 
   it('closes the command history with Escape', async () => {
-    window.localStorage.setItem('dsh-ide-database.history.v1', JSON.stringify({ sql: [], redis: [{ statement: 'GET user:9', at: Date.now() }] }))
+    window.localStorage.setItem('dsh-database-view.history.v1', JSON.stringify({ sql: [], redis: [{ statement: 'GET user:9', at: Date.now() }] }))
     render(<ConsoleTab useTabInfo={() => ({ tab: { navigation: { params: { connectionId: 'redis-1' } } } })} />)
     await waitForConsoleSource(mocks)
     await waitFor(() => expect(mocks.redisScan).toHaveBeenCalled())

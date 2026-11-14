@@ -44,7 +44,7 @@ vi.mock('../../src/client/api', () => {
 
 import { ConsoleTab } from '../../src/client/ConsoleTab'
 
-const SCHEMA_KEY = 'dsh-ide-database.schema.v1:mysql-1'
+const SCHEMA_KEY = 'dsh-database-view.schema.v1:mysql-1'
 
 const mysql = {
   id: 'mysql-1',

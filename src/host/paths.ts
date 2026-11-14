@@ -7,7 +7,7 @@ import { DATA_DIR_NAME } from '../shared/presets.js'
 
 /**
  * On an installed profile the plugin lives at
- * `<profile>/node_modules/dsh-ide-database`, so walking two directories up from
+ * `<profile>/node_modules/dsh-database-view`, so walking two directories up from
  * `lib/` (or `src/host/` in a checkout) finds the package root.
  */
 function findPluginRoot(): string {
@@ -15,7 +15,7 @@ function findPluginRoot(): string {
   for (const candidate of [resolve(here, '..'), resolve(here, '..', '..')]) {
     try {
       const pkg = JSON.parse(readFileSync(join(candidate, 'package.json'), 'utf8')) as { name?: string }
-      if (pkg.name === 'dsh-ide-database') return candidate
+      if (pkg.name === 'dsh-database-view') return candidate
     } catch {
       // keep looking
     }
@@ -37,12 +37,12 @@ export interface PluginPaths {
 }
 
 /**
- * Data lives next to the profile: `<profile>/data/dsh-ide-database/`.
+ * Data lives next to the profile: `<profile>/data/dsh-database-view/`.
  * `DSH_PROFILE_DIR` is set by the desktop host; the remaining fallbacks keep
  * the plugin usable from a bare `dsh` checkout and from tests.
  */
 function resolveDataDir(): string {
-  const override = process.env.DSH_IDE_DATABASE_DATA?.trim()
+  const override = process.env.DSH_DATABASE_VIEW_DATA?.trim()
   if (override !== undefined && override !== '') return resolve(override)
 
   // Prefer the active DSH home over an inherited DSH_PROFILE_DIR: a throwaway

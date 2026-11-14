@@ -69,7 +69,7 @@ describe('table auto refresh memory', () => {
   })
 
   it('starts from the interval remembered last time', async () => {
-    window.localStorage.setItem('dsh-ide-database.auto-refresh.v1', '10000')
+    window.localStorage.setItem('dsh-database-view.auto-refresh.v1', '10000')
     render(<TableTab useTabInfo={tab} />)
 
     const select = (await screen.findByLabelText('自动刷新')) as HTMLSelectElement
@@ -77,7 +77,7 @@ describe('table auto refresh memory', () => {
   })
 
   it('ignores a stored interval that is no longer offered', async () => {
-    window.localStorage.setItem('dsh-ide-database.auto-refresh.v1', '7')
+    window.localStorage.setItem('dsh-database-view.auto-refresh.v1', '7')
     render(<TableTab useTabInfo={tab} />)
 
     const select = (await screen.findByLabelText('自动刷新')) as HTMLSelectElement

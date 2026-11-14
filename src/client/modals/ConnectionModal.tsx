@@ -57,6 +57,15 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
   const [redisDb, setRedisDb] = useState('0')
   const [paramsText, setParamsText] = useState('')
   const [readOnly, setReadOnly] = useState(false)
+  const [nativeEngine, setNativeEngine] = useState(false)
+  const [sshEnabled, setSshEnabled] = useState(false)
+  const [sshHost, setSshHost] = useState('')
+  const [sshPort, setSshPort] = useState('22')
+  const [sshUser, setSshUser] = useState('')
+  const [sshAuth, setSshAuth] = useState<'password' | 'key' | 'agent'>('password')
+  const [sshPassword, setSshPassword] = useState('')
+  const [sshKeyPath, setSshKeyPath] = useState('')
+  const [sshPassphrase, setSshPassphrase] = useState('')
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null)
@@ -81,6 +90,15 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
       setRedisDb(String(editing.redisDb))
       setParamsText(toParamsText(editing.params))
       setReadOnly(editing.readOnly)
+      setNativeEngine(editing.nativeEngine === true)
+      setSshEnabled(editing.ssh !== undefined)
+      setSshHost(editing.ssh?.host ?? '')
+      setSshPort(String(editing.ssh?.port ?? 22))
+      setSshUser(editing.ssh?.user ?? '')
+      setSshAuth(editing.ssh?.auth ?? 'password')
+      setSshKeyPath(editing.ssh?.privateKeyPath ?? '')
+      setSshPassword('')
+      setSshPassphrase('')
       setPassword('')
       setClearPassword(false)
       return
@@ -94,6 +112,15 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     setRedisDb('0')
     setParamsText('')
     setReadOnly(false)
+    setNativeEngine(true)
+    setSshEnabled(false)
+    setSshHost('')
+    setSshPort('22')
+    setSshUser('')
+    setSshAuth('password')
+    setSshKeyPath('')
+    setSshPassword('')
+    setSshPassphrase('')
     setPassword('')
     setClearPassword(false)
   }, [props.open, editing])
@@ -108,6 +135,8 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
   const fileBased = preset?.hostOptional === true
   const dialect = isCustom ? customDriver?.dialect : preset?.dialect
   const isRedis = dialect === 'redis'
+  const supportsNativeMysql = !isCustom && choice === 'mysql'
+  const useNative = supportsNativeMysql && nativeEngine
 
   const driverOptions = [
     ...PRESET_ORDER.map((id) => ({
@@ -121,9 +150,13 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     setChoice(value)
     setTestResult(null)
     setError('')
-    if (value.startsWith('custom:')) return
+    if (value.startsWith('custom:')) {
+      setNativeEngine(false)
+      return
+    }
     const spec = presetOf(value)
     if (spec) setPort(String(spec.defaultPort))
+    setNativeEngine(value === 'mysql')
   }
 
   const buildDraft = (): ConnectionDraft => ({
@@ -143,6 +176,22 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     // The read-only flag is chosen once, when the connection is created; an edit
     // always keeps the stored value (the switch is disabled for existing rows).
     readOnly: editing ? editing.readOnly : readOnly,
+    ...(useNative ? { nativeEngine: true } : {}),
+    ...(useNative && sshEnabled
+      ? {
+          ssh: {
+            enabled: true as const,
+            host: sshHost.trim(),
+            port: Number.parseInt(sshPort, 10) || 22,
+            user: sshUser.trim(),
+            auth: sshAuth,
+            hostKeyPolicy: 'accept-new' as const,
+            ...(sshKeyPath.trim() === '' ? {} : { privateKeyPath: sshKeyPath.trim() }),
+          },
+        }
+      : {}),
+    ...(useNative && sshEnabled && sshPassword !== '' ? { sshPassword } : {}),
+    ...(useNative && sshEnabled && sshPassphrase !== '' ? { sshPassphrase } : {}),
   })
 
   const validate = (draft: ConnectionDraft): string => {
@@ -155,6 +204,13 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     }
     if (hostOptional && draft.database === '') return '请填写数据库文件路径'
     if (isCustom && !customDriver) return '请选择或先新增一个自定义驱动'
+    if (useNative && sshEnabled) {
+      if (draft.ssh?.host === undefined || draft.ssh.host === '') return '请填写 SSH 主机'
+      if (!Number.isInteger(draft.ssh.port) || draft.ssh.port < 1 || draft.ssh.port > 65535) return 'SSH 端口需在 1-65535 之间'
+      if (draft.ssh.user === '') return '请填写 SSH 用户名'
+      if (draft.ssh.auth === 'key' && (draft.ssh.privateKeyPath === undefined || draft.ssh.privateKeyPath === '')) return '请填写 SSH 私钥路径'
+      if (draft.ssh.auth === 'password' && sshPassword === '' && !editing?.hasSshPassword) return '请填写 SSH 密码'
+    }
     return ''
   }
 
@@ -244,6 +300,15 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
           <Field label="驱动" required span hint={dialect ? `方言：${dialectLabel(dialect)}` : undefined}>
             <Select options={driverOptions} value={choice} onValueChange={changeChoice} />
           </Field>
+          {supportsNativeMysql ? (
+            <div className="dshdb-span-2 dshdb-list">
+              <Switch
+                checked={nativeEngine}
+                onChange={setNativeEngine}
+                label="使用内置 MySQL 引擎（无需 Java；支持 SSH 隧道）"
+              />
+            </div>
+          ) : null}
           {isCustom && !customDriver ? (
             <div className="dshdb-span-2">
               <Banner tone="warn">还没有自定义驱动，请先在「设置」标签页新增。</Banner>
@@ -297,7 +362,67 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
               />
             </Field>
           )}
-          {!isRedis ? (
+          {useNative ? (
+            <div className="dshdb-span-2 dshdb-list">
+              <Switch checked={sshEnabled} onChange={setSshEnabled} label="通过 SSH 隧道连接" />
+            </div>
+          ) : null}
+          {useNative && sshEnabled ? (
+            <>
+              <Field label="SSH 主机" required>
+                <TextInput value={sshHost} onChange={(event) => setSshHost(event.target.value)} placeholder="bastion.example.com" />
+              </Field>
+              <Field label="SSH 端口" required>
+                <TextInput
+                  value={sshPort}
+                  inputMode="numeric"
+                  onChange={(event) => setSshPort(event.target.value.replace(/[^0-9]/g, ''))}
+                />
+              </Field>
+              <Field label="SSH 用户名" required>
+                <TextInput value={sshUser} onChange={(event) => setSshUser(event.target.value)} placeholder="ops" />
+              </Field>
+              <Field label="SSH 认证">
+                <Select
+                  value={sshAuth}
+                  options={[
+                    { value: 'password', label: '密码' },
+                    { value: 'key', label: '私钥' },
+                    { value: 'agent', label: 'ssh-agent' },
+                  ]}
+                  onValueChange={(value) => setSshAuth(value as 'password' | 'key' | 'agent')}
+                />
+              </Field>
+              {sshAuth === 'password' ? (
+                <Field label="SSH 密码" hint={editing?.hasSshPassword ? '已保存，留空则保持不变' : undefined}>
+                  <TextInput
+                    type="password"
+                    value={sshPassword}
+                    autoComplete="new-password"
+                    onChange={(event) => setSshPassword(event.target.value)}
+                    placeholder={editing?.hasSshPassword ? '留空则保持不变' : 'SSH 密码'}
+                  />
+                </Field>
+              ) : null}
+              {sshAuth === 'key' ? (
+                <>
+                  <Field label="私钥路径" required>
+                    <TextInput value={sshKeyPath} onChange={(event) => setSshKeyPath(event.target.value)} placeholder="~/.ssh/id_ed25519" />
+                  </Field>
+                  <Field label="私钥口令">
+                    <TextInput
+                      type="password"
+                      value={sshPassphrase}
+                      autoComplete="new-password"
+                      onChange={(event) => setSshPassphrase(event.target.value)}
+                      placeholder="可选"
+                    />
+                  </Field>
+                </>
+              ) : null}
+            </>
+          ) : null}
+          {!isRedis && !useNative ? (
             <Field label="额外 JDBC 参数" span hint="每行一个 key=value，例如 useSSL=false">
               <TextArea
                 value={paramsText}
@@ -345,9 +470,14 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
           </span>
         ) : null}
         {isCustom ? <Tag tone="business">自定义驱动</Tag> : null}
-        {!isRedis && dialect ? (
+        {!isRedis && dialect && !useNative ? (
           <span className="dshdb-muted" style={{ fontSize: 11 }}>
             驱动类：{customDriver?.driverClass ?? preset?.driverClass ?? '—'}
+          </span>
+        ) : null}
+        {useNative ? (
+          <span className="dshdb-muted" style={{ fontSize: 11 }}>
+            引擎：内置 MySQL（driver pack：mysql2）
           </span>
         ) : null}
         {!editing ? null : (

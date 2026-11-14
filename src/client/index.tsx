@@ -6,14 +6,14 @@ import { DatabaseIcon } from './icons'
 import { setConsoleTabOpener, setTableTabOpener, type ConsoleTabParams, type TableTabParams } from './tab-open'
 import { injectStyles } from './styles'
 
-const PLUGIN_ID = 'dsh-ide-database'
-const TAB_ID = 'dsh-ide-database/database'
+const PLUGIN_ID = 'dsh-database-view'
+const TAB_ID = 'dsh-database-view/database'
 const TAB_KIND = 'database'
 const TAB_TITLE = '数据库'
-const TABLE_TAB_ID = 'dsh-ide-database/table'
+const TABLE_TAB_ID = 'dsh-database-view/table'
 const TABLE_TAB_KIND = 'database-table'
 const TABLE_TAB_TITLE = '数据表'
-const CONSOLE_TAB_ID = 'dsh-ide-database/console'
+const CONSOLE_TAB_ID = 'dsh-database-view/console'
 const CONSOLE_TAB_KIND = 'database-console'
 const CONSOLE_TAB_TITLE = '查询控制台'
 
@@ -102,7 +102,7 @@ export const inject: string[] = ['slots']
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     return injectStyles()
-  }, 'dsh-ide-database: styles')
+  }, 'dsh-database-view: styles')
 
   // The right Sidebar owns both the tab type list and the keyed body slot.
   // Inject lazily so hosts without the native sidebar do not fail activation.
@@ -157,6 +157,6 @@ export function apply(ctx: ClientContext): void {
         setTableTabOpener(undefined)
         setConsoleTabOpener(undefined)
       }
-    }, 'dsh-ide-database: native right sidebar tab')
+    }, 'dsh-database-view: native right sidebar tab')
   })
 }

@@ -10,3 +10,5 @@ playwright-report/
 .ghconfig/
 .npm-cache/
 .fork/
+
+.npm-logs/

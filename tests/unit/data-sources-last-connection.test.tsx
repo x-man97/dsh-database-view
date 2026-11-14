@@ -21,7 +21,7 @@ vi.mock('../../src/client/api', () => ({
 
 import { useDataSources } from '../../src/client/hooks/useDataSources'
 
-const KEY = 'dsh-ide-database.last-connection.v1'
+const KEY = 'dsh-database-view.last-connection.v1'
 
 function connection(id: string, name: string) {
   return {

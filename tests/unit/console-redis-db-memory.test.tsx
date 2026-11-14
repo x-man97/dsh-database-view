@@ -38,7 +38,7 @@ const settings = {
   confirmDestructive: false,
 }
 
-const KEY = 'dsh-ide-database.redis-db.v1:redis-1'
+const KEY = 'dsh-database-view.redis-db.v1:redis-1'
 
 beforeEach(() => {
   window.localStorage.clear()

@@ -25,7 +25,7 @@ vi.mock('../../src/client/api', () => ({
 
 import { useDataSources } from '../../src/client/hooks/useDataSources'
 
-const SCHEMAS_KEY = 'dsh-ide-database:visible-schemas:'
+const SCHEMAS_KEY = 'dsh-database-view:visible-schemas:'
 
 function connection(id: string, database: string) {
   return {

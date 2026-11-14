@@ -1,6 +1,7 @@
 import { ROUTE_PREFIX } from '../shared/presets.js'
 import { ConfigStore } from './config.js'
 import { DriverManager } from './drivers.js'
+import { DriverManager as NativeDriverManager } from './drivers/manager.js'
 import { JavaLocator } from './java.js'
 import { JreManager } from './jre.js'
 import { pluginPaths } from './paths.js'
@@ -13,7 +14,7 @@ import { SqlService } from './sql.js'
 import { StructureStore } from './structure.js'
 import { createDatabaseTools } from './tools.js'
 
-export const name = 'dsh-ide-database'
+export const name = 'dsh-database-view'
 
 /**
  * `webServer` carries the panel API; `tools` registers the agent tools.
@@ -31,7 +32,8 @@ export function apply(ctx: HostContext): void {
   const java = new JavaLocator(paths.jreDir)
   const jre = new JreManager(paths, log)
   const drivers = new DriverManager(paths, config, log)
-  const sql = new SqlService(paths, config, secrets, drivers, java, log)
+  const nativeDrivers = new NativeDriverManager(paths, log)
+  const sql = new SqlService(paths, config, secrets, drivers, java, log, nativeDrivers)
   const redis = new RedisManager(config, secrets, log)
   const structure = new StructureStore(paths.structureFile, log)
   // Trashed connections keep their cached structure so restoring one stays
@@ -49,7 +51,7 @@ export function apply(ctx: HostContext): void {
     log,
   })
 
-  const handler = createRouteHandler({ ctx, paths, config, secrets, drivers, java, jre, sql, redis, structure, prefetch, log })
+  const handler = createRouteHandler({ ctx, paths, config, secrets, drivers, nativeDrivers, java, jre, sql, redis, structure, prefetch, log })
 
   ctx.effect(() => {
     const dispose = ctx.webServer.register({ kind: 'prefix', path: ROUTE_PREFIX, handler })

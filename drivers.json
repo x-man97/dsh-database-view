@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "packs": [
+    {
+      "id": "mysql2",
+      "engine": "mysql",
+      "kind": "js",
+      "version": "3.24.6",
+      "delivery": "bundled",
+      "license": "MIT",
+      "file": "drivers/mysql2-3.24.6.mjs",
+      "sha256": "25014237d35707e1e215924f57d6fba6978ed9ff09dbaf1858fc1c5a75ea9bd1",
+      "bytes": 1396050
+    }
+  ]
+}

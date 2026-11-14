@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../src/client/api', () => ({ api: mocks }))
 
-const SCHEMA_KEY = 'dsh-ide-database.schema.v1:mysql-1'
+const SCHEMA_KEY = 'dsh-database-view.schema.v1:mysql-1'
 
 function settings() {
   return {

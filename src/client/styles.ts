@@ -1557,7 +1557,7 @@ export const CSS = `
 
 `;
 
-const STYLE_ID = 'dsh-ide-database/styles';
+const STYLE_ID = 'dsh-database-view/styles';
 
 export function injectStyles(): () => void {
   if (typeof document === 'undefined') return () => {}
@@ -1565,7 +1565,7 @@ export function injectStyles(): () => void {
   if (!element) {
     element = document.createElement('style')
     element.id = STYLE_ID
-    element.dataset.plugin = 'dsh-ide-database'
+    element.dataset.plugin = 'dsh-database-view'
     document.head.appendChild(element)
   }
   element.textContent = CSS

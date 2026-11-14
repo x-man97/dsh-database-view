@@ -1,14 +1,14 @@
 {
-  "name": "dsh-ide-database",
-  "version": "0.4.0",
-  "description": "JetBrains Database-style data source tool window and agent tools for DeepSeek Harness.",
+  "name": "dsh-database-view",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness database table preview plugin: Java-free, SSH tunnel, on-demand drivers.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/qwq1999/dsh-ide-database.git"
+    "url": "git+https://github.com/x-man97/dsh-database-view.git"
   },
-  "homepage": "https://github.com/qwq1999/dsh-ide-database#readme",
+  "homepage": "https://github.com/x-man97/dsh-database-view#readme",
   "bugs": {
-    "url": "https://github.com/qwq1999/dsh-ide-database/issues"
+    "url": "https://github.com/x-man97/dsh-database-view/issues"
   },
   "type": "module",
   "main": "lib/index.js",
@@ -26,7 +26,10 @@
     "assets",
     "cordis.patch.yml",
     "dsh.plugin.json",
-    "README.md"
+    "README.md",
+    "drivers",
+    "drivers.json",
+    "README.zh-CN.md"
   ],
   "dsh": {
     "bundle": {
@@ -37,7 +40,8 @@
     }
   },
   "dependencies": {
-    "ioredis": "^6.0.0"
+    "ioredis": "^6.0.0",
+    "ssh2": "^1.17.0"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
@@ -58,8 +62,10 @@
     "@types/node": "^24.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/ssh2": "^1.15.6",
     "esbuild": "^0.28.2",
     "jsdom": "^30.1.3",
+    "mysql2": "^3.24.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.9.3",
@@ -70,7 +76,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "npm run build:bridge && npm run build:host && npm run build:client",
+    "build": "npm run build:drivers && npm run build:host && npm run build:client",
     "build:bridge": "node scripts/build-bridge.mjs",
     "build:host": "tsc -p tsconfig.host.json",
     "build:client": "node scripts/build-client.mjs",
@@ -82,7 +88,8 @@
     "qa:ui": "node scripts/qa-ui.mjs",
     "changelog": "node scripts/build-changelog.mjs",
     "changelog:check": "node scripts/build-changelog.mjs --check",
-    "verify": "npm run typecheck && npm test"
+    "verify": "npm run typecheck && npm test",
+    "build:drivers": "node scripts/build-drivers.mjs"
   },
   "keywords": [
     "dsh",

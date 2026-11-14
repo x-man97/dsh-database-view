@@ -18,6 +18,8 @@ import type {
   DriverChoice,
   JarRef,
   SqlDialect,
+  SshConfig,
+  TlsConfig,
   TrashedConnection,
 } from '../shared/types.js'
 import { DbError, errorMessage } from './errors.js'
@@ -135,6 +137,55 @@ function sanitizeJar(raw: unknown): JarRef {
     throw new DbError('invalid', `非法的 Maven 坐标：${group}:${artifact}:${version}`)
   }
   return { group, artifact, version }
+}
+
+function sanitizeSsh(raw: unknown): SshConfig | undefined {
+  if (raw === undefined || raw === null) return undefined
+  if (!isRecord(raw)) throw new DbError('invalid', 'SSH 配置必须是对象')
+  if (raw.enabled !== true) return undefined
+  const host = asString(raw.host, 'SSH 主机', TEXT_MAX, true)
+  const port = asPort(raw.port, 'SSH 端口', 22)
+  const user = asString(raw.user, 'SSH 用户名', 128, true)
+  const authRaw = asString(raw.auth, 'SSH 认证方式', 16, true)
+  const auth = authRaw === 'password' || authRaw === 'key' || authRaw === 'agent' ? authRaw : undefined
+  if (auth === undefined) throw new DbError('invalid', 'SSH 认证方式只能是 password、key 或 agent')
+  const policyRaw = asString(raw.hostKeyPolicy, 'SSH 主机密钥策略', 16)
+  const hostKeyPolicy = policyRaw === 'strict' || policyRaw === 'accept-new' || policyRaw === 'ask' ? policyRaw : 'ask'
+  const privateKeyPath = asString(raw.privateKeyPath, 'SSH 私钥路径', 1024)
+  return {
+    enabled: true,
+    host,
+    port,
+    user,
+    auth,
+    hostKeyPolicy,
+    ...(privateKeyPath === '' ? {} : { privateKeyPath }),
+    connectTimeoutMs: asInt(raw.connectTimeoutMs, 'SSH 连接超时', 1000, 120000, 15000),
+    keepaliveIntervalMs: asInt(raw.keepaliveIntervalMs, 'SSH keepalive', 5000, 300000, 30000),
+  }
+}
+
+function sanitizeTls(raw: unknown): TlsConfig | undefined {
+  if (raw === undefined || raw === null) return undefined
+  if (!isRecord(raw)) throw new DbError('invalid', 'TLS 配置必须是对象')
+  const modeRaw = asString(raw.mode, 'TLS 模式', 16)
+  const mode = modeRaw === 'disable' || modeRaw === 'prefer' || modeRaw === 'require' || modeRaw === 'verify-ca' || modeRaw === 'verify-full'
+    ? modeRaw
+    : undefined
+  if (mode === undefined) throw new DbError('invalid', 'TLS 模式不合法')
+  if (mode === 'disable') return undefined
+  const caPath = asString(raw.caPath, 'CA 证书路径', 1024)
+  const certPath = asString(raw.certPath, '客户端证书路径', 1024)
+  const keyPath = asString(raw.keyPath, '客户端私钥路径', 1024)
+  const servername = asString(raw.servername, 'TLS servername', TEXT_MAX)
+  return {
+    mode,
+    ...(caPath === '' ? {} : { caPath }),
+    ...(certPath === '' ? {} : { certPath }),
+    ...(keyPath === '' ? {} : { keyPath }),
+    ...(servername === '' ? {} : { servername }),
+    ...(raw.allowInvalidHostname === true ? { allowInvalidHostname: true } : {}),
+  }
 }
 
 export class ConfigStore {
@@ -279,6 +330,8 @@ export class ConfigStore {
       const dialect = preset !== undefined ? preset.dialect : this.data.drivers.find((d) => d.id === customDriverId)?.dialect
       if (dialect === undefined) return []
       const secretName = typeof raw.secretName === 'string' && raw.secretName !== '' ? raw.secretName : undefined
+      const ssh = sanitizeSsh(raw.ssh)
+      const tls = sanitizeTls(raw.tls)
       return [{
         id,
         name: asString(raw.name, 'connection.name', NAME_MAX, true),
@@ -294,6 +347,9 @@ export class ConfigStore {
         redisDb: asInt(raw.redisDb, 'connection.redisDb', 0, 255, 0),
         params: sanitizeParams(raw.params),
         readOnly: raw.readOnly === true,
+        ...(raw.nativeEngine === true ? { nativeEngine: true } : {}),
+        ...(ssh === undefined ? {} : { ssh }),
+        ...(tls === undefined ? {} : { tls }),
         createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : nowIso(),
         ...(typeof raw.lastUsedAt === 'string' ? { lastUsedAt: raw.lastUsedAt } : {}),
       }]
@@ -331,6 +387,11 @@ export class ConfigStore {
       redisDb: conn.redisDb,
       params: { ...conn.params },
       readOnly: conn.readOnly,
+      ...(conn.nativeEngine === true ? { nativeEngine: true } : {}),
+      ...(conn.ssh === undefined ? {} : { ssh: { ...conn.ssh } }),
+      ...(conn.tls === undefined ? {} : { tls: { ...conn.tls } }),
+      hasSshPassword: conn.ssh !== undefined && this.secrets.has(Store.nameForSshPassword(conn.id)),
+      hasSshPassphrase: conn.ssh !== undefined && this.secrets.has(Store.nameForSshPassphrase(conn.id)),
       createdAt: conn.createdAt,
       ...(conn.lastUsedAt === undefined ? {} : { lastUsedAt: conn.lastUsedAt }),
     }
@@ -394,11 +455,21 @@ export class ConfigStore {
     // The read-only flag is decided when the connection is created and is immutable
     // afterwards: edits always keep the stored value, even if a caller sends another.
     const readOnly = existing === undefined ? draft.readOnly === true : existing.readOnly
+    const nativeEngine = driver === 'mysql' && draft.nativeEngine === true
+    const ssh = sanitizeSsh(draft.ssh)
+    const tls = sanitizeTls(draft.tls)
 
     const id = existing?.id ?? randId('conn')
     const secretName = existing?.secretName ?? Store.nameForConnection(id)
     if (typeof draft.password === 'string' && draft.password !== '') this.secrets.set(secretName, draft.password)
     else if (draft.clearPassword === true) this.secrets.delete(secretName)
+
+    if (ssh !== undefined) {
+      const sshPasswordName = Store.nameForSshPassword(id)
+      const sshPassphraseName = Store.nameForSshPassphrase(id)
+      if (typeof draft.sshPassword === 'string' && draft.sshPassword !== '') this.secrets.set(sshPasswordName, draft.sshPassword)
+      if (typeof draft.sshPassphrase === 'string' && draft.sshPassphrase !== '') this.secrets.set(sshPassphraseName, draft.sshPassphrase)
+    }
 
     const connection: ConnectionConfig = {
       id,
@@ -415,6 +486,9 @@ export class ConfigStore {
       redisDb,
       params,
       readOnly,
+      ...(nativeEngine ? { nativeEngine: true } : {}),
+      ...(ssh === undefined ? {} : { ssh }),
+      ...(tls === undefined ? {} : { tls }),
       createdAt: existing?.createdAt ?? nowIso(),
       ...(existing?.lastUsedAt === undefined ? {} : { lastUsedAt: existing.lastUsedAt }),
     }
@@ -458,6 +532,8 @@ export class ConfigStore {
     this.data.connections = this.data.connections.filter((entry) => entry.id !== id)
     this.data.trash = this.data.trash.filter((entry) => entry.id !== id)
     if (connection.secretName !== undefined) this.secrets.delete(connection.secretName)
+    this.secrets.delete(Store.nameForSshPassword(connection.id))
+    this.secrets.delete(Store.nameForSshPassphrase(connection.id))
     this.persist()
     return connection
   }
@@ -467,6 +543,8 @@ export class ConfigStore {
     const count = this.data.trash.length
     for (const connection of this.data.trash) {
       if (connection.secretName !== undefined) this.secrets.delete(connection.secretName)
+      this.secrets.delete(Store.nameForSshPassword(connection.id))
+      this.secrets.delete(Store.nameForSshPassphrase(connection.id))
     }
     this.data.trash = []
     this.persist()

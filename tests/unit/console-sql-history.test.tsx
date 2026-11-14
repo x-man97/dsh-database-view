@@ -80,7 +80,7 @@ describe('sql editor history recall', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     globalThis.localStorage.setItem(
-      'dsh-ide-database.history.v1',
+      'dsh-database-view.history.v1',
       JSON.stringify({
         sql: [
           { statement: 'SELECT 2', at: 2 },

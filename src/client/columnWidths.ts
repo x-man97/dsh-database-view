@@ -6,7 +6,7 @@
  * stale or hand-edited entry can never make a column invisible.
  */
 
-const STORAGE_KEY = 'dsh-ide-database.colwidths.v1'
+const STORAGE_KEY = 'dsh-database-view.colwidths.v1'
 const MIN_WIDTH = 40
 const MAX_WIDTH = 1200
 const MAX_COLUMNS = 64

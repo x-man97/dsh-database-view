@@ -45,9 +45,9 @@ import { TABLE_PAGE_KEY, readPageSize, writePageSize } from './pagesize'
 import { readAllowedNumber, readFlag, readText, writeFlag, writeNumber, writeText } from './prefs'
 
 const PAGE_SIZES = [100, 200, 500, 1000, 2000, 5000]
-const AUTO_REFRESH_KEY = 'dsh-ide-database.auto-refresh.v1'
-const FILTERS_OPEN_KEY = 'dsh-ide-database.table.filters-open.v1'
-const ORDER_KEY = 'dsh-ide-database.table-order.v1'
+const AUTO_REFRESH_KEY = 'dsh-database-view.auto-refresh.v1'
+const FILTERS_OPEN_KEY = 'dsh-database-view.table.filters-open.v1'
+const ORDER_KEY = 'dsh-database-view.table-order.v1'
 const AUTO_REFRESH_OPTIONS = [0, 5000, 10000, 30000] as const
 
 const noTabInfo = (): undefined => undefined

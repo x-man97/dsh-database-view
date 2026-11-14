@@ -107,10 +107,10 @@ import { CONSOLE_PAGE_KEY, readPageSize, writePageSize } from './pagesize'
 
 /** Redis accepts up to 16 logical databases by default; allow a generous ceiling. */
 const REDIS_DB_CHOICES = Array.from({ length: 4096 }, (_, index) => index)
-const REDIS_DB_KEY_PREFIX = 'dsh-ide-database.redis-db.v1:'
-const SCHEMA_KEY_PREFIX = 'dsh-ide-database.schema.v1:'
+const REDIS_DB_KEY_PREFIX = 'dsh-database-view.redis-db.v1:'
+const SCHEMA_KEY_PREFIX = 'dsh-database-view.schema.v1:'
 
-const TTL_ONLY_KEY = 'dsh-ide-database.redis.ttl-only.v1'
+const TTL_ONLY_KEY = 'dsh-database-view.redis.ttl-only.v1'
 /** 中文输入法用回车确认候选词时，KeyboardEvent 带 isComposing 标记。 */
 function composing(event: { nativeEvent: Event }): boolean {
   return (event.nativeEvent as unknown as { isComposing?: boolean }).isComposing === true

@@ -87,7 +87,7 @@ const demos = [
 ]
 
 for (const demo of demos) {
-  const response = await fetch(`${BASE}/dsh-ide-database/api/connections/save`, {
+  const response = await fetch(`${BASE}/dsh-database-view/api/connections/save`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', cookie },
     body: JSON.stringify(demo),
