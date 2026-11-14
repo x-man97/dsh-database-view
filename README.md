@@ -2,11 +2,12 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-> **Status: M0 in progress.** This repository is a fork of
+> **Status: M0 vertical slice complete.** This repository is a fork of
 > [`qwq1999/dsh-ide-database`](https://github.com/qwq1999/dsh-ide-database) and is being reshaped into a
 > Java-free DSH database plugin with built-in SSH tunneling and bundled driver packs.
-> The package rename, native MySQL engine, SSH transport, bundled MySQL driver, and connection UI are in place;
-> the remaining engines and hardening work are still ahead.
+> Working now: package rename, native MySQL engine, SSH transport, bundled MySQL driver, connection UI,
+> schema/table/DDL/query over the existing right sidebar. PostgreSQL/SQLite/SQL Server/Oracle, hardening,
+> and visual QA are still ahead.
 
 `dsh-database-view` is a planned DeepSeek Harness (DSH) plugin for browsing database schemas and previewing
 table data in the right sidebar, in the spirit of the JetBrains Database tool window. It will also expose
