@@ -1331,6 +1331,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                 ? inlineEdit.mode === 'insert' ? 'INSERT' : 'UPDATE'
                 : `DELETE ${deletePreview?.count ?? 0} 行`}
             </span>
+            {keyColumns.length === 0 ? <Tag tone="warn">无主键：按全部列匹配</Tag> : null}
             <span className="dshdb-qbar-spacer" />
             <Button size="sm" variant="ghost" onClick={() => void copyText(inlineEdit !== null ? inlineSqlPreview : (deletePreview?.sqls.join(';\n') ?? ''))}>
               复制 SQL
