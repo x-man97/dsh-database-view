@@ -410,3 +410,22 @@ export function ArrowDownIcon(props: IconProps): ReactElement {
   )
 }
 
+
+export function MinusIcon(props: IconProps): ReactElement {
+  return (
+    <Svg {...props}>
+      <path d="M5 12h14" />
+    </Svg>
+  )
+}
+
+/** Eye + up arrow: open the pending DML preview. */
+export function EyeUpIcon(props: IconProps): ReactElement {
+  return (
+    <Svg {...props}>
+      <path d="M2.5 9.5s3.2-4.5 7.5-4.5 7.5 4.5 7.5 4.5-3.2 4.5-7.5 4.5S2.5 9.5 2.5 9.5Z" />
+      <circle cx="10" cy="9.5" r="1.8" />
+      <path d="M19 12v7M16 15l3-3 3 3" />
+    </Svg>
+  )
+}

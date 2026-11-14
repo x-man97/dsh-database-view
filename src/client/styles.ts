@@ -1605,34 +1605,24 @@ export const CSS = `
 .dshdb-tok-function { color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 70%, var(--dsw-alias-label-primary)); }
 .dshdb-tok-operator { color: var(--dsw-alias-label-secondary); }
 
-/* Inline DML preview: the exact SQL is visible before it runs. */
-.dshdb-sql-preview {
-  margin: 6px 0 4px;
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-1);
-  overflow: hidden;
-}
-.dshdb-sql-preview-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
-  font-size: 11px;
-  color: var(--dsw-alias-label-secondary);
-}
-.dshdb-sql-preview-text {
+/* Pending table changes: new=grey/green/blue like a database IDE. */
+.dshdb-row-new { background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent) !important; }
+tr[data-deleted="true"] { background: color-mix(in srgb, var(--dsw-alias-label-tertiary) 10%, transparent) !important; }
+tr[data-deleted="true"] td { background: color-mix(in srgb, var(--dsw-alias-label-tertiary) 12%, transparent) !important; color: var(--dsw-alias-label-tertiary); text-decoration: line-through; opacity: 0.72; }
+.dshdb-cell-edited { background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, transparent); }
+.dshdb-dml-sql {
   margin: 0;
-  padding: 7px 9px;
-  max-height: 120px;
+  padding: 10px 12px;
+  max-height: 50vh;
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: break-word;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
   font-family: var(--ds-font-family-code, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 

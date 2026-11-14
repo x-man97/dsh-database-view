@@ -33,13 +33,17 @@ export interface CellMenuTarget {
   rowIndex: number
 }
 
-export interface InlineEdit {
-  mode: 'insert' | 'edit'
-  /** Row being replaced in edit mode. */
-  rowIndex?: number
+export interface PendingNewRow {
   values: Record<string, string>
-  readOnlyColumns?: ReadonlySet<string>
   onChange: (column: string, value: string) => void
+  onRemove: () => void
+}
+
+export interface CellEdit {
+  rowIndex: number
+  column: string
+  value: string
+  onChange: (value: string) => void
   onCommit: () => void
   onCancel: () => void
 }
@@ -85,8 +89,16 @@ export interface DataGridProps {
   onToggleRow?: (rowIndex: number, extend: boolean) => void
   /** Check or clear every visible row from the header checkbox. */
   onToggleAllRows?: () => void
-  /** Inline row editor rendered inside the grid, not in a dialog. */
-  inlineEdit?: InlineEdit
+  /** New rows that will be inserted when the user submits the pending DML. */
+  pendingNewRows?: PendingNewRow[]
+  /** One existing cell being edited in place. */
+  cellEdit?: CellEdit | null
+  /** Rows marked for deletion; rendered grey until submit. */
+  deletedRows?: ReadonlySet<number>
+  /** Existing cells with pending changes; rendered blue until submit. */
+  editedCells?: (rowIndex: number, column: string) => boolean
+  /** Double-clicking a cell starts in-place editing instead of opening it. */
+  onCellDoubleClick?: (rowIndex: number, column: ColumnInfo) => void
 }
 
 const MIN_COLUMN_WIDTH = 48
@@ -178,30 +190,15 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
     selectedRows,
     onToggleRow,
     onToggleAllRows,
-    inlineEdit,
+    pendingNewRows,
+    cellEdit,
+    deletedRows,
+    editedCells,
+    onCellDoubleClick,
   } = props
   const selectable = onToggleRow !== undefined
   const selectedCount = selectedRows?.size ?? 0
   const colSpan = columns.length + (selectable ? 2 : 1)
-  const inlineInput = (column: ColumnInfo, rowNo: string, autoFocus: boolean): ReactElement => (
-    <input
-      className="dshdb-cell-input"
-      aria-label={`${rowNo} ${column.name}`}
-      value={inlineEdit?.values[column.name] ?? ''}
-      readOnly={inlineEdit?.readOnlyColumns?.has(column.name) === true}
-      autoFocus={autoFocus}
-      onChange={(event) => inlineEdit?.onChange(column.name, event.target.value)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') {
-          event.preventDefault()
-          inlineEdit?.onCommit()
-        } else if (event.key === 'Escape') {
-          event.preventDefault()
-          inlineEdit?.onCancel()
-        }
-      }}
-    />
-  )
   const [menu, setMenu] = useState<{ items: ColumnMenuItem[]; x: number; y: number } | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const dragIndex = useRef<number | null>(null)
@@ -452,9 +449,9 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
             const rowIndex = range.start + index
             const rowNo = rowNumbers?.[rowIndex] ?? offset + rowIndex + 1
             const checked = selectedRows?.has(rowIndex) === true
-            const editing = inlineEdit?.mode === 'edit' && inlineEdit.rowIndex === rowIndex
+            const deleted = deletedRows?.has(rowIndex) === true
             return (
-              <tr key={rowIndex} data-selected={selectable && checked ? 'true' : undefined} data-editing={editing ? 'true' : undefined}>
+              <tr key={rowIndex} data-selected={selectable && checked ? 'true' : undefined} data-deleted={deleted ? 'true' : undefined}>
                 {selectable ? (
                   <td className="dshdb-select-cell">
                     <input
@@ -467,10 +464,27 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
                 ) : null}
                 <td className="dshdb-num">{rowNo}</td>
                 {columns.map((column, columnIndex) => {
+                  const editing = cellEdit?.rowIndex === rowIndex && cellEdit.column === column.name
                   if (editing) {
                     return (
                       <td key={`${column.name}-${columnIndex}`} className="dshdb-cell-editing">
-                        {inlineInput(column, String(rowNo), columnIndex === 0)}
+                        <input
+                          className="dshdb-cell-input"
+                          aria-label={`${rowNo} ${column.name}`}
+                          autoFocus
+                          value={cellEdit.value}
+                          onChange={(event) => cellEdit.onChange(event.target.value)}
+                          onBlur={() => cellEdit.onCommit()}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault()
+                              cellEdit.onCommit()
+                            } else if (event.key === 'Escape') {
+                              event.preventDefault()
+                              cellEdit.onCancel()
+                            }
+                          }}
+                        />
                       </td>
                     )
                   }
@@ -478,17 +492,26 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
                   // One format per cell: the same text feeds the tooltip and the body.
                   const text = formatCell(value)
                   const shown = text.length > CELL_TEXT_LIMIT ? `${text.slice(0, CELL_TEXT_LIMIT)}…` : text
+                  const changed = editedCells?.(rowIndex, column.name) === true
                   return (
                     <td
                       key={`${column.name}-${columnIndex}`}
                       title={text}
                       className={
-                        [numericColumn(column) ? 'dshdb-cell-num' : '', cellClass?.(column, value) ?? '']
+                        [
+                          numericColumn(column) ? 'dshdb-cell-num' : '',
+                          changed ? 'dshdb-cell-edited' : '',
+                          cellClass?.(column, value) ?? '',
+                        ]
                           .filter((value) => value !== '')
                           .join(' ') || undefined
                       }
                       onClick={onCellClick === undefined ? undefined : () => onCellClick(column, value)}
-                      onDoubleClick={onCellOpen === undefined ? undefined : () => onCellOpen(column, value)}
+                      onDoubleClick={
+                        onCellDoubleClick === undefined
+                          ? onCellOpen === undefined ? undefined : () => onCellOpen(column, value)
+                          : () => onCellDoubleClick(rowIndex, column)
+                      }
                       onContextMenu={
                         cellMenu === undefined
                           ? undefined
@@ -505,17 +528,25 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
               </tr>
             )
           })}
-          {inlineEdit?.mode === 'insert' ? (
-            <tr className="dshdb-inline-row">
+          {pendingNewRows?.map((pending, rowIndex) => (
+            <tr className="dshdb-inline-row dshdb-row-new" key={`new-${rowIndex}`}>
               {selectable ? <td className="dshdb-select-cell" /> : null}
-              <td className="dshdb-num">新</td>
+              <td className="dshdb-num">
+                <button type="button" className="dshdb-row-action" title="移除这行新增" aria-label="移除新增行" onClick={pending.onRemove}>×</button>
+              </td>
               {columns.map((column, columnIndex) => (
                 <td key={`insert-${column.name}-${columnIndex}`} className="dshdb-cell-editing">
-                  {inlineInput(column, '新行', columnIndex === 0)}
+                  <input
+                    className="dshdb-cell-input"
+                    aria-label={`新行 ${rowIndex + 1} ${column.name}`}
+                    autoFocus={rowIndex === 0 && columnIndex === 0}
+                    value={pending.values[column.name] ?? ''}
+                    onChange={(event) => pending.onChange(column.name, event.target.value)}
+                  />
                 </td>
               ))}
             </tr>
-          ) : null}
+          ))}
           {range.paddingBottom > 0 ? (
             <tr className="dshdb-vpad" aria-hidden="true">
               <td colSpan={colSpan} style={{ height: range.paddingBottom }} />
