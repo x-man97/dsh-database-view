@@ -72,7 +72,7 @@ describe('settings console auto complete', () => {
     const panel = openPanel()
     fireEvent.click(within(panel).getByRole('switch', { name: switchName }))
     expect(within(panel).getByRole('switch', { name: switchName }).getAttribute('aria-checked')).toBe('false')
-    fireEvent.click(within(panel).getByRole('button', { name: '保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
     expect(onSave).toHaveBeenCalledTimes(1)
     expect(onSave.mock.calls[0]?.[0]).toMatchObject({ consoleAutoComplete: false })
   })

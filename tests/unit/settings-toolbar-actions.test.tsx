@@ -78,7 +78,7 @@ describe('settings data-source toolbar order', () => {
       (row) => row.textContent,
     )
     expect(order.slice(0, 2)).toEqual(['编辑', '新增'])
-    fireEvent.click(within(panel).getByRole('button', { name: '保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
     const draft = onSave.mock.calls[0]?.[0] as { toolbarActions?: string[] }
     expect(draft.toolbarActions?.slice(0, 2)).toEqual(['edit', 'add'])
     expect(draft.toolbarActions).toHaveLength(7)
@@ -89,7 +89,7 @@ describe('settings data-source toolbar order', () => {
     const panel = openPanel()
     fireEvent.click(within(panel).getByLabelText('下移 新增'))
     fireEvent.click(within(panel).getByRole('button', { name: '恢复默认' }))
-    fireEvent.click(within(panel).getByRole('button', { name: '保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
     const draft = onSave.mock.calls[0]?.[0] as { toolbarActions?: string[] }
     expect(draft.toolbarActions).toEqual([])
   })

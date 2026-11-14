@@ -151,9 +151,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     ...(clearPassword ? { clearPassword: true } : {}),
     database: isRedis ? '' : database.trim(),
     redisDb: Number.parseInt(redisDb, 10) || 0,
-    // The read-only flag is chosen once, when the connection is created; an edit
-    // always keeps the stored value (the switch is disabled for existing rows).
-    readOnly: editing ? editing.readOnly : readOnly,
+    readOnly,
     ...(supportsSsh && sshEnabled
       ? {
           ssh: {
@@ -406,12 +404,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
             <Switch
               checked={readOnly}
               onChange={setReadOnly}
-              disabled={editing != null}
-              label={
-                editing == null
-                  ? t('conn.readonly')
-                  : t('conn.readonlyEdit')
-              }
+              label={t('conn.readonly')}
             />
           </div>
         </div>

@@ -77,7 +77,7 @@ describe('settings console toolbar order', () => {
       (row) => row.textContent,
     )
     expect(order.slice(0, 2)).toEqual(['取消', '执行'])
-    fireEvent.click(within(panel).getByRole('button', { name: '保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
     expect(onSave).toHaveBeenCalledTimes(1)
     const draft = onSave.mock.calls[0]?.[0] as { consoleActions?: string[] }
     expect(draft.consoleActions?.slice(0, 2)).toEqual(['cancel', 'run'])
@@ -89,7 +89,7 @@ describe('settings console toolbar order', () => {
     const panel = openPanel()
     fireEvent.click(within(panel).getByLabelText('下移 执行'))
     fireEvent.click(within(panel).getByRole('button', { name: '恢复默认' }))
-    fireEvent.click(within(panel).getByRole('button', { name: '保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
     const draft = onSave.mock.calls[0]?.[0] as { consoleActions?: string[] }
     expect(draft.consoleActions).toEqual([])
   })

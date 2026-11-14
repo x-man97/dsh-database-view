@@ -142,14 +142,14 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
 
   return (
     <div className="dshdb-scroll dshdb-scroll-thin" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="dshdb-inline" style={{ justifyContent: 'flex-end', padding: '2px 0' }}>
+        <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
+          {t('settings.save')}
+        </Button>
+      </div>
       <Panel
         title={t('settings.querySecurity')}
         collapsible
-        actions={
-          <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
-            {t('settings.save')}
-          </Button>
-        }
         bodyClassName="dshdb-panel-body-pad"
       >
         <div className="dshdb-form">
@@ -215,9 +215,6 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
             <Button size="sm" variant="ghost" onClick={() => update('keybindings', {})}>
               {t('settings.restore')}
             </Button>
-            <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
-              {t('settings.save')}
-            </Button>
           </div>
         }
         bodyClassName="dshdb-panel-body-pad"
@@ -253,9 +250,6 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
           <div className="dshdb-inline">
             <Button size="sm" variant="ghost" onClick={() => update('toolbarActions', [])}>
               {t('settings.restore')}
-            </Button>
-            <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
-              {t('settings.save')}
             </Button>
           </div>
         }
@@ -298,11 +292,6 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
         title={t('settings.console')}
         collapsible
         defaultOpen={false}
-        actions={
-          <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
-            {t('settings.save')}
-          </Button>
-        }
         bodyClassName="dshdb-panel-body-pad"
       >
         <div className="dshdb-list">
@@ -325,9 +314,6 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
           <div className="dshdb-inline">
             <Button size="sm" variant="ghost" onClick={() => update('consoleActions', [])}>
               {t('settings.restore')}
-            </Button>
-            <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
-              {t('settings.save')}
             </Button>
           </div>
         }

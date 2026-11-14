@@ -349,9 +349,8 @@ export class ConfigStore {
       throw new DbError('invalid', 'SQLite 连接需要数据库文件路径（database），例如 D:/data/app.db 或 :memory:')
     }
     const redisDb = dialect === 'redis' ? asInt(draft.redisDb, 'Redis 库序号', 0, 255, 0) : 0
-    // The read-only flag is decided when the connection is created and is immutable
-    // afterwards: edits always keep the stored value, even if a caller sends another.
-    const readOnly = existing === undefined ? draft.readOnly === true : existing.readOnly
+    // The read-only flag can be changed with the other connection fields.
+    const readOnly = draft.readOnly === true
     const ssh = sanitizeSsh(draft.ssh)
     const tls = sanitizeTls(draft.tls)
 

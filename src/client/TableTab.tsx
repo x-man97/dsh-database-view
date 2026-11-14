@@ -345,8 +345,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     connection !== null &&
     connection.readOnly !== true &&
     objectKind === 'table' &&
-    description !== null &&
-    hiddenCount === 0
+    description !== null
   const selectedIndex = selectedRows.size === 1 ? [...selectedRows][0] : undefined
   const selectedRow = selectedIndex === undefined ? undefined : displayRows[selectedIndex]
 
@@ -363,14 +362,16 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     setNewCell({ rowIndex: pendingNew.length, column: first.name, value: '' })
     setPendingNew((previous) => [...previous, {}])
   }
-  const startCellEdit = (rowIndex: number, column: ColumnInfo): void => {
+  const startCellEdit = useCallback((rowIndex: number, column: ColumnInfo): void => {
     if (!canMutate || pendingDeletes.has(rowIndex)) return
     const row = displayRows[rowIndex]
     if (row === undefined) return
-    const current = pendingUpdates[rowIndex]?.[column.name] ?? rowValue(column.name, row)
+    const index = displayColumns.findIndex((entry) => entry.name === column.name)
+    const loaded = index < 0 ? null : row[index] ?? null
+    const current = pendingUpdates[rowIndex]?.[column.name] ?? loaded
     setRowError('')
     setCellEdit({ rowIndex, column: column.name, value: current === null ? '' : String(current) })
-  }
+  }, [canMutate, displayColumns, displayRows, pendingDeletes, pendingUpdates])
   const updateCell = (value: string): void => {
     setCellEdit((previous) => (previous === null ? previous : { ...previous, value }))
   }
@@ -707,10 +708,10 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
               disabled: filters[cell.column.name] === undefined,
               run: () => {
                 setColumnFilter(cell.column, undefined)
-                apply({ page: 0 })
+                applyRef.current({ page: 0 })
               },
             },],
-    [connection, displayColumns, displayRows, filters, pageSize, params.schema, params.table],
+    [canMutate, connection, displayColumns, displayRows, filters, pageSize, params.schema, params.table, pendingDeletes, startCellEdit],
   )
   const hasPrevious = page > 0
   const lastPage = total === undefined ? undefined : Math.max(Math.ceil(total / pageSize) - 1, 0)
@@ -1509,7 +1510,17 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           deletedRows={pendingDeletes}
           editedCells={editedCell}
           pendingCellValue={pendingCell}
-          {...(canMutate ? { onCellDoubleClick: (rowIndex: number, column: ColumnInfo) => startCellEdit(rowIndex, column) } : {})}
+          {...(cellEdit === null ? {} : {
+            cellEdit: {
+              rowIndex: cellEdit.rowIndex,
+              column: cellEdit.column,
+              value: cellEdit.value,
+              onChange: updateCell,
+              onCommit: commitCell,
+              onCancel: cancelCell,
+            },
+          })}
+          {...(canMutate ? { onCellDoubleClick: startCellEdit } : {})}
         />
       )}
 

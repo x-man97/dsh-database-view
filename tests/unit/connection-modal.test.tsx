@@ -122,20 +122,20 @@ describe('read-only flag', () => {
     mocks.saveConnection.mockResolvedValue({ connection: existing })
   })
 
-  it('locks the switch when editing and saves the stored value', async () => {
+  it('allows changing the read-only switch when editing', async () => {
     renderModal({ ...existing, readOnly: true })
 
     const toggle = screen.getByRole('switch', { name: /只读连接/ }) as HTMLButtonElement
-    expect(toggle.disabled).toBe(true)
+    expect(toggle.disabled).toBe(false)
     expect(toggle.getAttribute('aria-checked')).toBe('true')
 
     fireEvent.click(toggle)
-    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
 
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(mocks.saveConnection).toHaveBeenCalledTimes(1))
-    expect(mocks.saveConnection.mock.calls[0][0].readOnly).toBe(true)
+    expect(mocks.saveConnection.mock.calls[0][0].readOnly).toBe(false)
   })
 
   it('lets a new connection be created read-only', async () => {

@@ -85,7 +85,7 @@ describe('settings shortcut recorder', () => {
     expect(panelReset).toBeTruthy()
     fireEvent.click(panelReset!)
     expect(input.value).toBe('Ctrl + L')
-    fireEvent.click(within(panelReset!.parentElement as HTMLElement).getByRole('button', { name: '保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
     expect(onSave).toHaveBeenCalledTimes(1)
     expect(onSave.mock.calls[0]![0].keybindings).toEqual({})
     // The wording stays 恢复默认; the old 全部恢复默认 label is gone.
