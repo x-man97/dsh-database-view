@@ -272,7 +272,7 @@ function appendConnection(context: BuildContext, connection: ClientConnection): 
         mode: 'redis-dbs',
       }
     : {
-        title: '选择要展示的架构',
+        title: t('tree.chooseSchemas'),
         allLabel: '所有架构',
         items: allSchemas.map((schema) => ({ id: schema.name, label: schema.name })),
         visible: shownSchemas,
@@ -293,10 +293,10 @@ function appendConnection(context: BuildContext, connection: ClientConnection): 
     query: filter,
     title: `${connection.name} · ${connection.host}:${connection.port}${
       redis ? ` · db${connection.redisDb}` : ''
-    }${cachedStamp ? `\n离线可用 · 结构更新于 ${relativeTime(cachedStamp)}` : ''}`,
+    }${cachedStamp ? `\n${t('tree.offlineAvailable')} · ${t('tree.structureUpdated', { time: relativeTime(cachedStamp) })}` : ''}`,
     tag: DIALECT_LABEL[connection.dialect],
     readOnly: connection.readOnly,
-    cacheLabel: !server && cachedStamp !== undefined && hasCachedStructure ? `缓存 ${relativeTime(cachedStamp)}` : undefined,
+    cacheLabel: !server && cachedStamp !== undefined && hasCachedStructure ? t('tree.cached', { time: relativeTime(cachedStamp) }) : undefined,
     picker,
     connecting,
     online: server !== undefined,
@@ -316,7 +316,7 @@ function appendConnection(context: BuildContext, connection: ClientConnection): 
       expandable: false,
       open: false,
       connectionId: connection.id,
-      label: connecting ? '正在连接…' : `连接到 ${connection.host}:${connection.port}`,
+      label: connecting ? t('tree.connecting') : t('tree.connectTo', { address: `${connection.host}:${connection.port}` }),
       loading: connecting,
       connecting,
     })

@@ -235,21 +235,21 @@ export function DataView(props: DataViewProps): ReactElement {
       const items = [
         ...(isRelation
           ? [
-              { label: '打开数据', run: () => props.onOpenTable(connectionId, schema, object) },
-              { label: '在控制台查询', run: () => props.onOpenConsole(connectionId, schema, object.name) },
+              { label: t('menu.openData'), run: () => props.onOpenTable(connectionId, schema, object) },
+              { label: t('menu.queryConsole'), run: () => props.onOpenConsole(connectionId, schema, object.name) },
               {
-                label: '复制查询语句',
+                label: t('menu.copySelect'),
                 // Same statement the console opens with; keeping it copyable
                 // saves a round trip through the other tab.
                 run: () => void copyText(tableSelectSql(props.connections.find((item) => item.id === connectionId)?.dialect ?? 'mysql', schema, object.name, '', '', 500)),
               },
             ]
           : []),
-        { label: '查看 DDL', run: () => props.onShowDdl(connectionId, schema, object.name, object.kind) },
-        { label: '复制名称', run: () => void copyText(object.name) },
-        { label: '复制限定名', run: () => void copyText(`${schema}.${object.name}`) },
+        { label: t('menu.showDdl'), run: () => props.onShowDdl(connectionId, schema, object.name, object.kind) },
+        { label: t('menu.copyName'), run: () => void copyText(object.name) },
+        { label: t('menu.copyQualified'), run: () => void copyText(`${schema}.${object.name}`) },
         {
-          label: '只看这个表',
+          label: t('menu.onlyTable'),
           run: () => {
             setFilter(`${schema}.${object.name}`)
             setTimeout(focusTreeFilter, 0)
@@ -289,10 +289,10 @@ export function DataView(props: DataViewProps): ReactElement {
     (event: React.MouseEvent<HTMLButtonElement>, connectionId: string, schemaName: string): void => {
       event.preventDefault()
       const items = [
-        { label: '复制库名', run: () => void copyText(schemaName) },
-        { label: '导出这个库的建表语句', run: () => exportSchemaScript(connectionId, schemaName) },
+        { label: t('menu.copySchema'), run: () => void copyText(schemaName) },
+        { label: t('menu.exportSchema'), run: () => exportSchemaScript(connectionId, schemaName) },
         {
-          label: '只看这个库',
+          label: t('menu.onlySchema'),
           run: () => {
             setFilter(`${schemaName}.`)
             // Put the caret in the filter box so the prefix can be extended instead of retyped.
@@ -309,13 +309,13 @@ export function DataView(props: DataViewProps): ReactElement {
     (event: React.MouseEvent<HTMLButtonElement>, connection: ClientConnection): void => {
       event.preventDefault()
       const items = [
-        { label: '复制连接名', run: () => void copyText(connection.name) },
-        { label: '复制连接ID', run: () => void copyText(connection.id) },
-        { label: '复制地址', run: () => void copyText(`${connection.host}:${connection.port}`) },
+        { label: t('menu.copyConnectionName'), run: () => void copyText(connection.name) },
+        { label: t('menu.copyConnectionId'), run: () => void copyText(connection.id) },
+        { label: t('menu.copyAddress'), run: () => void copyText(`${connection.host}:${connection.port}`) },
         ...(props.onOpenConsoleTab === undefined
           ? []
-          : [{ label: '打开控制台', run: () => props.onOpenConsoleTab?.(connection.id) }]),
-        { label: '重新连接', run: () => props.onConnect(connection.id) },
+          : [{ label: t('menu.openConsole'), run: () => props.onOpenConsoleTab?.(connection.id) }]),
+        { label: t('menu.reconnect'), run: () => props.onConnect(connection.id) },
       ]
       setConnectionMenu({ ...placeMenu(event.clientX, event.clientY, items), items })
     },
@@ -855,7 +855,7 @@ export function DataView(props: DataViewProps): ReactElement {
             ref={containerRef}
             className="dshdb-tree dshdb-scroll-thin"
             role="tree"
-            aria-label="数据源"
+            aria-label={t('tree.aria')}
             tabIndex={0}
             aria-activedescendant={activeVisible && activeRow?.navigable === true ? rowDomId(activeIndex) : undefined}
             onKeyDown={handleTreeKey}

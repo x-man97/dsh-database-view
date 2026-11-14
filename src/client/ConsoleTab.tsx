@@ -1601,44 +1601,44 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
   const toolbarActions: ConsoleToolbarAction[] = [
     {
       id: 'run',
-      label: '执行',
-      title: '有选中内容时只执行选中部分',
+      label: t('console.action.run'),
+      title: t('console.title.run'),
       variant: 'primary',
       loading: running,
       onClick: () => void run(),
     },
-    { id: 'cancel', label: '取消', disabled: !running, onClick: () => void cancel() },
+    { id: 'cancel', label: t('console.action.cancel'), disabled: !running, onClick: () => void cancel() },
     {
       id: 'history',
-      label: '历史',
+      label: t('console.action.history'),
       expanded: historyOpen,
       disabled: history.length === 0,
       onClick: () => setHistoryOpen((open) => !open),
     },
     {
       id: 'format',
-      label: '格式化',
-      title: `整理关键字大小写与换行（${shortcutLabel('console.format')}）`,
+      label: t('console.action.format'),
+      title: t('console.title.format', { binding: shortcutLabel('console.format') }),
       disabled: statement.trim() === '',
       onClick: applyFormat,
     },
     {
       id: 'import',
-      label: '导入',
-      title: `从 .sql 文件读取脚本并插入到光标处（上限 ${String(MAX_SQL_IMPORT_BYTES / 1024 / 1024)} MB）`,
+      label: t('console.action.import'),
+      title: t('console.title.import', { size: MAX_SQL_IMPORT_BYTES / 1024 / 1024 }),
       onClick: () => fileInputRef.current?.click(),
     },
     {
       id: 'save',
-      label: '保存',
-      title: '把编辑器里的 SQL 保存为 .sql 文件',
+      label: t('console.action.save'),
+      title: t('console.title.save'),
       disabled: statement.trim() === '',
       onClick: saveSqlFile,
     },
     {
       id: 'clear',
-      label: '清空',
-      title: '清空编辑器里的 SQL（不影响已经拿到的结果）',
+      label: t('console.action.clear'),
+      title: t('console.title.clear'),
       disabled: statement === '',
       onClick: () => {
         setStatement('')
@@ -1649,53 +1649,53 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     },
     {
       id: 'copy',
-      label: '复制 SQL',
-      visibleLabel: statementFlash.copied ? '已复制' : '复制 SQL',
-      title: '复制选中的 SQL；没有选中时复制光标所在的那条',
+      label: t('console.action.copy'),
+      visibleLabel: statementFlash.copied ? t('console.copied') : t('console.action.copy'),
+      title: t('console.title.copy'),
       disabled: statement.trim() === '',
       onClick: copyStatement,
     },
     {
       id: 'explain',
-      label: '执行计划',
-      title: '查看当前语句的执行计划（不会真正执行语句）',
+      label: t('console.action.explain'),
+      title: t('console.title.explain'),
       loading: planRunning,
       disabled: statement.trim() === '' || running,
       onClick: () => void explainPlan(),
     },
     {
       id: 'openTable',
-      label: '打开数据表',
-      title: '在新标签页打开编辑器里这条语句查询的表',
+      label: t('console.action.openTable'),
+      title: t('console.title.openTable'),
       disabled: editorTarget() === null || selectedId === '',
       onClick: () => void openEditorTable(),
     },
     {
       id: 'txStart',
-      label: '事务',
-      title: '发送 BEGIN，开启手动事务',
+      label: t('console.action.txStart'),
+      title: t('console.title.txStart'),
       disabled: txButtonDisabled(tx, 'start') || txBusy || selectedId === '',
       onClick: () => void runTx('start'),
     },
     {
       id: 'txCommit',
       label: '提交',
-      title: '提交当前事务',
+      title: t('console.title.txCommit'),
       disabled: txButtonDisabled(tx, 'commit') || txBusy,
       onClick: () => void runTx('commit'),
     },
     {
       id: 'txRollback',
       label: '回滚',
-      title: '回滚当前事务',
+      title: t('console.title.txRollback'),
       disabled: txButtonDisabled(tx, 'rollback') || txBusy,
       onClick: () => void runTx('rollback'),
     },
     {
       id: 'export',
-      label: '导出',
-      ariaLabel: '导出结果',
-      title: exporting ? '正在导出…' : '导出结果',
+      label: t('console.export'),
+      ariaLabel: t('console.exportAria'),
+      title: exporting ? t('console.exporting') : t('console.exportAria'),
       disabled: running || exporting || rows.length === 0,
       onClick: () => setExportOpen((open) => !open),
     },
@@ -1845,8 +1845,8 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     <div className="dshdb-qtab" onKeyDown={panelShortcuts}>
       <div className="dshdb-qbar">
         <SearchSelect
-          label="数据源"
-          title="控制台执行 SQL 的连接"
+          label={t('console.connectionAria')}
+          title={t('console.connectionTitle')}
           className="dshdb-console-select"
           value={selectedId}
           onChange={(next) => {
@@ -1867,7 +1867,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         {connection === undefined ? null : isRedis ? (
           <select
             className="dshdb-select dshdb-select-inline dshdb-console-select"
-            aria-label="Redis 逻辑库"
+            aria-label={t('console.redisDb')}
             title="控制台扫描键和执行命令所用的逻辑库"
             value={activeRedisDb}
             onChange={(event) => {
@@ -1880,14 +1880,14 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
             {Array.from({ length: Math.max(1, redisDatabases ?? 16) }, (_, index) => (
               <option key={index} value={index}>
                 db{index}
-                {index === connection.redisDb ? '（默认）' : ''}
+                {index === connection.redisDb ? t('console.redisDefault') : ''}
               </option>
             ))}
           </select>
         ) : (
           <SearchSelect
-            label="数据库"
-            title="控制台执行的默认数据库/Schema；选了它就不用给表名加库名前缀"
+            label={t('console.schemaAria')}
+            title={t('console.schemaTitle')}
             className="dshdb-console-select"
             // An empty schema means "whatever the connection logs in as"; show
             // the default entry as the current choice instead of a blank trigger.
@@ -1898,7 +1898,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               writeText(`${SCHEMA_KEY_PREFIX}${selectedId}`, next)
             }}
             options={[
-              { value: defaultSchema, label: `默认${defaultSchema === '' ? '' : `（${defaultSchema}）`}` },
+              { value: defaultSchema, label: defaultSchema === '' ? t('console.defaultSchemaEmpty') : t('console.defaultSchema', { name: defaultSchema }) },
               ...(schema !== '' && schema !== defaultSchema && !schemas.some((item) => item.name === schema)
                 ? // A schema carried over from the tree shows before the list arrives,
                   // and keeps the picker honest if the server no longer reports it.
@@ -1933,7 +1933,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
             <span className="dshdb-qfilter-label">MATCH</span>
             <input
               className="dshdb-input dshdb-qfilter-input dshdb-pattern-input"
-              aria-label="键模式"
+              aria-label={t('console.keyPattern')}
               title="服务器端 glob 匹配（* ? []），按 Enter 重新扫描"
               placeholder="键模式，例如 shop:*"
               value={pattern}
@@ -1949,7 +1949,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                 type="button"
                 className="dshdb-row-action"
                 title="清空键模式"
-                aria-label="清空键模式"
+                aria-label={t('console.clearKeyPattern')}
                 onClick={() => {
                   setPattern('*')
                   scanCursorRef.current = '0'
@@ -1962,7 +1962,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
             <label className="dshdb-qmeta" title="只列出设置了过期时间的键">
               <input
                 type="checkbox"
-                aria-label="只看有 TTL"
+                aria-label={t('console.onlyTtl')}
                 checked={ttlOnly}
                 onChange={(event) => {
                   const next = event.target.checked
@@ -1974,7 +1974,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
             </label>
             <input
               className="dshdb-input dshdb-qfilter-input"
-              aria-label="筛选键名"
+              aria-label={t('console.filterKeys')}
               title="在当前已加载的键里按子串筛选，不会重新扫描"
               placeholder="筛选键名"
               value={keyFilter}
@@ -1988,7 +1988,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                 type="button"
                 className="dshdb-row-action"
                 title="清空键名筛选"
-                aria-label="清空键名筛选"
+                aria-label={t('console.clearKeyFilter')}
                 onClick={() => setKeyFilter('')}
               >
                 ×
@@ -1996,7 +1996,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
             )}
             <select
               className="dshdb-input dshdb-qfilter-input"
-              aria-label="键类型"
+              aria-label={t('console.keyType')}
               value={scanType}
               onChange={(event) => {
                 setScanType(event.target.value)
@@ -2136,7 +2136,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
             <input
               className="dshdb-input dshdb-qfilter-input dshdb-command-input"
               placeholder="例如 GET shop:customer:42"
-                  aria-label="Redis 命令"
+                  aria-label={t('console.redisCommand')}
               value={command}
               spellCheck={false}
               onScroll={(event) => {
@@ -2249,7 +2249,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               <textarea
               className="dshdb-input dshdb-console-input dshdb-sql-input"
               placeholder={t('console.placeholder')}
-                  aria-label="SQL 编辑器"
+                  aria-label={t('console.editorAria')}
               ref={inputRef}
               aria-controls={suggestions === null ? undefined : `${completeId}-list`}
               aria-activedescendant={
@@ -2359,7 +2359,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               />
             </div>
             {suggestions !== null ? (
-              <div className="dshdb-complete" id={`${completeId}-list`} role="listbox" aria-label="补全候选">
+              <div className="dshdb-complete" id={`${completeId}-list`} role="listbox" aria-label={t('console.completionAria')}>
                 {suggestionItems.length === 0 ? (
                   <span className="dshdb-complete-empty">没有匹配的候选</span>
                 ) : (
@@ -2431,8 +2431,8 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                   size="sm"
                   variant="ghost"
                   icon={<MoreIcon size={13} />}
-                  aria-label="更多操作"
-                  title="更多操作"
+                  aria-label={t('console.title.more')}
+                  title={t('console.title.more')}
                   aria-expanded={overflowOpen || (exportHidden && exportOpen)}
                   onClick={() => {
                     setOverflowOpen((open) => !open)
@@ -2469,7 +2469,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               type="file"
               accept=".sql,.txt,text/plain"
               hidden
-              aria-label="导入 SQL 文件"
+              aria-label={t('console.importAria')}
               onChange={(event) => {
                 const file = event.target.files?.[0]
                 event.target.value = ''
@@ -2479,7 +2479,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
             {scriptResults.length > 1 ? (
               <select
                 className="dshdb-input dshdb-console-select"
-                aria-label="语句结果"
+                aria-label={t('console.resultAria')}
                 value={scriptIndex}
                 onChange={(event) => {
                   const index = Number(event.target.value)
@@ -2585,7 +2585,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
 
           {result !== null && rows.length > 0 ? (
             planText !== null ? (
-              <pre className="dshdb-plan-text" aria-label="执行计划文本">
+              <pre className="dshdb-plan-text" aria-label={t('console.planTextAria')}>
                 {planText}
               </pre>
             ) : (
@@ -2641,7 +2641,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                   type="button"
                   className="dshdb-pager-btn"
                   title="复制实际执行的 SQL"
-                  aria-label="复制实际执行的 SQL"
+                  aria-label={t('console.copyExecutedSql')}
                   onClick={() => void copyText(result.sql)}
                 >
                   <CopyIcon size={12} />
@@ -2651,7 +2651,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                   <input
                     ref={filterRef}
                     className="dshdb-input dshdb-qfilter-input"
-                    aria-label="筛选结果"
+                    aria-label={t('console.filterResults')}
                     placeholder="筛选结果"
                     value={rowFilter}
                     disabled={running}
@@ -2667,7 +2667,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                       type="button"
                       className="dshdb-row-action"
                       title="清空筛选"
-                      aria-label="清空筛选"
+                      aria-label={t('console.clearFilter')}
                       onClick={() => setRowFilter('')}
                     >
                       ×
@@ -2700,7 +2700,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                     type="number"
                     min={1}
                     inputMode="numeric"
-                    aria-label="页码"
+                    aria-label={t('console.page')}
                     title="输入页码后回车跳到该页"
                     value={pageDraft}
                     disabled={running || allRows}

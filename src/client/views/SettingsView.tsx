@@ -262,7 +262,7 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
         bodyClassName="dshdb-panel-body-pad"
       >
         <div className="dshdb-muted" style={{ fontSize: 11.5, lineHeight: 1.6 }}>
-          数据源工具栏按钮的左右顺序；窗口太窄放不下时，末尾的按钮会收进「⋯」菜单。
+          {t('settings.toolbarHint')}
         </div>
         <div className="dshdb-list">
           {toolbarOrder.map((id, index) => (
@@ -313,7 +313,7 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
           />
         </div>
         <div className="dshdb-muted" style={{ fontSize: 11.5, lineHeight: 1.6 }}>
-          默认开启。关闭后仍可按补全快捷键手动展开表名、列名建议。
+          {t('settings.autoCompleteHint')}
         </div>
       </Panel>
 
@@ -334,7 +334,7 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
         bodyClassName="dshdb-panel-body-pad"
       >
         <div className="dshdb-muted" style={{ fontSize: 11.5, lineHeight: 1.6 }}>
-          控制台工具栏按钮的左右顺序；窗口太窄放不下时，末尾的按钮会收进「⋯」菜单。
+          {t('settings.consoleToolbarHint')}
         </div>
         <div className="dshdb-list">
           {actionOrder.map((id, index) => (

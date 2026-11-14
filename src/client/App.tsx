@@ -478,7 +478,7 @@ export function App(props: AppProps): ReactElement {
   return (
     <div className="dshdb-root" style={rootStyle} data-plugin-route={ROUTE_PREFIX}>
       {/* IDEA 风格工具窗口：工具栏左对齐，下面是数据源列表 */}
-      <div className="dshdb-toolbar dshdb-toolbar-top" role="toolbar" aria-label="数据库工具栏">
+      <div className="dshdb-toolbar dshdb-toolbar-top" role="toolbar" aria-label={t('app.toolbarAria')}>
         <span className="dshdb-toolbar-actions" ref={toolbarActionsRef}>
           {orderedToolbarActions.map((action, index) => (
             <span
@@ -507,8 +507,8 @@ export function App(props: AppProps): ReactElement {
             <button
               type="button"
               className="dshdb-toolbtn"
-              aria-label="更多操作"
-              title="更多操作"
+              aria-label={t('app.moreActions')}
+              title={t('app.moreActions')}
               aria-expanded={toolbarOverflowOpen}
               onClick={() => setToolbarOverflowOpen((open) => !open)}
             >

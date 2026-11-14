@@ -10,6 +10,7 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react'
+import { t } from './i18n'
 import { IconWarningOutlineRegular, Toast as PrimitiveToast } from '@deepseek-ai/dsh-client-ui-primitives'
 import { CheckIcon, ChevronDownIcon, ChevronRightIcon, CloseIcon, InfoIcon, WarningIcon } from './icons'
 import { usePopoverDismiss } from './popover'
@@ -417,7 +418,7 @@ export function Banner({
       </span>
       <div className="dshdb-banner-text">{children}</div>
       {actions ? <span className="dshdb-banner-actions">{actions}</span> : null}
-      {onClose ? <IconButton label="关闭" size="sm" variant="ghost" icon={<CloseIcon size={12} />} onClick={onClose} /> : null}
+      {onClose ? <IconButton label={t('common.close')} size="sm" variant="ghost" icon={<CloseIcon size={12} />} onClick={onClose} /> : null}
     </div>
   )
 }
@@ -527,7 +528,7 @@ export function Modal({
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const start = box?.querySelector<HTMLElement>(
-      'input, textarea, select, button:not([aria-label="关闭"])',
+      `input, textarea, select, button:not([aria-label="${t('common.close')}"])`,
     )
     if (start) start.focus()
     else box?.focus()
@@ -560,7 +561,7 @@ export function Modal({
         <header className="dshdb-modal-head">
           <div className="dshdb-modal-title">{title}</div>
           <IconButton
-            label="关闭"
+            label={t('common.close')}
             size="sm"
             variant="ghost"
             icon={<CloseIcon size={13} />}

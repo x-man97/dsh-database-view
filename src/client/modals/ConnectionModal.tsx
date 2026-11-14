@@ -119,10 +119,10 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
   const supportsTls = TLS_PRESETS.has(choice)
   const supportsSsh = SSH_PRESETS.has(choice)
   const driverLabel = isRedis
-    ? '内置 Redis 客户端（ioredis）'
+    ? t('conn.engineRedis')
     : choice === 'sqlite'
-      ? '内置 SQLite（Node.js node:sqlite）'
-      : `内置 ${PRESET_LABEL[choice]} 驱动（driver pack 随插件打包）`
+      ? t('conn.engineSqlite')
+      : t('conn.enginePack', { engine: PRESET_LABEL[choice] })
 
   const changeChoice = (value: string) => {
     const next = value as PresetId
@@ -203,7 +203,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
       return
     }
     if (isRedis) {
-      setError('Redis 连接请在保存后通过面板连接验证')
+      setError(t('conn.redisTestNote'))
       return
     }
     setTesting(true)
@@ -253,17 +253,17 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
         <>
           {editing ? (
             <Button variant="danger" size="sm" icon={<TrashIcon size={12} />} onClick={() => props.onDelete(editing)}>
-              删除
+              {t('conn.delete')}
             </Button>
           ) : null}
           <div className="dshdb-modal-foot-spacer" />
           {!isRedis ? (
             <Button onClick={() => void test()} loading={testing}>
-              测试连接
+              {t('conn.test')}
             </Button>
           ) : null}
           <Button variant="primary" onClick={() => void save()} loading={saving}>
-            保存
+            {t('conn.save')}
           </Button>
         </>
       }
@@ -271,9 +271,9 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
       <div className="dshdb-form">
         <div className="dshdb-form-grid">
           <Field label={t('conn.name')} required span>
-            <TextInput value={name} autoFocus placeholder="例如 本地 MySQL" onChange={(event) => setName(event.target.value)} />
+            <TextInput value={name} autoFocus placeholder={t('conn.namePlaceholder')} onChange={(event) => setName(event.target.value)} />
           </Field>
-          <Field label={t('conn.type')} required span hint={`方言：${dialectLabel(preset.dialect)}`}>
+          <Field label={t('conn.type')} required span hint={t('conn.dialectHint', { dialect: dialectLabel(preset.dialect) })}>
             <Select
               options={PRESET_ORDER.map((id) => ({ value: id, label: PRESET_LABEL[id] }))}
               value={choice}
@@ -289,20 +289,20 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
                 <TextInput value={port} inputMode="numeric" onChange={(event) => setPort(event.target.value.replace(/[^0-9]/g, ''))} />
               </Field>
               <Field label={t('conn.user')}>
-                <TextInput value={user} onChange={(event) => setUser(event.target.value)} placeholder={isRedis ? 'default' : '用户名'} />
+                <TextInput value={user} onChange={(event) => setUser(event.target.value)} placeholder={isRedis ? 'default' : t('conn.userPlaceholder')} />
               </Field>
-              <Field label={t('conn.password')} hint={editing?.hasPassword ? '已保存密码，留空则保持不变' : undefined}>
+              <Field label={t('conn.password')} hint={editing?.hasPassword ? t('conn.savedPasswordHint') : undefined}>
                 <TextInput
                   type="password"
                   value={password}
                   autoComplete="new-password"
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder={editing?.hasPassword ? '留空则保持不变' : '密码'}
+                  placeholder={editing?.hasPassword ? t('conn.savedPasswordHint') : t('conn.passwordPlaceholder')}
                 />
               </Field>
               {editing?.hasPassword ? (
                 <div className="dshdb-span-2 dshdb-list">
-                  <Switch checked={clearPassword} onChange={setClearPassword} label="清除已保存的密码" />
+                  <Switch checked={clearPassword} onChange={setClearPassword} label={t('conn.clearPassword')} />
                 </div>
               ) : null}
             </>
@@ -312,11 +312,11 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
               <TextInput value={redisDb} inputMode="numeric" onChange={(event) => setRedisDb(event.target.value.replace(/[^0-9]/g, ''))} />
             </Field>
           ) : (
-            <Field label={choice === 'sqlite' ? t('conn.sqliteFile') : t('conn.database')} span={fileBased} hint={preset.databaseHint}>
+            <Field label={choice === 'sqlite' ? t('conn.sqliteFile') : t('conn.database')} span={fileBased} hint={t(`preset.${choice}.dbHint`)}>
               <TextInput
                 value={database}
                 onChange={(event) => setDatabase(event.target.value)}
-                placeholder={fileBased ? '例如 ./data/app.db' : '可留空'}
+                placeholder={fileBased ? 'e.g. ./data/app.db' : t('conn.emptyPlaceholder')}
               />
             </Field>
           )}
@@ -328,13 +328,13 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
           {supportsSsh && sshEnabled ? (
             <>
               <Field label={t('conn.sshHost')} required>
-                <TextInput value={sshHost} onChange={(event) => setSshHost(event.target.value)} placeholder="bastion.example.com" />
+                <TextInput value={sshHost} onChange={(event) => setSshHost(event.target.value)} placeholder={t('conn.sshHostPlaceholder')} />
               </Field>
               <Field label={t('conn.sshPort')} required>
                 <TextInput value={sshPort} inputMode="numeric" onChange={(event) => setSshPort(event.target.value.replace(/[^0-9]/g, ''))} />
               </Field>
               <Field label={t('conn.sshUser')} required>
-                <TextInput value={sshUser} onChange={(event) => setSshUser(event.target.value)} placeholder="ops" />
+                <TextInput value={sshUser} onChange={(event) => setSshUser(event.target.value)} placeholder={t('conn.sshUserPlaceholder')} />
               </Field>
               <Field label={t('conn.sshAuth')}>
                 <Select
@@ -348,13 +348,13 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
                 />
               </Field>
               {sshAuth === 'password' ? (
-                <Field label={t('conn.sshPassword')} hint={editing?.hasSshPassword ? '已保存，留空则保持不变' : undefined}>
+                <Field label={t('conn.sshPassword')} hint={editing?.hasSshPassword ? t('conn.savedSshHint') : undefined}>
                   <TextInput
                     type="password"
                     value={sshPassword}
                     autoComplete="new-password"
                     onChange={(event) => setSshPassword(event.target.value)}
-                    placeholder={editing?.hasSshPassword ? '留空则保持不变' : 'SSH 密码'}
+                    placeholder={editing?.hasSshPassword ? t('conn.savedSshHint') : t('conn.sshPassword')}
                   />
                 </Field>
               ) : null}
@@ -369,7 +369,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
                       value={sshPassphrase}
                       autoComplete="new-password"
                       onChange={(event) => setSshPassphrase(event.target.value)}
-                      placeholder="可选"
+                      placeholder={t('conn.optional')}
                     />
                   </Field>
                 </>
@@ -436,11 +436,11 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
         ) : null}
         {testing ? (
           <span className="dshdb-muted dshdb-inline" style={{ fontSize: 11 }}>
-            <Loading label="正在测试连接…" />
+            <Loading label={t('conn.testing')} />
           </span>
         ) : null}
         <span className="dshdb-muted" style={{ fontSize: 11 }}>
-          引擎：{driverLabel}
+          {t('conn.engineLabel', { engine: driverLabel })}
         </span>
         {!editing ? null : (
           <span className="dshdb-muted" style={{ fontSize: 11 }}>

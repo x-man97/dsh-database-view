@@ -18,7 +18,7 @@ import { Loading, StateDot, Tag } from '../ui'
 import { RowPicker } from './row-picker'
 import { Highlight, RowToggle } from './tree-parts'
 import type { TreeRow, TreeRowKind } from './tree-rows'
-import { useI18n } from '../i18n'
+import { useI18n, t } from '../i18n'
 
 /** Imperative handlers shared by every mounted row. Stable for the whole view. */
 export interface TreeRowActions {
@@ -102,10 +102,10 @@ function objectIcon(object: SchemaObject): ReactNode {
 }
 
 const toggleTitle = (row: TreeRow): string => {
-  if (row.kind === 'connection') return row.open ? '收起数据源' : '展开数据源'
-  if (row.kind === 'schema') return row.open ? '收起 Schema' : '展开 Schema'
-  if (row.kind === 'redis-db') return row.open ? '收起数据库' : '展开数据库'
-  return row.open ? `收起${row.label ?? ''}` : `展开${row.label ?? ''}`
+  if (row.kind === 'connection') return row.open ? t('tree.collapseSource') : t('tree.expandSource')
+  if (row.kind === 'schema') return row.open ? t('tree.collapseSchema') : t('tree.expandSchema')
+  if (row.kind === 'redis-db') return row.open ? t('tree.collapseDb') : t('tree.expandDb')
+  return row.open ? t('tree.collapse', { name: row.label ?? '' }) : t('tree.expand', { name: row.label ?? '' })
 }
 
 const rowTitle = (row: TreeRow): string | undefined => {
