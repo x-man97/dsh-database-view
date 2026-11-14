@@ -1,5 +1,15 @@
 # dsh-ide-database
 
+> **项目状态（x-man97/dsh-database-view fork）**
+>
+> 本仓库是 [`qwq1999/dsh-ide-database`](https://github.com/qwq1999/dsh-ide-database) 的 fork，正在按「B + 可选 C」方案改造为 Java-free、内置 SSH、驱动按需下载的版本。当前处于设计阶段，代码尚未开始改造。
+>
+> - [设计方案（B + 可选 C）](docs/design.md)
+> - [可行性研究报告](docs/feasibility.md)
+> - [POC 验证脚本](poc/README.md)
+>
+> 上游原始 README 保留在下方，供参考。
+
 DeepSeek Harness（DSH）的 JetBrains Database 风格数据源插件：右侧边栏的数据库工具窗，以及一组供 Agent 查询/操作数据库的工具。
 
 支持 MySQL、MariaDB、PostgreSQL、SQLite、SQL Server、Oracle、Redis、达梦 DM、OceanBase（MySQL / Oracle 两种模式），也可以配置任意自定义 JDBC 驱动。
