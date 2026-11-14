@@ -2,6 +2,7 @@ import { useCallback, useRef, useState, type ReactElement } from 'react'
 
 import { ColumnsIcon } from '../icons'
 import { usePopoverDismiss } from '../popover'
+import { useI18n } from '../i18n'
 
 /**
  * Row-end visibility picker, modelled on DataGrip's database selector: an
@@ -23,6 +24,7 @@ export function RowPicker({
   onToggle: (id: string) => void
   onToggleAll: (all: boolean) => void
 }): ReactElement {
+  const t = useI18n()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const anchor = useRef<HTMLSpanElement>(null)
@@ -75,7 +77,7 @@ export function RowPicker({
           <label className="dshdb-picker-item dshdb-picker-all">
             <input type="checkbox" checked={allVisible} onChange={() => onToggleAll(!allVisible)} />
             <span>{allLabel}</span>
-            <em>添加模式</em>
+            <em>{t('tree.addSchema')}</em>
           </label>
           {items.length > 5 ? (
             <input
