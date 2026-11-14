@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -135,6 +135,29 @@ describe('ConfigStore', () => {
       host: '',
       database: '/tmp/demo.db',
     })
+  })
+
+  it('migrates v1 config and drops unsupported/JDBC-era connections', () => {
+    const { dir } = store()
+    const file = join(dir, 'connections.json')
+    writeFileSync(file, JSON.stringify({
+      version: 1,
+      connections: [
+        { id: 'conn-native', name: 'MySQL', driver: 'mysql', host: '127.0.0.1', port: 3306, user: 'root', database: 'app', params: {}, nativeEngine: false },
+        { id: 'conn-dm', name: 'DM', driver: 'dameng', host: '127.0.0.1', port: 5236, user: 'SYSDBA', database: 'x' },
+        { id: 'conn-custom', name: 'Custom', driver: 'custom', customDriverId: 'c1', host: 'x', port: 1 },
+      ],
+      trash: [],
+      drivers: [{ id: 'c1', name: 'H2', dialect: 'generic', driverClass: 'org.h2.Driver', urlTemplate: 'jdbc:h2:{{host}}', jars: [] }],
+      settings: { javaPath: '/usr/bin/java', mavenMirror: 'central', maxRows: 100 },
+    }))
+    const config = new ConfigStore(file, new SecretStore(join(dir, 'secrets.json')))
+    config.load()
+    expect(config.snapshot().connections.map((entry) => entry.driver)).toEqual(['mysql'])
+    const persisted = JSON.parse(readFileSync(file, 'utf8'))
+    expect(persisted.version).toBe(2)
+    expect(persisted.drivers).toBeUndefined()
+    expect(persisted.settings.javaPath).toBeUndefined()
   })
 
   it('rejects invalid ports and oversized row limits', () => {
