@@ -191,7 +191,7 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
           redisDb: { type: 'number', description: 'Redis logical database index (default 0).' },
           readOnly: {
             type: 'boolean',
-            description: 'Mark the connection read-only (default false). Fixed when the connection is created; it cannot be changed later.',
+            description: 'Mark the connection read-only (default false). It can be changed later from the connection editor.',
           },
         },
         required: ['name', 'driver'],
