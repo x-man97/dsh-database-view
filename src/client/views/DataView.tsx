@@ -926,11 +926,11 @@ export function DataView(props: DataViewProps): ReactElement {
                 <Button
                   size="sm"
                   variant="ghost"
-                  title="按逗号复制这张表的所有列名"
-                  aria-label="复制列名"
+                  title={t('structure.copyColumnsTitle')}
+                  aria-label={t('structure.copyColumns')}
                   onClick={() => void copyText(detail.columns.map((column) => column.name).join(', '))}
                 >
-                  复制列名
+                  {t('structure.copyColumns')}
                 </Button>
               ) : null}
               {detail.kind === 'table' || detail.kind === 'view' ? (
@@ -938,15 +938,15 @@ export function DataView(props: DataViewProps): ReactElement {
                   <Button
                     size="sm"
                     variant="ghost"
-                    title="复制一条把列名写全的 SELECT"
-                    aria-label="复制查询语句"
+                    title={t('structure.copySelectTitle')}
+                    aria-label={t('structure.copySelect')}
                     onClick={() => {
                       const connection = props.connections.find((item) => item.id === selectedId)
                       if (connection === undefined) return
                       void copyText(selectColumnsSql(connection.dialect, detail.schema, detail.table, detail.columns))
                     }}
                   >
-                    复制查询
+                    {t('structure.copySelect')}
                   </Button>
                   <Button
                     size="sm"
@@ -964,8 +964,8 @@ export function DataView(props: DataViewProps): ReactElement {
           {detail.columns.length === 0 && (detail.ddl === undefined || detail.ddl === '') ? (
             <div className="dshdb-muted" style={{ padding: '4px 0' }}>
               {detail.kind === 'table' || detail.kind === 'view'
-                ? '没有读取到列结构。'
-                : `未读取到${objectKindLabel(detail.kind)}定义，请在 SQL 控制台查看。`}
+                ? t('structure.noStructure')
+                : t('structure.noDefinition', { kind: objectKindLabel(detail.kind) })}
             </div>
           ) : null}
           {detail.columns.length > 0 ? (
@@ -973,11 +973,11 @@ export function DataView(props: DataViewProps): ReactElement {
               <table className="dshdb-grid">
                 <thead>
                   <tr>
-                    <th>列</th>
-                    <th>类型</th>
-                    <th>可空</th>
-                    <th>默认值</th>
-                    <th>注释</th>
+                    <th>{t('structure.column')}</th>
+                    <th>{t('structure.type')}</th>
+                    <th>{t('structure.nullable')}</th>
+                    <th>{t('structure.default')}</th>
+                    <th>{t('structure.comment')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -988,7 +988,7 @@ export function DataView(props: DataViewProps): ReactElement {
                         {column.primaryKey ? <span className="dshdb-tag" style={{ marginLeft: 6 }}>PK</span> : null}
                       </td>
                       <td title={column.typeName}>{column.typeName}</td>
-                      <td>{column.nullable === false ? '否' : '是'}</td>
+                      <td>{column.nullable === false ? t('structure.no') : t('structure.yes')}</td>
                       <td title={column.defaultValue ?? ''}>{column.defaultValue ?? '—'}</td>
                       <td title={column.comment ?? ''}>{column.comment ?? ''}</td>
                     </tr>
@@ -1001,7 +1001,7 @@ export function DataView(props: DataViewProps): ReactElement {
             <div style={{ marginTop: detail.columns.length > 0 ? 10 : 0 }}>
               <pre className="dshdb-ddl" style={{ maxHeight: 280 }}>{detail.ddl}</pre>
               <div className="dshdb-muted" style={{ marginTop: 4 }}>
-                {detail.ddlSource === 'generated' ? '根据列结构生成的 DDL' : '来自服务器的定义'}
+                {detail.ddlSource === 'generated' ? t('structure.ddlGenerated') : t('structure.ddlServer')}
                 {detail.ddlWarnings !== undefined && detail.ddlWarnings.length > 0
                   ? `；${detail.ddlWarnings.join('；')}`
                   : ''}
@@ -1013,7 +1013,7 @@ export function DataView(props: DataViewProps): ReactElement {
               {detail.indexes.map((index) => (
                 <span key={index.name} style={{ display: 'contents' }}>
                   <span className="dshdb-kv-key">
-                    {index.primary ? '主键' : index.unique ? '唯一索引' : '索引'} {index.name}
+                    {index.primary ? t('structure.primaryKey') : index.unique ? t('structure.uniqueIndex') : t('structure.index')} {index.name}
                   </span>
                   <span className="dshdb-kv-val dshdb-mono">{index.columns.join(', ')}</span>
                 </span>

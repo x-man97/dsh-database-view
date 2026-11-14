@@ -494,42 +494,42 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
       const active = activeSort?.column === column.name ? activeSort.direction : null
       const index = columns.findIndex((item) => item.name === column.name)
       return [
-        { label: '按此列升序', disabled: active === 'asc', run: () => sortBy(column, 'asc') },
-        { label: '按此列降序', disabled: active === 'desc', run: () => sortBy(column, 'desc') },
-        { label: '清除排序', disabled: activeSort === undefined, run: clearSort },
+        { label: t('menu.sortAsc'), disabled: active === 'asc', run: () => sortBy(column, 'asc') },
+        { label: t('menu.sortDesc'), disabled: active === 'desc', run: () => sortBy(column, 'desc') },
+        { label: t('menu.clearSort'), disabled: activeSort === undefined, run: clearSort },
         { label: `复制列名「${column.name}」`, run: () => void copyText(column.name).then(noteCopied('列名')) },
         {
-          label: `复制本列值（${rows.length} 行）`,
+          label: t('menu.copyColumnValues', { n: rows.length }),
           disabled: rows.length === 0 || index < 0,
           run: () => void copyText(columnValues(rows, index)).then(noteCopied('本列值')),
         },
         {
-          label: '复制为 IN 列表',
+          label: t('menu.copyIn'),
           disabled: rows.length === 0 || index < 0,
           run: () => void copyText(inListOf(connection?.dialect ?? 'mysql', rows, index)).then(noteCopied('IN 列表')),
         },
         {
-          label: '复制本列（逗号分隔）',
+          label: t('menu.copyComma'),
           disabled: rows.length === 0 || index < 0,
           run: () => void copyText(commaValues(rows, index)).then(noteCopied('逗号分隔')),
         },
         {
-          label: '复制全部列名',
+          label: t('menu.copyAllColumns'),
           disabled: displayColumns.length === 0,
           run: () => void copyText(columnNames(connection?.dialect ?? 'mysql', displayColumns)).then(noteCopied('全部列名')),
         },
         {
-          label: `复制查询语句（${displayColumns.length} 列）`,
+          label: t('menu.copySelectColumns', { n: displayColumns.length }),
           disabled: displayColumns.length === 0,
           run: () => void copyText(selectColumnsSql(connection?.dialect ?? 'mysql', params.schema, params.table, displayColumns)).then(noteCopied('查询语句')),
         },
         {
-          label: `隐藏列「${column.name}」`,
+          label: t('menu.hideColumn', { name: column.name }),
           disabled: shownColumns.length <= 1,
           run: () => setHiddenColumns((current) => toggleHidden(current, column.name)),
         },
         {
-          label: '只看这一列',
+          label: t('menu.onlyColumn'),
           disabled: displayColumns.length <= 1,
           run: () => setHiddenColumns(onlyColumn(displayColumns, column.name)),
         },
@@ -607,39 +607,39 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     (cell: CellMenuTarget): ColumnMenuItem[] => [
             ...(canMutate
               ? [{
-                  label: '编辑',
+                  label: t('menu.edit'),
                   disabled: pendingDeletes.has(cell.rowIndex),
                   run: () => startCellEdit(cell.rowIndex, cell.column),
                 }]
               : []),
             {
-              label: '查看完整值',
+              label: t('menu.viewFull'),
               run: () => setCellView(cellValueView(cell.column.name, cell.value)),
             },
             {
-              label: '复制单元格值',
+              label: t('menu.copyCell'),
               run: () => void copyText(cellCopyText(cell.value)).then(noteCopied('单元格值')),
             },
             {
-              label: `复制整行（${displayColumns.length} 列，制表符分隔）`,
+              label: t('menu.copyRow', { n: displayColumns.length }),
               run: () => void copyText(rowToTsv(displayColumns, cell.row)).then(noteCopied('整行')),
             },
             {
-              label: '复制 INSERT 语句',
+              label: t('menu.copyInsert'),
               run: () => {
                 if (connection === null) return
                 void copyText(insertStatement(connection.dialect, params.schema, params.table, displayColumns, cell.row)).then(noteCopied('INSERT'))
               },
             },
             {
-              label: '复制 WHERE 条件',
+              label: t('menu.copyWhere'),
               run: () => {
                 if (connection === null) return
                 void copyText(`WHERE ${cellWhere(connection.dialect, cell.column, cell.value)}`).then(noteCopied('WHERE 条件'))
               },
             },
             {
-              label: '按此列分组计数',
+              label: t('menu.groupCount'),
               run: () => {
                 if (connection === null) return
                 openConsoleTab({
@@ -649,7 +649,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
               },
             },
             {
-              label: '在控制台按该值查询',
+              label: t('menu.queryByValue'),
               run: () => {
                 if (connection === null) return
                 const where = cellWhere(connection.dialect, cell.column, cell.value)
@@ -660,7 +660,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
               },
             },
             {
-              label: '按此值筛选',
+              label: t('menu.filterByValue'),
               run: () => {
                 setFiltersOpen(true)
                 setColumnFilter(
@@ -670,7 +670,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
               },
             },
             {
-              label: `取消「${cell.column.name}」列的筛选`,
+              label: t('menu.clearColumnFilter', { name: cell.column.name }),
               disabled: filters[cell.column.name] === undefined,
               run: () => {
                 setColumnFilter(cell.column, undefined)
@@ -1129,7 +1129,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           {exportOpen ? (
             <MenuGroupList
               groups={exportGroups}
-              extra={{ id: 'dump', label: '整表脚本', onSelect: () => void exportDump() }}
+              extra={{ id: 'dump', label: t('table.export.all'), onSelect: () => void exportDump() }}
               onClose={() => setExportOpen(false)}
             />
           ) : null}

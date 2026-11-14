@@ -1338,27 +1338,27 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
       { label: '清除排序', disabled: rowSort === null, run: () => setRowSort(null) },
       { label: `复制列名「${column.name}」`, run: () => void copyText(column.name).then(noteCopied('列名')) },
       {
-        label: `复制本列值（${filteredRows.length} 行）`,
+        label: t('menu.copyColumnValues', { n: filteredRows.length }),
         disabled: filteredRows.length === 0 || index < 0,
         run: () => void copyText(columnValues(filteredRows, index)).then(noteCopied('本列值')),
       },
       {
-        label: '复制为 IN 列表',
+        label: t('menu.copyIn'),
         disabled: filteredRows.length === 0 || index < 0,
         run: () => void copyText(inListOf(connection?.dialect ?? 'mysql', filteredRows, index)).then(noteCopied('IN 列表')),
       },
       {
-        label: '复制本列（逗号分隔）',
+        label: t('menu.copyComma'),
         disabled: filteredRows.length === 0 || index < 0,
         run: () => void copyText(commaValues(filteredRows, index)).then(noteCopied('逗号分隔')),
       },
       {
-        label: '复制全部列名',
+        label: t('menu.copyAllColumns'),
         disabled: displayColumns.length === 0,
         run: () => void copyText(columnNames(connection?.dialect ?? 'mysql', displayColumns)).then(noteCopied('全部列名')),
       },
       {
-        label: `复制查询语句（${displayColumns.length} 列）`,
+        label: t('menu.copySelectColumns', { n: displayColumns.length }),
         disabled: displayColumns.length === 0 || tableTarget() === null,
         run: () => {
           const target = tableTarget()
@@ -1367,12 +1367,12 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         },
       },
       {
-        label: `隐藏列「${column.name}」`,
+        label: t('menu.hideColumn', { name: column.name }),
         disabled: shownColumns.length <= 1,
         run: () => setHiddenColumns((current) => toggleHidden(current, column.name)),
       },
       {
-        label: '按此列分组计数',
+        label: t('menu.groupCount'),
         disabled: tableTarget() === null,
         run: () => {
           const target = tableTarget()
@@ -1384,7 +1384,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         },
       },
       {
-        label: '只看这一列',
+        label: t('menu.onlyColumn'),
         disabled: displayColumns.length <= 1,
         run: () => setHiddenColumns(onlyColumn(displayColumns, column.name)),
       },
@@ -1412,11 +1412,11 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
   )
   const gridCellMenu = useCallback(
     (cell: CellMenuTarget): ColumnMenuItem[] => [
-      { label: '查看完整值', run: () => setCellView(cellValueView(cell.column.name, cell.value)) },
+      { label: t('menu.viewFull'), run: () => setCellView(cellValueView(cell.column.name, cell.value)) },
       { label: '用该值筛选当前页', run: () => setRowFilter(cellCopyText(cell.value)) },
       { label: '复制单元格值', run: () => void copyText(cellCopyText(cell.value)).then(noteCopied('单元格值')) },
       {
-        label: '复制 INSERT 语句',
+        label: t('menu.copyInsert'),
         disabled: tableTarget() === null,
         run: () => {
           const target = tableTarget()
@@ -1427,7 +1427,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         },
       },
       {
-        label: '复制 WHERE 条件',
+        label: t('menu.copyWhere'),
         run: () => void copyText(`WHERE ${cellWhere(connection?.dialect ?? 'mysql', cell.column, cell.value)}`).then(noteCopied('WHERE 条件')),
       },
       { label: `复制整行（${displayColumns.length} 列，制表符分隔）`, run: () => void copyText(rowToTsv(displayColumns, cell.row)).then(noteCopied('整行')) },
@@ -1679,14 +1679,14 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     },
     {
       id: 'txCommit',
-      label: '提交',
+      label: t('console.txCommit'),
       title: t('console.title.txCommit'),
       disabled: txButtonDisabled(tx, 'commit') || txBusy,
       onClick: () => void runTx('commit'),
     },
     {
       id: 'txRollback',
-      label: '回滚',
+      label: t('console.txRollback'),
       title: t('console.title.txRollback'),
       disabled: txButtonDisabled(tx, 'rollback') || txBusy,
       onClick: () => void runTx('rollback'),
@@ -1758,31 +1758,31 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     const groups: MenuGroupSpec[] = [
       {
         id: 'page',
-        label: '导出当前页',
+        label: t('table.export.page'),
         leaves: [
-          { id: 'page-csv', label: `当前页 CSV（${filteredRows.length} 行）`, disabled: filteredRows.length === 0, onSelect: () => exportPage('csv') },
-          { id: 'page-json', label: `当前页 JSON（${filteredRows.length} 行）`, disabled: filteredRows.length === 0, onSelect: () => exportPage('json') },
-          { id: 'page-sql', label: `当前页 SQL（${filteredRows.length} 行）`, disabled: filteredRows.length === 0, onSelect: () => exportPage('sql') },
-          { id: 'page-md', label: `当前页 Markdown（${filteredRows.length} 行）`, disabled: filteredRows.length === 0, onSelect: () => exportPage('md') },
+          { id: 'page-csv', label: `${t('table.export.page')} CSV (${filteredRows.length} ${t('table.rows')})`, disabled: filteredRows.length === 0, onSelect: () => exportPage('csv') },
+          { id: 'page-json', label: `${t('table.export.page')} JSON (${filteredRows.length} ${t('table.rows')})`, disabled: filteredRows.length === 0, onSelect: () => exportPage('json') },
+          { id: 'page-sql', label: `${t('table.export.page')} SQL (${filteredRows.length} ${t('table.rows')})`, disabled: filteredRows.length === 0, onSelect: () => exportPage('sql') },
+          { id: 'page-md', label: `${t('table.export.page')} Markdown (${filteredRows.length} ${t('table.rows')})`, disabled: filteredRows.length === 0, onSelect: () => exportPage('md') },
         ],
       },
       ...(selectedRows.size > 0
         ? [
             {
               id: 'selected',
-              label: '导出已选',
+              label: t('table.export.selected'),
               leaves: [
-                { id: 'selected-csv', label: `已选 CSV（${selectedRows.size} 行）`, onSelect: () => exportSelected('csv') },
-                { id: 'selected-json', label: `已选 JSON（${selectedRows.size} 行）`, onSelect: () => exportSelected('json') },
-                { id: 'selected-sql', label: `已选 SQL（${selectedRows.size} 行）`, onSelect: () => exportSelected('sql') },
-                { id: 'selected-md', label: `已选 Markdown（${selectedRows.size} 行）`, onSelect: () => exportSelected('md') },
+                { id: 'selected-csv', label: `${t('table.export.selected')} CSV (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('csv') },
+                { id: 'selected-json', label: `${t('table.export.selected')} JSON (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('json') },
+                { id: 'selected-sql', label: `${t('table.export.selected')} SQL (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('sql') },
+                { id: 'selected-md', label: `${t('table.export.selected')} Markdown (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('md') },
               ],
             },
           ]
         : []),
       {
         id: 'copy-page',
-        label: '复制当前页',
+        label: t('table.copy.page'),
         leaves: [
           { id: 'copy-page-md', label: '复制当前页 Markdown', disabled: filteredRows.length === 0, onSelect: () => void copyText(toMarkdown(displayColumns, filteredRows)).then(noteCopied('Markdown')) },
           { id: 'copy-page-csv', label: '复制当前页 CSV', disabled: filteredRows.length === 0, onSelect: () => void copyText(toCsv(displayColumns, filteredRows)).then(noteCopied('CSV')) },
@@ -1790,7 +1790,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
           { id: 'copy-page-json', label: '复制当前页 JSON', disabled: filteredRows.length === 0, onSelect: () => void copyText(toJson(displayColumns, filteredRows)).then(noteCopied('JSON')) },
           {
             id: 'copy-page-sql',
-            label: '复制当前页 SQL',
+            label: `${t('table.copy.page')} SQL`,
             disabled: filteredRows.length === 0 || tableTarget() === null,
             onSelect: () => {
               const target = tableTarget()
@@ -1806,13 +1806,13 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         ? [
             {
               id: 'copy-selected',
-              label: '复制已选',
+              label: t('table.copy.selected'),
               leaves: [
-                { id: 'copy-selected-md', label: '复制已选 Markdown', onSelect: () => copySelected('md') },
-                { id: 'copy-selected-csv', label: '复制已选 CSV', onSelect: () => copySelected('csv') },
-                { id: 'copy-selected-tsv', label: '复制已选 TSV', onSelect: () => copySelected('tsv') },
-                { id: 'copy-selected-json', label: '复制已选 JSON', onSelect: () => copySelected('json') },
-                { id: 'copy-selected-sql', label: '复制已选 SQL', onSelect: () => copySelected('sql') },
+                { id: 'copy-selected-md', label: `${t('table.copy.selected')} Markdown`, onSelect: () => copySelected('md') },
+                { id: 'copy-selected-csv', label: `${t('table.copy.selected')} CSV`, onSelect: () => copySelected('csv') },
+                { id: 'copy-selected-tsv', label: `${t('table.copy.selected')} TSV`, onSelect: () => copySelected('tsv') },
+                { id: 'copy-selected-json', label: `${t('table.copy.selected')} JSON`, onSelect: () => copySelected('json') },
+                { id: 'copy-selected-sql', label: `${t('table.copy.selected')} SQL`, onSelect: () => copySelected('sql') },
               ],
             },
           ]
@@ -1823,10 +1823,10 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               id: 'all',
               label: '导出全部',
               leaves: [
-                { id: 'all-csv', label: `全部 CSV（最多 ${EXPORT_LIMIT} 行）`, disabled: exporting, onSelect: () => void exportAll('csv') },
-                { id: 'all-json', label: `全部 JSON（最多 ${EXPORT_LIMIT} 行）`, disabled: exporting, onSelect: () => void exportAll('json') },
-                { id: 'all-sql', label: `全部 SQL（最多 ${EXPORT_LIMIT} 行）`, disabled: exporting, onSelect: () => void exportAll('sql') },
-                { id: 'all-md', label: `全部 Markdown（最多 ${EXPORT_LIMIT} 行）`, disabled: exporting, onSelect: () => void exportAll('md') },
+                { id: 'all-csv', label: `${t('table.export.all')} CSV (max ${EXPORT_LIMIT} ${t('table.rows')})`, disabled: exporting, onSelect: () => void exportAll('csv') },
+                { id: 'all-json', label: `${t('table.export.all')} JSON (max ${EXPORT_LIMIT} ${t('table.rows')})`, disabled: exporting, onSelect: () => void exportAll('json') },
+                { id: 'all-sql', label: `${t('table.export.all')} SQL (max ${EXPORT_LIMIT} ${t('table.rows')})`, disabled: exporting, onSelect: () => void exportAll('sql') },
+                { id: 'all-md', label: `${t('table.export.all')} Markdown (max ${EXPORT_LIMIT} ${t('table.rows')})`, disabled: exporting, onSelect: () => void exportAll('md') },
               ],
             },
           ]
@@ -1861,7 +1861,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
           }}
           options={connections.map((item) => ({
             value: item.id,
-            label: `${item.name} · ${item.dialect}${item.readOnly ? ' · 只读' : ''}`,
+            label: `${item.name} · ${item.dialect}${item.readOnly ? ` · ${t('common.readonly')}` : ''}`,
           }))}
         />
         {connection === undefined ? null : isRedis ? (
@@ -1908,7 +1908,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                 .filter((item) => item.name !== defaultSchema)
                 .map((item) => ({
                   value: item.name,
-                  label: `${item.name}${item.system === true ? '（系统）' : ''}`,
+                  label: `${item.name}${item.system === true ? t('common.system') : ''}`,
                 })),
             ]}
           />

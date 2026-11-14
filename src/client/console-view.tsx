@@ -4,6 +4,7 @@
  * live here instead of growing ConsoleTab.tsx.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactElement } from 'react'
+import { t } from './i18n'
 import type { RedisKeyInfo } from '../shared/types'
 import { historyAgo, type HistoryEntry } from './history'
 import { ClearIcon, CopyIcon, StarIcon } from './icons'
@@ -229,7 +230,7 @@ export const KeyGrid = memo(function KeyGrid({
     const items = [
       { label: '复制键名', run: () => void copyText(key.key) },
       {
-        label: '复制可见键名（每行一个）',
+        label: t('console.copyKeys'),
         run: () => void copyText(rowsRef.current.map((info) => info.key).join('\n')),
       },
     ]
