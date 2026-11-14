@@ -34,6 +34,7 @@ import { TREE_ROW_HEIGHT, useWindow } from '../useWindow'
 import { DatabaseIcon, FilterIcon, KeyIcon, PlusIcon } from '../icons'
 import { Button, EmptyState, Loading, Panel, Tag, TextInput } from '../ui'
 import { usePopoverDismiss } from '../popover'
+import { useI18n } from '../i18n'
 
 export { relativeTime } from '../relativetime'
 
@@ -100,6 +101,7 @@ export interface DataViewProps {
 const rowDomId = (index: number): string => `dshdb-tree-row-${index}`
 
 export function DataView(props: DataViewProps): ReactElement {
+  const t = useI18n()
   const [filter, setFilter] = useState('')
   // The filter box starts hidden so the toolbar stays quiet; Ctrl+F (or the
   // funnel button) reveals it, and it closes again once emptied.
@@ -833,18 +835,18 @@ export function DataView(props: DataViewProps): ReactElement {
       {connections.length === 0 ? (
         <EmptyState
           icon={<DatabaseIcon size={28} />}
-          title="还没有数据源"
-          description="用工具栏的「新增」按钮添加 MySQL、PostgreSQL、SQLite、SQL Server、Oracle 或 Redis 连接。连接一次之后，即使离线也能浏览缓存的库表结构。"
+          title={t('data.emptyTitle')}
+          description={t('data.emptyDescription')}
           actions={
             <Button variant="primary" icon={<PlusIcon size={13} />} onClick={props.onAddConnection}>
-              新建连接
+              {t('data.newConnection')}
             </Button>
           }
         />
       ) : (
         <Panel className="dshdb-grow" bodyClassName="dshdb-panel-body-pad">
           {filterSummary !== null && filterSummary.connections === 0 ? (
-            <span className="dshdb-filter-empty">没有匹配的对象</span>
+            <span className="dshdb-filter-empty">{t('data.noMatches')}</span>
           ) : null}
           {filterSummary !== null && filterSummary.objects > 0 ? (
             <span className="dshdb-filter-empty">{filterSummary.objects} 个对象匹配</span>
@@ -1025,7 +1027,7 @@ export function DataView(props: DataViewProps): ReactElement {
         <div className="dshdb-muted" style={{ padding: '0 2px' }}>
           {selected?.dialect === 'redis'
             ? '展开 Redis 数据源和逻辑库，选择键可查看值、TTL 与长度；行尾按钮可选择显示的数据库。'
-            : '展开数据源，选择表或视图可查看列、索引等结构信息；选择函数、存储过程、触发器可查看定义；行尾按钮可选择显示的架构。'}
+            : t('data.help')}
         </div>
       ) : null}
 

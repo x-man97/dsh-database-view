@@ -85,3 +85,8 @@ native driver options. Oracle TLS is not implemented.
 - Queries are bounded by row count, timeout, and statement key; cancel uses driver-native cancellation where
   available.
 - Destructive UI actions require confirmation.
+
+
+## Localization
+
+Client copy is registered through `@deepseek-ai/dsh-client-locale` under the `dsh-database-view` namespace with `zh` and `en` dictionaries. Components call the module-level `t()` helper; `useI18n()` subscribes the main surfaces to locale revisions. Other DSH locales fall back through English. The DSH General → Language row is the only language switch; the plugin has no separate locale selector.

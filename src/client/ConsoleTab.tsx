@@ -40,6 +40,7 @@ import { filterRowIndexesByHaystacks, rowHaystacks } from './rowfilter'
 import { pageable, wrapPage } from './pagesql'
 import { applyCommandCompletion, commandCompletion, keyCompletion } from './rediscommands'
 import { SqlHighlight } from './sqlhighlight'
+import { useI18n } from './i18n'
 import { pickStatement, statementAtCaret } from './sqlselection'
 import { splitStatements } from './multistatement'
 import { readAllowedNumber, readFlag, readText, writeFlag, writeNumber, writeText } from './prefs'
@@ -172,6 +173,7 @@ async function queryWithRetry(id: string, sql: string, maxRows: number, allowWri
 
 /** One console body: SQL editor + pager, or Redis key grid + command box. */
 function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initialConnectionId?: string; initialSchema?: string; initialSql?: string }): ReactElement {
+  const t = useI18n()
   const [connections, setConnections] = useState<ClientConnection[]>([])
   const [settings, setSettings] = useState<DbSettings | null>(null)
   const [selectedId, setSelectedId] = useState(initialConnectionId ?? '')
@@ -2246,7 +2248,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               <SqlHighlight sql={statement} />
               <textarea
               className="dshdb-input dshdb-console-input dshdb-sql-input"
-              placeholder={`输入 SQL，${shortcutLabel('console.run')} 执行（有选中内容时只执行选中部分），${shortcutLabel('console.complete')} 补全表名和列名（\`表.\` 后补全列名），${shortcutLabel('console.save')} 存成 .sql，${shortcutLabel('console.explain')} 查看执行计划，${shortcutLabel('console.clear')} 清空编辑器，${shortcutLabel('console.comment')} 注释，${shortcutLabel('console.runCaret')} 执行光标所在的语句，${shortcutLabel('console.format')} 格式化，${shortcutLabel('console.historyOlder')} / ${shortcutLabel('console.historyNewer')} 切换历史（可在设置里改）`}
+              placeholder={t('console.placeholder')}
                   aria-label="SQL 编辑器"
               ref={inputRef}
               aria-controls={suggestions === null ? undefined : `${completeId}-list`}
@@ -2615,8 +2617,8 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               {result === null ? (
                 <EmptyState
                   icon={<TerminalIcon size={22} />}
-                  title="等待执行"
-                  description="上面的语句会在当前数据源上运行，结果按页展示。"
+                  title={t('console.waiting')}
+                  description={t('console.waitingHint')}
                 />
               ) : (
                 <EmptyState
@@ -2790,10 +2792,11 @@ export function ConsoleTab(props: ConsoleTabProps): ReactElement {
 
 /** The chip text of a console tab. */
 export function ConsoleTabTitle(): ReactElement {
+  const t = useI18n()
   return (
-    <span className="dshdb-tabtitle" title="查询控制台">
+    <span className="dshdb-tabtitle" title={t('nav.console')}>
       <TerminalIcon size={12} />
-      控制台
+      {t('nav.console')}
     </span>
   )
 }

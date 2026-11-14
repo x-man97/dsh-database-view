@@ -12,6 +12,7 @@ import {
   type ShortcutScope,
 } from '../../shared/keymap'
 import { IS_MAC } from '../keymap'
+import { useI18n } from '../i18n'
 import { ArrowDownIcon, ArrowUpIcon } from '../icons'
 import { CONSOLE_ACTION_LABEL, consoleActionIcon } from '../consoleactions'
 import { orderConsoleActions, type ConsoleActionId } from '../../shared/consoleactions'
@@ -28,6 +29,7 @@ function ShortcutRow(props: {
   onChange: (binding: string | null) => void
 }): ReactElement {
   const { def, overrides, onChange } = props
+  const t = useI18n()
   const [recording, setRecording] = useState(false)
   const [problem, setProblem] = useState('')
   const binding = bindingOf(def.id, overrides)
@@ -85,7 +87,7 @@ function ShortcutRow(props: {
         onKeyDown={capture}
       />
       <Button size="sm" variant="ghost" disabled={overrides[def.id] === undefined} onClick={() => onChange(null)}>
-        恢复默认
+        {t('settings.restore')}
       </Button>
     </div>
   )
@@ -98,6 +100,7 @@ export interface SettingsViewProps {
 }
 
 export function SettingsView(props: SettingsViewProps): ReactElement {
+  const t = useI18n()
   const [draft, setDraft] = useState<DbSettings>(props.settings)
 
   useEffect(() => {
@@ -140,18 +143,18 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
   return (
     <div className="dshdb-scroll dshdb-scroll-thin" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <Panel
-        title="查询与安全"
+        title={t('settings.querySecurity')}
         collapsible
         actions={
           <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
-            保存
+            {t('settings.save')}
           </Button>
         }
         bodyClassName="dshdb-panel-body-pad"
       >
         <div className="dshdb-form">
           <div className="dshdb-form-grid">
-            <Field label="返回行数上限" hint="面板与工具共用的硬上限">
+            <Field label={t('settings.maxRows')} hint={t('settings.maxRowsHint')}>
               <TextInput
                 type="number"
                 min={1}
@@ -160,7 +163,7 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
                 onChange={(event) => updateNumber('maxRows', event.target.value)}
               />
             </Field>
-            <Field label="查询超时（秒）">
+            <Field label={t('settings.queryTimeout')}>
               <TextInput
                 type="number"
                 min={1}
@@ -169,7 +172,7 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
                 onChange={(event) => updateNumber('queryTimeoutSec', event.target.value)}
               />
             </Field>
-            <Field label="连接超时（秒）">
+            <Field label={t('settings.connectTimeout')}>
               <TextInput
                 type="number"
                 min={1}
@@ -178,7 +181,7 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
                 onChange={(event) => updateNumber('connectTimeoutSec', event.target.value)}
               />
             </Field>
-            <Field label="Redis 单次扫描数量">
+            <Field label={t('settings.redisScan')}>
               <TextInput
                 type="number"
                 min={10}
@@ -192,28 +195,28 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
             <Switch
               checked={draft.allowAgentWrites}
               onChange={(checked) => update('allowAgentWrites', checked)}
-              label="允许 Agent 工具执行写语句（仅非只读连接）"
+              label={t('settings.agentWrites')}
             />
             <Switch
               checked={draft.confirmDestructive}
               onChange={(checked) => update('confirmDestructive', checked)}
-              label="执行破坏性操作前需要二次确认"
+              label={t('settings.confirmDestructive')}
             />
           </div>
         </div>
       </Panel>
 
       <Panel
-        title="快捷键"
+        title={t('settings.shortcuts')}
         collapsible
         defaultOpen={false}
         actions={
           <div className="dshdb-inline">
             <Button size="sm" variant="ghost" onClick={() => update('keybindings', {})}>
-              恢复默认
+              {t('settings.restore')}
             </Button>
             <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
-              保存
+              {t('settings.save')}
             </Button>
           </div>
         }
@@ -245,16 +248,16 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
       </Panel>
 
       <Panel
-        title="数据源工具栏"
+        title={t('settings.toolbar')}
         collapsible
         defaultOpen={false}
         actions={
           <div className="dshdb-inline">
             <Button size="sm" variant="ghost" onClick={() => update('toolbarActions', [])}>
-              恢复默认
+              {t('settings.restore')}
             </Button>
             <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
-              保存
+              {t('settings.save')}
             </Button>
           </div>
         }
@@ -294,12 +297,12 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
       </Panel>
 
       <Panel
-        title="控制台"
+        title={t('settings.console')}
         collapsible
         defaultOpen={false}
         actions={
           <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
-            保存
+            {t('settings.save')}
           </Button>
         }
         bodyClassName="dshdb-panel-body-pad"
@@ -317,16 +320,16 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
       </Panel>
 
       <Panel
-        title="控制台工具栏"
+        title={t('settings.consoleToolbar')}
         collapsible
         defaultOpen={false}
         actions={
           <div className="dshdb-inline">
             <Button size="sm" variant="ghost" onClick={() => update('consoleActions', [])}>
-              恢复默认
+              {t('settings.restore')}
             </Button>
             <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
-              保存
+              {t('settings.save')}
             </Button>
           </div>
         }

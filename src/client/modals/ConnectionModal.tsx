@@ -4,6 +4,7 @@ import type { ClientConnection, ConnectionDraft, ConnectionTestResult, PresetId 
 import { api } from '../api'
 import { copyText } from '../colmenu'
 import { dialectLabel, formatMs } from '../format'
+import { useI18n } from '../i18n'
 import { DatabaseIcon, TrashIcon } from '../icons'
 import { Banner, Button, Field, Loading, Modal, Select, Switch, TextInput } from '../ui'
 
@@ -25,6 +26,7 @@ const TLS_PRESETS = new Set<PresetId>(['mysql', 'mariadb', 'postgres', 'mssql'])
 const SSH_PRESETS = new Set<PresetId>(['mysql', 'mariadb', 'oracle', 'postgres', 'mssql'])
 
 export function ConnectionModal(props: ConnectionModalProps): ReactElement | null {
+  const t = useI18n()
   const [choice, setChoice] = useState<PresetId>('mysql')
   const [name, setName] = useState('')
   const [host, setHost] = useState('127.0.0.1')
@@ -243,7 +245,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
       title={
         <span className="dshdb-inline">
           <DatabaseIcon size={14} />
-          {editing ? `编辑连接 · ${editing.name}` : '新建数据源连接'}
+          {editing ? `${t('conn.editTitle')} · ${editing.name}` : t('conn.newTitle')}
         </span>
       }
       onClose={props.onClose}
@@ -268,10 +270,10 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     >
       <div className="dshdb-form">
         <div className="dshdb-form-grid">
-          <Field label="名称" required span>
+          <Field label={t('conn.name')} required span>
             <TextInput value={name} autoFocus placeholder="例如 本地 MySQL" onChange={(event) => setName(event.target.value)} />
           </Field>
-          <Field label="数据库类型" required span hint={`方言：${dialectLabel(preset.dialect)}`}>
+          <Field label={t('conn.type')} required span hint={`方言：${dialectLabel(preset.dialect)}`}>
             <Select
               options={PRESET_ORDER.map((id) => ({ value: id, label: PRESET_LABEL[id] }))}
               value={choice}
@@ -280,16 +282,16 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
           </Field>
           {fileBased ? null : (
             <>
-              <Field label="主机" required>
+              <Field label={t('conn.host')} required>
                 <TextInput value={host} onChange={(event) => setHost(event.target.value)} placeholder="127.0.0.1" />
               </Field>
-              <Field label="端口" required>
+              <Field label={t('conn.port')} required>
                 <TextInput value={port} inputMode="numeric" onChange={(event) => setPort(event.target.value.replace(/[^0-9]/g, ''))} />
               </Field>
-              <Field label="用户名">
+              <Field label={t('conn.user')}>
                 <TextInput value={user} onChange={(event) => setUser(event.target.value)} placeholder={isRedis ? 'default' : '用户名'} />
               </Field>
-              <Field label="密码" hint={editing?.hasPassword ? '已保存密码，留空则保持不变' : undefined}>
+              <Field label={t('conn.password')} hint={editing?.hasPassword ? '已保存密码，留空则保持不变' : undefined}>
                 <TextInput
                   type="password"
                   value={password}
@@ -306,11 +308,11 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
             </>
           )}
           {isRedis ? (
-            <Field label="逻辑库序号" hint="Redis 数据库编号，默认 0">
+            <Field label={t('conn.redisDb')} hint="Redis 数据库编号，默认 0">
               <TextInput value={redisDb} inputMode="numeric" onChange={(event) => setRedisDb(event.target.value.replace(/[^0-9]/g, ''))} />
             </Field>
           ) : (
-            <Field label={choice === 'sqlite' ? '数据库文件' : '数据库 / 服务名'} span={fileBased} hint={preset.databaseHint}>
+            <Field label={choice === 'sqlite' ? t('conn.sqliteFile') : t('conn.database')} span={fileBased} hint={preset.databaseHint}>
               <TextInput
                 value={database}
                 onChange={(event) => setDatabase(event.target.value)}
@@ -320,7 +322,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
           )}
           {supportsSsh ? (
             <div className="dshdb-span-2 dshdb-list">
-              <Switch checked={sshEnabled} onChange={setSshEnabled} label="通过 SSH 隧道连接" />
+              <Switch checked={sshEnabled} onChange={setSshEnabled} label={t('conn.ssh')} />
             </div>
           ) : null}
           {supportsSsh && sshEnabled ? (
@@ -376,7 +378,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
           ) : null}
           {supportsTls ? (
             <div className="dshdb-span-2 dshdb-list">
-              <Switch checked={tlsEnabled} onChange={setTlsEnabled} label="启用 TLS / SSL" />
+              <Switch checked={tlsEnabled} onChange={setTlsEnabled} label={t('conn.tls')} />
             </div>
           ) : null}
           {supportsTls && tlsEnabled ? (
@@ -407,8 +409,8 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
               disabled={editing != null}
               label={
                 editing == null
-                  ? '只读连接（面板与 Agent 均拒绝写操作）'
-                  : '只读连接（仅新建时设置，创建后不能修改；需变更请新建连接）'
+                  ? t('conn.readonly')
+                  : t('conn.readonlyEdit')
               }
             />
           </div>

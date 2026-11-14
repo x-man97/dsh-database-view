@@ -34,6 +34,10 @@ query console, and read-only agent tools are available. Oracle TLS is not implem
 There is deliberately **no JDBC bridge, no Java runtime manager, and no custom-driver form**. Adding a
 database means adding a native Engine and a driver pack.
 
+## Languages
+
+The plugin follows DSH's **Settings → General → Language** choice. English and Chinese dictionaries are registered through the DSH locale service; other DSH locales fall back to English. Settings, the connection form, the data-source toolbar, table editing, and the SQL console use the shared translator.
+
 ## Design
 
 ```text

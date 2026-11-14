@@ -4,6 +4,7 @@ import { ConsoleTab, ConsoleTabTitle, type ConsoleTabProps } from './ConsoleTab'
 import { TableTab, TableTabTitle, type TableTabProps } from './TableTab'
 import { DatabaseIcon } from './icons'
 import { SettingsSection } from './SettingsSection'
+import { installI18n, t, useI18n } from './i18n'
 import { setConsoleTabOpener, setTableTabOpener, type ConsoleTabParams, type TableTabParams } from './tab-open'
 import { injectStyles } from './styles'
 
@@ -51,6 +52,7 @@ interface SlotDefinition {
 type Disposer = (() => void) | void
 
 interface ClientContext {
+  locale: import('./i18n').LocaleService
   sidebarRightTabs: {
     register(definition: SidebarTabDefinition): Disposer
   }
@@ -75,10 +77,11 @@ function DatabaseTabBody(props: Record<string, unknown>): ReactElement {
 
 /** The database chip in the tab strip: the same database glyph the guide uses. */
 function DatabaseTabChip(): ReactElement {
+  const t = useI18n()
   return (
     <>
       <DatabaseIcon size={13} />
-      <span>{TAB_TITLE}</span>
+      <span>{t('nav.database')}</span>
     </>
   )
 }
@@ -101,9 +104,10 @@ function ConsoleTabChip(): ReactElement {
 }
 
 export const name = PLUGIN_ID
-export const inject: string[] = ['slots']
+export const inject: string[] = ['slots', 'locale']
 
 export function apply(ctx: ClientContext): void {
+  ctx.effect(() => installI18n(ctx.locale), 'dsh-database-view: locale')
   ctx.effect(() => {
     return injectStyles()
   }, 'dsh-database-view: styles')
@@ -115,7 +119,7 @@ export function apply(ctx: ClientContext): void {
       name: 'settings.section',
       id: 'database',
       order: 40,
-      label: () => '数据库',
+      label: () => t('settings.nav'),
     }, SettingsSection)
     return undefined
   })
@@ -127,14 +131,14 @@ export function apply(ctx: ClientContext): void {
       host.sidebarRightTabs.register({
         id: TAB_ID,
         kind: TAB_KIND,
-        title: () => TAB_TITLE,
+        title: () => t('nav.database'),
         keepMounted: true,
         guide: [
           {
             id: TAB_KIND,
             order: 38,
-            title: () => TAB_TITLE,
-            description: () => '浏览和查询 MySQL、PostgreSQL、SQLite、SQL Server、Oracle 与 Redis 数据源',
+            title: () => t('nav.database'),
+            description: () => t('nav.database'),
             icon: GuideIcon,
           },
         ],
@@ -143,14 +147,14 @@ export function apply(ctx: ClientContext): void {
       host.sidebarRightTabs.register({
         id: TABLE_TAB_ID,
         kind: TABLE_TAB_KIND,
-        title: () => TABLE_TAB_TITLE,
+        title: () => t('nav.table'),
         multiple: true,
       })
       // Each console open gets its own tab, so every connection can run its own query.
       host.sidebarRightTabs.register({
         id: CONSOLE_TAB_ID,
         kind: CONSOLE_TAB_KIND,
-        title: () => CONSOLE_TAB_TITLE,
+        title: () => t('nav.console'),
         multiple: true,
       })
       host.slots.inject('sidebar.right.pane.tab', () => {

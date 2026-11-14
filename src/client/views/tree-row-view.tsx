@@ -18,6 +18,7 @@ import { Loading, StateDot, Tag } from '../ui'
 import { RowPicker } from './row-picker'
 import { Highlight, RowToggle } from './tree-parts'
 import type { TreeRow, TreeRowKind } from './tree-rows'
+import { useI18n } from '../i18n'
 
 /** Imperative handlers shared by every mounted row. Stable for the whole view. */
 export interface TreeRowActions {
@@ -148,7 +149,7 @@ const drawLabel = (row: TreeRow): ReactNode => (
 const drawMeta = (row: TreeRow): ReactNode =>
   row.meta === undefined ? null : <span className="dshdb-row-meta">{row.meta}</span>
 
-function drawContent(row: TreeRow, actions: TreeRowActions): ReactNode {
+function drawContent(row: TreeRow, actions: TreeRowActions, t: ReturnType<typeof useI18n>): ReactNode {
   switch (row.kind) {
     case 'connection':
       return (
@@ -190,7 +191,7 @@ function drawContent(row: TreeRow, actions: TreeRowActions): ReactNode {
                 }
               }}
             >
-              连接
+              {t('app.connect')}
             </span>
           )}
           <StateDot
@@ -419,7 +420,7 @@ export const TreeRowView = memo(function TreeRowView({
       }
       onDragEnd={row.kind === 'connection' ? actions.dragEnd : undefined}
     >
-      {drawContent(row, actions)}
+      {drawContent(row, actions, useI18n())}
     </button>
   )
 })

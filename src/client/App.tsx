@@ -24,6 +24,7 @@ import { fitActionCount } from './toolbaroverflow'
 import { usePopoverDismiss } from './popover'
 import type { ToolbarActionId } from '../shared/toolbaractions'
 import { copyText } from './colmenu'
+import { useI18n } from './i18n'
 import { MoreIcon } from './icons'
 import { ConnectionModal } from './modals/ConnectionModal'
 import { TrashModal, type TrashBusy } from './modals/TrashModal'
@@ -83,6 +84,7 @@ function ToolButton({
 }
 
 export function App(props: AppProps): ReactElement {
+  const t = useI18n()
   const info = (props.useTabInfo ?? noopTabInfo)()
   const hidden = info?.tab?.visible === false
 
@@ -331,14 +333,14 @@ export function App(props: AppProps): ReactElement {
   }[] = [
     {
       id: 'add',
-      label: '新增',
-      title: '新增数据源',
+      label: t('app.add'),
+      title: t('app.addTitle'),
       onClick: () => setConnModal({ open: true, editing: null }),
     },
     {
       id: 'edit',
-      label: '编辑',
-      title: '编辑选中的数据源',
+      label: t('app.edit'),
+      title: t('app.editTitle'),
       disabled: !selected || deleting,
       onClick: () => {
         if (selected) setConnModal({ open: true, editing: selected })
@@ -346,8 +348,8 @@ export function App(props: AppProps): ReactElement {
     },
     {
       id: 'refresh',
-      label: '刷新',
-      title: '刷新选中的数据源',
+      label: t('app.refresh'),
+      title: t('app.refreshTitle'),
       disabled: connectingId !== '' || refreshing,
       onClick: () => {
         if (refreshing) return
@@ -357,8 +359,8 @@ export function App(props: AppProps): ReactElement {
     },
     {
       id: 'delete',
-      label: '删除',
-      title: '删除选中的数据源',
+      label: t('app.delete'),
+      title: t('app.deleteTitle'),
       disabled: !selected || deleting,
       onClick: () => {
         if (selected) void deleteConnection(selected)
@@ -366,15 +368,15 @@ export function App(props: AppProps): ReactElement {
     },
     {
       id: 'console',
-      label: '控制台',
-      title: selectedSchema === '' ? '查询控制台' : `查询控制台（${selectedSchema}）`,
+      label: t('app.console'),
+      title: selectedSchema === '' ? t('app.consoleTitle') : `${t('app.consoleTitle')} (${selectedSchema})`,
       onClick: () =>
         openConsoleTab({ connectionId: selected?.id, ...(selectedSchema === '' ? {} : { schema: selectedSchema }) }),
     },
     {
       id: 'trash',
-      label: '回收站',
-      title: trash.length > 0 ? `回收站（${String(trash.length)}）` : '回收站',
+      label: t('app.trash'),
+      title: trash.length > 0 ? `${t('app.trashTitle')} (${String(trash.length)})` : t('app.trashTitle'),
       onClick: () => setTrashOpen(true),
     },
   ]
@@ -627,7 +629,7 @@ export function App(props: AppProps): ReactElement {
             <StateDot tone={server ? 'success' : connectingId === selectedId ? 'warn' : 'idle'} />
             <span title={selected.name}>{selected.name}</span>
             <span>·</span>
-            <span className="dshdb-mono dshdb-muted" title={`连接 ID：${selected.id}`}>
+            <span className="dshdb-mono dshdb-muted" title={`ID: ${selected.id}`}>
               {selected.id}
             </span>
             <span>·</span>
@@ -641,7 +643,7 @@ export function App(props: AppProps): ReactElement {
             ) : null}
             {server ? (
               <Button size="sm" variant="ghost" onClick={() => void disconnect(selected.id)}>
-                断开
+                {t('app.disconnect')}
               </Button>
             ) : (
               <Button
@@ -650,12 +652,12 @@ export function App(props: AppProps): ReactElement {
                 loading={connectingId === selected.id}
                 onClick={() => void connect(selected.id)}
               >
-                连接
+                {t('app.connect')}
               </Button>
             )}
           </>
         ) : (
-          <span>尚未选择数据源</span>
+          <span>{t('app.noSelection')}</span>
         )}
         <span className="dshdb-statusbar-spacer" />
         {prefetchEntry !== undefined ? (
@@ -676,7 +678,7 @@ export function App(props: AppProps): ReactElement {
         ) : null}
         {snapshot ? (
           <span title={snapshot.env.configPath}>
-            内置引擎 · v{snapshot.env.pluginVersion}
+            {t('app.nativeEngine')} · v{snapshot.env.pluginVersion}
           </span>
         ) : null}
       </footer>

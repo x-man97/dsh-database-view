@@ -31,6 +31,7 @@ import { DdlModal } from './DdlModal'
 import { cellValueView, type CellValueView } from './cellvalue'
 import { tableDumpText } from './tabledump'
 import { SqlHighlight } from './sqlhighlight'
+import { useI18n } from './i18n'
 import { deleteRowSql, insertRowSql, updateRowSql } from './rowedit'
 
 /** What the tab body receives: the framework's tab reader. */
@@ -100,6 +101,7 @@ function PagerButton({
 }
 
 function TableGrid({ params }: { params: TableTabParams }): ReactElement {
+  const t = useI18n()
   const [connection, setConnection] = useState<ClientConnection | null>(null)
   const [columns, setColumns] = useState<ColumnInfo[]>([])
   const [rows, setRows] = useState<Row[]>([])
@@ -1058,8 +1060,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <button
           type="button"
           className="dshdb-pager-btn"
-          title={canMutate ? '增加一行' : objectKind === 'view' ? '视图不能新增行' : '显示全部列并连接可写数据源后才能新增行'}
-          aria-label="增加行"
+          title={canMutate ? t('table.add') : objectKind === 'view' ? 'View rows cannot be added' : 'Show all columns and connect a writable source first'}
+          aria-label={t('table.add')}
           onClick={startInsert}
           disabled={!canMutate || rowSaving}
         >
@@ -1068,8 +1070,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <button
           type="button"
           className="dshdb-pager-btn"
-          title={canMutate ? '标记选中的行为删除（再次点击恢复）' : '当前不可删除'}
-          aria-label="删除选中行"
+          title={canMutate ? t('table.delete') : 'Not deletable'}
+          aria-label={t('table.delete')}
           onClick={markDelete}
           disabled={!canMutate || selectedRows.size === 0 || rowSaving}
         >
@@ -1078,8 +1080,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <button
           type="button"
           className="dshdb-pager-btn"
-          title="打开 DML 语句预览"
-          aria-label="DML 预览"
+          title={t('table.dml')}
+          aria-label={t('table.dml')}
           onClick={openDml}
           disabled={pendingCount === 0 || rowSaving}
         >
@@ -1088,14 +1090,14 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <button
           type="button"
           className="dshdb-pager-btn"
-          title="直接提交所有待处理更改"
-          aria-label="提交更改"
+          title={t('table.submit')}
+          aria-label={t('table.submit')}
           onClick={() => void submitDml()}
           disabled={pendingCount === 0 || rowSaving}
         >
           <ArrowUpIcon size={13} />
         </button>
-        {pendingCount > 0 ? <Tag tone="business">待提交 {pendingCount}</Tag> : null}
+        {pendingCount > 0 ? <Tag tone="business">{t('table.pending')} {pendingCount}</Tag> : null}
         <span className="dshdb-qbar-spacer" />
         {loading ? <Loading bare /> : null}
         {elapsed !== undefined && !loading ? <span className="dshdb-qmeta">{formatMs(elapsed)}</span> : null}
@@ -1153,8 +1155,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <button
           type="button"
           className="dshdb-pager-btn"
-          title="在查询控制台打开这个表"
-          aria-label="在查询控制台打开"
+          title={t('table.console')}
+          aria-label={t('table.console')}
           onClick={() => {
             const target = connection
             if (target === null) return
@@ -1188,8 +1190,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <button
           type="button"
           className="dshdb-pager-btn"
-          title="查看建表语句"
-          aria-label="查看建表语句"
+          title={t('table.ddl')}
+          aria-label={t('table.ddl')}
           onClick={() => void openDdl()}
           disabled={ddlBusy}
         >
@@ -1198,8 +1200,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <button
           type="button"
           className="dshdb-pager-btn"
-          title="刷新"
-          aria-label="刷新"
+          title={t('table.refresh')}
+          aria-label={t('table.refresh')}
           onClick={() => apply({ recount: true })}
           disabled={loading}
         >
@@ -1565,20 +1567,20 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
       />
       <Modal
         open={dmlOpen}
-        title="DML 预览"
+        title={t('table.dmlTitle')}
         width={720}
         onClose={() => setDmlOpen(false)}
         footer={
           <>
             <span className="dshdb-muted">共 {dmlStatements.length} 条语句</span>
             <span className="dshdb-modal-foot-spacer" />
-            <Button onClick={() => setDmlOpen(false)} disabled={rowSaving}>取消</Button>
-            <Button variant="primary" loading={rowSaving} onClick={() => void submitDml()}>提交</Button>
+            <Button onClick={() => setDmlOpen(false)} disabled={rowSaving}>{t('table.dmlCancel')}</Button>
+            <Button variant="primary" loading={rowSaving} onClick={() => void submitDml()}>{t('table.dmlSubmit')}</Button>
           </>
         }
       >
         <SqlHighlight sql={dmlStatements.join('\n\n')} className="dshdb-dml-sql" />
-        {keyColumns.length === 0 ? <Banner tone="warn">未检测到主键，WHERE 将按原始全部列匹配。</Banner> : null}
+        {keyColumns.length === 0 ? <Banner tone="warn">{t('table.noPrimaryKey')}</Banner> : null}
         {rowError !== '' ? <Banner tone="error">{rowError}</Banner> : null}
       </Modal>
       <CellValueModal view={cellView} onClose={() => setCellView(null)} />
@@ -1588,14 +1590,15 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
 
 /** Render the table tab named by this tab's navigation parameters. */
 export function TableTab(props: TableTabProps): ReactElement {
+  const t = useI18n()
   const info = (props.useTabInfo ?? noTabInfo)()
   const params = readTableTabParams(info?.tab?.navigation?.params)
   if (params === undefined) {
     return (
       <EmptyState
         icon={<TableIcon size={22} />}
-        title="数据表已关闭"
-        description="这个标签页没有记录数据表位置，请在数据树中双击数据表重新打开。"
+        title={t('nav.table')}
+        description={t('nav.table')}
       />
     )
   }
@@ -1604,9 +1607,10 @@ export function TableTab(props: TableTabProps): ReactElement {
 
 /** The chip text of a table tab: the table's name, or nothing to name. */
 export function TableTabTitle(props: TableTabProps): ReactElement {
+  const t = useI18n()
   const info = (props.useTabInfo ?? noTabInfo)()
   const params = readTableTabParams(info?.tab?.navigation?.params)
-  if (params === undefined) return <span>数据表</span>
+  if (params === undefined) return <span>{t('nav.table')}</span>
   // The chip is narrow: name the table, keep the qualified name in the tip and
   // in the body header.
   const label = params.table

@@ -7,6 +7,7 @@
  */
 import { useEffect, useState, type ReactElement } from 'react'
 import { orderConsoleActions, type ConsoleActionId } from '../shared/consoleactions'
+import { t } from './i18n'
 import {
   CheckIcon,
   ClearIcon,
@@ -24,22 +25,22 @@ import {
   UploadIcon,
 } from './icons'
 
-export const CONSOLE_ACTION_LABEL: Record<ConsoleActionId, string> = {
-  run: '执行',
-  cancel: '取消',
-  history: '历史',
-  format: '格式化',
-  import: '导入',
-  save: '保存',
-  clear: '清空',
-  copy: '复制 SQL',
-  explain: '执行计划',
-  openTable: '打开数据表',
-  txStart: '事务',
-  txCommit: '提交',
-  txRollback: '回滚',
-  export: '导出',
-}
+export const CONSOLE_ACTION_LABEL = {
+  get run() { return t('console.action.run') },
+  get cancel() { return t('console.action.cancel') },
+  get history() { return t('console.action.history') },
+  get format() { return t('console.action.format') },
+  get import() { return t('console.action.import') },
+  get save() { return t('console.action.save') },
+  get clear() { return t('console.action.clear') },
+  get copy() { return t('console.action.copy') },
+  get explain() { return t('console.action.explain') },
+  get openTable() { return t('console.action.openTable') },
+  get txStart() { return t('console.action.txStart') },
+  get txCommit() { return t('console.action.txCommit') },
+  get txRollback() { return t('console.action.txRollback') },
+  get export() { return t('console.action.export') },
+} as Record<ConsoleActionId, string>
 
 export function consoleActionIcon(id: ConsoleActionId, size = 12): ReactElement {
   switch (id) {
