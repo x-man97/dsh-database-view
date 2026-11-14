@@ -100,11 +100,4 @@ jobs:
           fi
 
       - name: 发布到 npm（GitHub OIDC Trusted Publishing）
-        run: |
-          set -euo pipefail
-          VERSION=$(node -p "require('./package.json').version")
-          if npm view "dsh-database-view@${VERSION}" version --registry=https://registry.npmjs.org >/dev/null 2>&1; then
-            echo "dsh-database-view@${VERSION} 已在 npm，跳过发布"
-          else
-            npm publish --provenance --access public --registry=https://registry.npmjs.org
-          fi
+        run: npm publish --provenance --access public --registry=https://registry.npmjs.org
