@@ -13,7 +13,7 @@ import { ApiError, api } from './api'
 import { DataGrid, type CellMenuTarget } from './DataGrid'
 import { MenuGroupList, type MenuGroupSpec } from './menugroups'
 import { formatCell, formatCount, formatMs } from './format'
-import { ArrowUpIcon, CopyIcon, DownloadIcon, EyeUpIcon, FilterIcon, MinusIcon, PlayIcon, PlusIcon, RefreshIcon, TableIcon, TerminalIcon } from './icons'
+import { ArrowUpIcon, CopyIcon, DownloadIcon, UndoIcon, EyeUpIcon, FilterIcon, MinusIcon, PlayIcon, PlusIcon, RefreshIcon, TableIcon, TerminalIcon } from './icons'
 import { downloadText, exportFilename, renderExport, toCsv, toJson, toMarkdown, toTsv, type ExportFormat } from './export'
 import { openConsoleTab, readTableTabParams, type TableTabParams } from './tab-open'
 import { columnValues, commaValues, copyText, type ColumnMenuItem } from './colmenu'
@@ -119,6 +119,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const [pendingUpdates, setPendingUpdates] = useState<Record<number, Record<string, string>>>({})
   const [pendingDeletes, setPendingDeletes] = useState<Set<number>>(new Set())
   const [cellEdit, setCellEdit] = useState<{ rowIndex: number; column: string; value: string } | null>(null)
+  const [newCell, setNewCell] = useState<{ rowIndex: number; column: string; value: string } | null>(null)
   const [dmlOpen, setDmlOpen] = useState(false)
   const [rowSaving, setRowSaving] = useState(false)
   const [rowError, setRowError] = useState('')
@@ -226,6 +227,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     setPendingDeletes(new Set())
     setPendingNew([])
     setCellEdit(null)
+    setNewCell(null)
     selectionAnchor.current = null
   }, [rows, page])
 
@@ -353,7 +355,10 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
 
   const startInsert = (): void => {
     if (!canMutate) return
+    const first = editableColumns[0]
+    if (first === undefined) return
     setRowError('')
+    setNewCell({ rowIndex: pendingNew.length, column: first.name, value: '' })
     setPendingNew((previous) => [...previous, {}])
   }
   const startCellEdit = (rowIndex: number, column: ColumnInfo): void => {
@@ -385,8 +390,33 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     setCellEdit(null)
   }
   const cancelCell = (): void => setCellEdit(null)
-  const updateNewRow = (index: number, column: string, value: string): void => {
-    setPendingNew((previous) => previous.map((row, rowIndex) => rowIndex === index ? { ...row, [column]: value } : row))
+  const startNewCell = (rowIndex: number, column: string): void => {
+    const value = pendingNew[rowIndex]?.[column] ?? ''
+    setNewCell({ rowIndex, column, value })
+  }
+  const updateNewCell = (value: string): void => {
+    setNewCell((previous) => (previous === null ? previous : { ...previous, value }))
+  }
+  const commitNewCell = (): void => {
+    if (newCell === null) return
+    const { rowIndex, column, value } = newCell
+    setPendingNew((previous) => previous.map((row, index) => index === rowIndex ? { ...row, [column]: value } : row))
+    setNewCell(null)
+  }
+  const cancelNewCell = (): void => setNewCell(null)
+  const removeNewRow = (rowIndex: number): void => {
+    setNewCell((previous) => (previous?.rowIndex === rowIndex ? null : previous))
+    setPendingNew((previous) => previous.filter((_, index) => index !== rowIndex))
+  }
+  const undoPending = (): void => {
+    if (rowSaving) return
+    setPendingNew([])
+    setPendingUpdates({})
+    setPendingDeletes(new Set())
+    setCellEdit(null)
+    setNewCell(null)
+    setRowError('')
+    setSelectedRows(new Set())
   }
   const markDelete = (): void => {
     if (!canMutate || selectedRows.size === 0 || rowSaving) return
@@ -451,6 +481,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
       setPendingUpdates({})
       setPendingDeletes(new Set())
       setCellEdit(null)
+      setNewCell(null)
       setDmlOpen(false)
       applyRef.current({ recount: true })
     } catch (caught) {
@@ -945,10 +976,10 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                   void load(last.found, last.target)
                 }}
               >
-                重试
+                {t('table.retry')}
               </Button>
-              <Button size="sm" variant="ghost" title="复制错误信息" onClick={() => void copyText(failureMessage(error))}>
-                复制
+              <Button size="sm" variant="ghost" title={t('table.copyError')} onClick={() => void copyText(failureMessage(error))}>
+                {t('table.copyError')}
               </Button>
             </>
           }
@@ -1076,6 +1107,16 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           disabled={!canMutate || selectedRows.size === 0 || rowSaving}
         >
           <MinusIcon size={13} />
+        </button>
+        <button
+          type="button"
+          className="dshdb-pager-btn"
+          title={t('table.undoTitle')}
+          aria-label={t('table.undo')}
+          onClick={undoPending}
+          disabled={pendingNew.length === 0 && pendingDeletes.size === 0 && Object.keys(pendingUpdates).length === 0 || rowSaving}
+        >
+          <UndoIcon size={13} />
         </button>
         <button
           type="button"
@@ -1214,10 +1255,10 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <input
           ref={whereRef}
           className="dshdb-input dshdb-qfilter-input"
-          placeholder="过滤条件，例如 ID > 10 AND BCH = '6084'"
-          aria-label="过滤条件"
+          placeholder={t('table.wherePlaceholder')}
+          aria-label={t('table.whereAria')}
           list={columnsListId}
-          title={`${shortcutLabel('table.where')} 聚焦这里`}
+          title={t('table.whereFocus', { binding: shortcutLabel('table.where') })}
           value={whereText}
           spellCheck={false}
           onChange={(event) => setWhereText(event.target.value)}
@@ -1233,8 +1274,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           <button
             type="button"
             className="dshdb-row-action"
-            title="清空过滤条件"
-            aria-label="清空过滤条件"
+            title={t('table.clearWhere')}
+            aria-label={t('table.clearWhere')}
             onClick={() => {
               setWhereText('')
               apply({ where: '', page: 0 })
@@ -1246,8 +1287,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <span className="dshdb-qfilter-label">ORDER BY</span>
         <input
           className="dshdb-input dshdb-qfilter-input dshdb-qfilter-order"
-          placeholder="排序列，例如 ID DESC"
-          aria-label="排序列"
+          placeholder={t('table.orderPlaceholder')}
+          aria-label={t('table.orderAria')}
           list={columnsListId}
           value={orderText}
           spellCheck={false}
@@ -1264,8 +1305,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           <button
             type="button"
             className="dshdb-row-action"
-            title="清空排序"
-            aria-label="清空排序"
+            title={t('table.clearOrder')}
+            aria-label={t('table.clearOrder')}
             onClick={() => {
               setOrderText('')
               apply({ orderBy: '', page: 0 })
@@ -1282,8 +1323,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <button
           type="button"
           className="dshdb-pager-btn"
-          title="应用查询条件"
-          aria-label="应用查询条件"
+          title={t('table.applyFilters')}
+          aria-label={t('table.applyFilters')}
           onClick={() => apply({ where: whereText, orderBy: orderText, page: 0 })}
           disabled={loading}
         >
@@ -1306,10 +1347,10 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                   void load(last.found, last.target)
                 }}
               >
-                重试
+                {t('table.retry')}
               </Button>
-              <Button size="sm" variant="ghost" title="复制错误信息" onClick={() => void copyText(failureMessage(error))}>
-                复制
+              <Button size="sm" variant="ghost" title={t('table.copyError')} onClick={() => void copyText(failureMessage(error))}>
+                {t('table.copyError')}
               </Button>
             </>
           }
@@ -1328,8 +1369,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         <div className="dshdb-grid-wrap">
           <EmptyState
             icon={<TableIcon size={22} />}
-            title={conditioned ? '没有匹配的行' : '这张表还没有数据'}
-            description={conditioned ? sqlText : '表里一行数据都没有'}
+            title={conditioned ? t('table.noRowsMatch') : t('table.empty')}
+            description={conditioned ? sqlText : t('table.emptyDescription')}
             actions={
               conditioned ? (
                 <Button
@@ -1341,9 +1382,9 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                     setOrderText('')
                     apply({ where: '', orderBy: '', page: 0 })
                   }}
-                  title="清掉过滤条件、列筛选与排序再查一次"
+                  title={t('table.clearConditionsTitle')}
                 >
-                  清空条件
+                  {t('table.clearConditions')}
                 </Button>
               ) : undefined
             }
@@ -1376,7 +1417,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                 <th className="dshdb-select-cell" />
                 <th className="dshdb-num">
                   {activeFilterCount > 0 ? (
-                    <button type="button" className="dshdb-row-action" title="清除所有列筛选" aria-label="清除列筛选" onClick={clearColumnFilters}>
+                    <button type="button" className="dshdb-row-action" title={t('table.clearAllFilters')} aria-label={t('table.clearAllFilters')} onClick={clearColumnFilters}>
                       ×
                     </button>
                   ) : null}
@@ -1389,9 +1430,9 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                       <span className={`dshdb-filter-box${cleared ? '' : ' dshdb-filter-box-active'}`}>
                         <input
                           className="dshdb-filter-input"
-                          placeholder={filter?.op === 'isnull' ? 'NULL' : '包含…'}
+                          placeholder={filter?.op === 'isnull' ? 'NULL' : t('table.filterContains')}
                           aria-label={`筛选 ${column.name}`}
-                          title={filter?.op === 'isnull' ? '等于 NULL' : `按 ${column.name} 筛选（包含匹配）`}
+                          title={filter?.op === 'isnull' ? t('table.filterNull') : t('table.filterByColumn', { name: column.name })}
                           value={filter?.op === 'isnull' ? '' : filter?.text ?? ''}
                           spellCheck={false}
                           onChange={(event) => {
@@ -1406,7 +1447,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                           <button
                             type="button"
                             className="dshdb-filter-clear"
-                            aria-label={`清除 ${column.name} 的筛选`}
+                            aria-label={t('table.clearColumnFilter', { name: column.name })}
                             onClick={() => {
                               setColumnFilter(column, undefined)
                               const next: ColumnFilters = { ...filters }
@@ -1435,8 +1476,19 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           }
           pendingNewRows={pendingNew.map((values, index) => ({
             values,
-            onChange: (column, value) => updateNewRow(index, column, value),
-            onRemove: () => setPendingNew((previous) => previous.filter((_, rowIndex) => rowIndex !== index)),
+            onStartEdit: (column) => startNewCell(index, column),
+            onRemove: () => removeNewRow(index),
+            ...(newCell?.rowIndex === index
+              ? {
+                  editing: {
+                    column: newCell.column,
+                    value: newCell.value,
+                    onChange: updateNewCell,
+                    onCommit: commitNewCell,
+                    onCancel: cancelNewCell,
+                  },
+                }
+              : {}),
           }))}
           {...(cellEdit === null ? {} : {
             cellEdit: {

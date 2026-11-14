@@ -9,6 +9,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
 import type { CellValue, ColumnInfo, Row } from '../shared/types'
 import type { ColumnMenuItem } from './colmenu'
+import { t } from './i18n'
 import { clearWidths, readWidths, writeWidths } from './columnWidths'
 import { formatCell } from './format'
 
@@ -35,8 +36,16 @@ export interface CellMenuTarget {
 
 export interface PendingNewRow {
   values: Record<string, string>
-  onChange: (column: string, value: string) => void
+  /** Start editing one new-row cell; normal cells stay as text when blurred. */
+  onStartEdit: (column: string) => void
   onRemove: () => void
+  editing?: {
+    column: string
+    value: string
+    onChange: (value: string) => void
+    onCommit: () => void
+    onCancel: () => void
+  }
 }
 
 export interface CellEdit {
@@ -539,17 +548,39 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
               <td className="dshdb-num">
                 <button type="button" className="dshdb-row-action" title="移除这行新增" aria-label="移除新增行" onClick={pending.onRemove}>×</button>
               </td>
-              {columns.map((column, columnIndex) => (
-                <td key={`insert-${column.name}-${columnIndex}`} className="dshdb-cell-editing">
-                  <input
-                    className="dshdb-cell-input"
-                    aria-label={`新行 ${rowIndex + 1} ${column.name}`}
-                    autoFocus={rowIndex === 0 && columnIndex === 0}
-                    value={pending.values[column.name] ?? ''}
-                    onChange={(event) => pending.onChange(column.name, event.target.value)}
-                  />
-                </td>
-              ))}
+              {columns.map((column, columnIndex) => {
+                const editing = pending.editing?.column === column.name
+                if (editing) {
+                  return (
+                    <td key={`insert-${column.name}-${columnIndex}`} className="dshdb-cell-editing">
+                      <input
+                        className="dshdb-cell-input"
+                        aria-label={`${t('table.newRow')} ${rowIndex + 1} ${column.name}`}
+                        autoFocus
+                        value={pending.editing?.value ?? ''}
+                        onChange={(event) => pending.editing?.onChange(event.target.value)}
+                        onBlur={() => pending.editing?.onCommit()}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            pending.editing?.onCommit()
+                          } else if (event.key === 'Escape') {
+                            event.preventDefault()
+                            pending.editing?.onCancel()
+                          }
+                        }}
+                      />
+                    </td>
+                  )
+                }
+                return (
+                  <td key={`insert-${column.name}-${columnIndex}`} className="dshdb-cell-editing" onDoubleClick={() => pending.onStartEdit(column.name)}>
+                    {(pending.values[column.name] ?? '') === ''
+                      ? <span className="dshdb-null">—</span>
+                      : <span>{pending.values[column.name]}</span>}
+                  </td>
+                )
+              })}
             </tr>
           ))}
           {range.paddingBottom > 0 ? (
