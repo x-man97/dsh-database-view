@@ -9,6 +9,7 @@ import { copyText } from './colmenu'
 import { formatCount } from './format'
 import { CheckIcon, CopyIcon, RefreshIcon } from './icons'
 import { useCopyFlash } from './copyflash'
+import { useI18n } from './i18n'
 import { redisTtlLabel, redisValueTable, redisValueText } from './redisvalue'
 import { Tag } from './ui'
 
@@ -25,6 +26,7 @@ export const RedisValuePanel = memo(function RedisValuePanel({
   refreshing?: boolean
   onRefresh?: () => void
 }): ReactElement {
+  const t = useI18n()
   const table = redisValueTable(value)
   // A multi-megabyte string would otherwise land in one text node and stall the
   // panel; showing a prefix keeps the key browsable while copy still gets it all.
@@ -42,14 +44,14 @@ export const RedisValuePanel = memo(function RedisValuePanel({
       <div className="dshdb-redis-meta">
         <Tag>{value.type}</Tag>
         <span className="dshdb-muted">{redisTtlLabel(value.ttl)}</span>
-        {value.size === undefined ? null : <span className="dshdb-muted">{formatCount(value.size)} 条</span>}
-        {value.truncated ? <Tag tone="warn">已截断</Tag> : null}
+        {value.size === undefined ? null : <span className="dshdb-muted">{t('redis.valueCount', { n: formatCount(value.size) })}</span>}
+        {value.truncated ? <Tag tone="warn">{t('redis.valueTruncated')}</Tag> : null}
         {onRefresh === undefined ? null : (
           <button
             type="button"
             className="dshdb-row-action"
-            title={refreshing ? '正在重新读取' : '重新读取这个键'}
-            aria-label={refreshing ? '正在刷新键值' : '刷新键值'}
+            title={refreshing ? t('redis.reloading') : t('redis.reloadKey')}
+            aria-label={refreshing ? t('redis.refreshingValue') : t('redis.refreshValue')}
             disabled={refreshing}
             onClick={onRefresh}
           >
@@ -62,13 +64,13 @@ export const RedisValuePanel = memo(function RedisValuePanel({
           title={
             value.truncated
               ? copiedValue
-                ? '已复制取回的部分（列表已截断）'
-                : '复制取回的部分（列表已截断）'
+                ? t('redis.copiedPartial')
+                : t('redis.copyPartial')
               : copiedValue
-                ? '已复制值'
-                : '复制值'
+                ? t('redis.copiedValue')
+                : t('redis.copyValue')
           }
-          aria-label={copiedValue ? '值已复制' : '复制值'}
+          aria-label={copiedValue ? t('redis.valueCopied') : t('redis.copyValue')}
           onClick={() => {
             void copyText(redisValueText(value.value)).then((ok) => valueFlash.flash(ok))
           }}
@@ -83,8 +85,8 @@ export const RedisValuePanel = memo(function RedisValuePanel({
             <button
               type="button"
               className="dshdb-row-action"
-              title={copied ? '已复制键名' : '复制键名'}
-              aria-label={copied ? '键名已复制' : '复制键名'}
+              title={copied ? t('redis.copiedKey') : t('redis.copyKey')}
+              aria-label={copied ? t('redis.keyCopied') : t('redis.copyKey')}
               onClick={() => {
                 void copyText(value.key).then((ok) => keyFlash.flash(ok))
               }}
@@ -99,7 +101,7 @@ export const RedisValuePanel = memo(function RedisValuePanel({
           <pre className="dshdb-console-value">{text}</pre>
           {clipped ? (
             <p className="dshdb-muted" style={{ margin: '6px 0 0' }}>
-              值太大，只显示了前 {DISPLAY_TEXT_LIMIT / 1024} KB；复制按钮拿到的是完整值。
+              {t('redis.largeValue', { kb: DISPLAY_TEXT_LIMIT / 1024 })}
             </p>
           ) : null}
         </>
@@ -131,7 +133,7 @@ export const RedisValuePanel = memo(function RedisValuePanel({
       )}
       {clipped ? (
         <p className="dshdb-muted" style={{ margin: '6px 0 0' }}>
-          值太大，只显示了前 {DISPLAY_TEXT_LIMIT / 1024} KB；复制按钮拿到的是完整值。
+          {t('redis.largeValue', { kb: DISPLAY_TEXT_LIMIT / 1024 })}
         </p>
       ) : null}
     </div>

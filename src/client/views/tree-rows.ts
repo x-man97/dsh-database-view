@@ -261,12 +261,12 @@ function appendConnection(context: BuildContext, connection: ClientConnection): 
 
   const dbItems = Array.from({ length: state.redisDatabases[connection.id] ?? 16 }, (_, index) => ({
     id: String(index),
-    label: index === connection.redisDb ? `db${index}（默认）` : `db${index}`,
+    label: index === connection.redisDb ? t('redis.dbDefault', { n: index }) : `db${index}`,
   }))
   const picker: TreeRowPicker = redis
     ? {
-        title: '选择要展示的数据库',
-        allLabel: '所有数据库',
+        title: t('redis.chooseDb'),
+        allLabel: t('redis.allDbs'),
         items: dbItems,
         visible: redisDbs.map(String),
         mode: 'redis-dbs',
@@ -616,7 +616,7 @@ function appendRedis(
 ): void {
   const { state, filter, rows } = context
   if (visibleDbs.length === 0) {
-    note(rows, `${connection.id}#redis-empty`, '未选择数据库，使用行尾的数据库按钮选择', 2)
+    note(rows, `${connection.id}#redis-empty`, t('redis.noDb'), 2)
     return
   }
   const keysByDb = state.redisKeys[connection.id]
@@ -647,17 +647,17 @@ function appendRedis(
       db,
       label: `db${db}`,
       mono: true,
-      title: `Redis 逻辑库 db${db}${db === connection.redisDb ? '（默认）' : ''}`,
+      title: t('redis.dbTitle', { n: db, default: db === connection.redisDb ? t('redis.dbTitleDefault') : '' }),
       defaultDb: db === connection.redisDb,
       loading,
       online,
-      meta: !loading && keys !== undefined ? `${keys.length} 个键` : undefined,
+      meta: !loading && keys !== undefined ? t('redis.keysCount', { n: keys.length }) : undefined,
     })
 
     if (!open) continue
 
     if (keys === undefined && loading) {
-      note(rows, `${nodeKey}#loading`, '正在扫描键…', 2, true)
+      note(rows, `${nodeKey}#loading`, t('redis.scanning'), 2, true)
     }
     if (keys === undefined && !loading) {
       rows.push({
@@ -672,11 +672,11 @@ function appendRedis(
         action: 'scan',
         connectionId: connection.id,
         db,
-        label: '扫描键',
+        label: t('redis.scanKeys'),
       })
     }
     if (keys !== undefined && list.length === 0) {
-      note(rows, `${nodeKey}#empty`, filter !== '' ? '没有匹配的键' : '没有键', 2)
+      note(rows, `${nodeKey}#empty`, filter !== '' ? t('redis.emptyMatch') : t('redis.emptyKeys'), 2)
     }
     for (const key of list) {
       rows.push({
@@ -713,7 +713,7 @@ function appendRedis(
         connectionId: connection.id,
         db,
         loading,
-        label: loading ? '正在加载…' : '加载更多键',
+        label: loading ? t('redis.loading') : t('redis.loadMore'),
       })
     }
   }

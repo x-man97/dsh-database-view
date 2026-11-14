@@ -411,7 +411,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
   const askConfirm = useCallback((message: string, detail?: string): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
       setConfirm({
-        request: { title: '确认执行', message, detail, danger: true, confirmLabel: '执行' },
+        request: { title: t('console.confirmRun'), message, detail, danger: true, confirmLabel: t('console.execute') },
         resolve,
       })
     })
@@ -733,7 +733,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
           setScriptResults(collected)
           setScriptIndex(Math.max(0, collected.length - 1))
           const failure = failureText(error)
-          setFailure({ message: `第 ${index + 1}/${parts.length} 条语句执行失败：${failure.message}`, detail: failure.detail ?? part })
+          setFailure({ message: t('console.multiFail', { n: index + 1, total: parts.length, message: failure.message }), detail: failure.detail ?? part })
           if (last !== null) {
             setResult(last)
             setPage(0)
@@ -749,7 +749,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
       setPage(0)
       setBase('')
       setSourceSql(parts[parts.length - 1] ?? '')
-      setMultiNote(`已顺序执行 ${parts.length} 条语句`)
+      setMultiNote(t('console.multiDone', { n: parts.length }))
       setHistory(pushHistory('sql', parts.join(';\n')))
       if (last !== null) setHistory(annotateHistory('sql', parts.join(';\n'), { rows: last.rows.length, elapsedMs: last.elapsedMs }))
       if (parts.some(looksLikeDdl)) {
@@ -808,7 +808,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     if (parts.length === 0) return
     const isWrite = parts.some((part) => looksLikeWrite(part))
     if (isWrite && settings?.confirmDestructive === true) {
-      const ok = await askConfirm(parts.length > 1 ? `即将顺序执行 ${parts.length} 条语句（含写语句），可能修改或删除数据。` : '即将执行写语句，可能修改或删除数据。', body)
+      const ok = await askConfirm(parts.length > 1 ? t('console.confirmWriteMulti', { n: parts.length }) : t('console.confirmWrite'), body)
       if (!ok) return
     }
     if (parts.length > 1) {
@@ -911,7 +911,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
       setPage(0)
       setBase('')
       if (next.plan === undefined) {
-        setFailure({ message: next.warnings.join('；') || '没有返回执行计划', detail: next.statements.join('\n') })
+        setFailure({ message: next.warnings.join('; ') || t('console.noPlan'), detail: next.statements.join('\n') })
       }
     } catch (error) {
       if (token !== planToken.current) return
@@ -1067,13 +1067,13 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     const isWrite = looksLikeRedisWrite(text)
     if (isWrite && connection?.readOnly === true) {
       setValueError({
-        message: '这是一条只读连接，不能执行写命令',
-        detail: '把连接设置里的「只读」关掉，再执行要修改 Redis 数据的命令',
+        message: t('console.readonlyWrite'),
+        detail: t('console.readonlyWriteDetail'),
       })
       return
     }
     if (isWrite && settings?.confirmDestructive === true) {
-      const ok = await askConfirm('即将执行会修改 Redis 数据的命令。', text)
+      const ok = await askConfirm(t('console.confirmRedisWrite'), text)
       if (!ok) return
     }
     recallRef.current = -1
@@ -1333,29 +1333,29 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     const active = rowSort?.column === column.name ? rowSort.direction : null
     const index = columns.findIndex((item) => item.name === column.name)
     return [
-      { label: '按此列升序', disabled: active === 'asc', run: () => setRowSort({ column: column.name, direction: 'asc' }) },
-      { label: '按此列降序', disabled: active === 'desc', run: () => setRowSort({ column: column.name, direction: 'desc' }) },
-      { label: '清除排序', disabled: rowSort === null, run: () => setRowSort(null) },
-      { label: `复制列名「${column.name}」`, run: () => void copyText(column.name).then(noteCopied('列名')) },
+      { label: t('menu.sortAsc'), disabled: active === 'asc', run: () => setRowSort({ column: column.name, direction: 'asc' }) },
+      { label: t('menu.sortDesc'), disabled: active === 'desc', run: () => setRowSort({ column: column.name, direction: 'desc' }) },
+      { label: t('menu.clearSort'), disabled: rowSort === null, run: () => setRowSort(null) },
+      { label: t('menu.copyColumnName', { name: column.name }), run: () => void copyText(column.name).then(noteCopied('列名')) },
       {
         label: t('menu.copyColumnValues', { n: filteredRows.length }),
         disabled: filteredRows.length === 0 || index < 0,
-        run: () => void copyText(columnValues(filteredRows, index)).then(noteCopied('本列值')),
+        run: () => void copyText(columnValues(filteredRows, index)).then(noteCopied(t('redis.headerValue'))),
       },
       {
         label: t('menu.copyIn'),
         disabled: filteredRows.length === 0 || index < 0,
-        run: () => void copyText(inListOf(connection?.dialect ?? 'mysql', filteredRows, index)).then(noteCopied('IN 列表')),
+        run: () => void copyText(inListOf(connection?.dialect ?? 'mysql', filteredRows, index)).then(noteCopied(t('menu.inListShort'))),
       },
       {
         label: t('menu.copyComma'),
         disabled: filteredRows.length === 0 || index < 0,
-        run: () => void copyText(commaValues(filteredRows, index)).then(noteCopied('逗号分隔')),
+        run: () => void copyText(commaValues(filteredRows, index)).then(noteCopied(t('menu.copyComma'))),
       },
       {
         label: t('menu.copyAllColumns'),
         disabled: displayColumns.length === 0,
-        run: () => void copyText(columnNames(connection?.dialect ?? 'mysql', displayColumns)).then(noteCopied('全部列名')),
+        run: () => void copyText(columnNames(connection?.dialect ?? 'mysql', displayColumns)).then(noteCopied(t('menu.copyAllColumns'))),
       },
       {
         label: t('menu.copySelectColumns', { n: displayColumns.length }),
@@ -1363,7 +1363,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         run: () => {
           const target = tableTarget()
           if (target === null) return
-          void copyText(selectColumnsSql(connection?.dialect ?? 'mysql', target.schema, target.table, displayColumns)).then(noteCopied('查询语句'))
+          void copyText(selectColumnsSql(connection?.dialect ?? 'mysql', target.schema, target.table, displayColumns)).then(noteCopied(t('menu.copySelect')))
         },
       },
       {
@@ -1389,7 +1389,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         run: () => setHiddenColumns(onlyColumn(displayColumns, column.name)),
       },
       {
-        label: hiddenCount === 0 ? '显示全部列' : `显示全部列（已隐藏 ${hiddenCount} 列）`,
+        label: hiddenCount === 0 ? t('menu.showAllColumns') : t('menu.showAllColumnsHidden', { n: hiddenCount }),
         disabled: hiddenCount === 0,
         run: () => setHiddenColumns(null),
       },
@@ -1413,8 +1413,8 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
   const gridCellMenu = useCallback(
     (cell: CellMenuTarget): ColumnMenuItem[] => [
       { label: t('menu.viewFull'), run: () => setCellView(cellValueView(cell.column.name, cell.value)) },
-      { label: '用该值筛选当前页', run: () => setRowFilter(cellCopyText(cell.value)) },
-      { label: '复制单元格值', run: () => void copyText(cellCopyText(cell.value)).then(noteCopied('单元格值')) },
+      { label: t('menu.filterPage'), run: () => setRowFilter(cellCopyText(cell.value)) },
+      { label: t('menu.copyCellValue'), run: () => void copyText(cellCopyText(cell.value)).then(noteCopied(t('menu.copyCellValue'))) },
       {
         label: t('menu.copyInsert'),
         disabled: tableTarget() === null,
@@ -1428,9 +1428,9 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
       },
       {
         label: t('menu.copyWhere'),
-        run: () => void copyText(`WHERE ${cellWhere(connection?.dialect ?? 'mysql', cell.column, cell.value)}`).then(noteCopied('WHERE 条件')),
+        run: () => void copyText(`WHERE ${cellWhere(connection?.dialect ?? 'mysql', cell.column, cell.value)}`).then(noteCopied(t('menu.whereShort'))),
       },
-      { label: `复制整行（${displayColumns.length} 列，制表符分隔）`, run: () => void copyText(rowToTsv(displayColumns, cell.row)).then(noteCopied('整行')) },
+      { label: `复制整行（${displayColumns.length} 列，制表符分隔）`, run: () => void copyText(rowToTsv(displayColumns, cell.row)).then(noteCopied(t('menu.copyRow', { n: displayColumns.length }))) },
     ],
     [base, connection?.dialect, displayColumns, schema, sourceSql],
   )
@@ -1469,8 +1469,8 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
       <div className="dshdb-qtab">
         <EmptyState
           icon={<DatabaseIcon size={22} />}
-          title="还没有数据源"
-          description="先在「数据库」标签页中新增数据源，再回来执行查询。"
+          title={t('console.noDataSources')}
+          description={t('console.noDataSourcesDesc')}
         />
       </div>
     )
@@ -1497,7 +1497,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     openTableTab({ connectionId: selectedId, schema: target.schema, table: target.table, kind })
   }
   const noTableNote = (): void => {
-    setExportNote('当前语句没有目标表，无法导出 SQL')
+    setExportNote(t('console.noTargetTable'))
     setTimeout(() => setExportNote(''), 5000)
   }
   /** Save the rows the grid is showing; the console keeps no cursor, so only the page. */
@@ -1517,7 +1517,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
       rows: displayRows,
     })
     downloadText(exportFilename(target?.schema ?? '', target?.table ?? 'console', format), payload.mime, payload.text)
-    setExportNote(`${format.toUpperCase()} 已导出 ${displayRows.length} 行`)
+    setExportNote(t('console.exported', { format: format.toUpperCase(), n: displayRows.length }))
     setTimeout(() => setExportNote(''), 5000)
   }
   /** Save only the checked rows of the current page. */
@@ -1538,7 +1538,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
       rows: picked,
     })
     downloadText(exportFilename(target?.schema ?? '', target?.table ?? 'console', format), payload.mime, payload.text)
-    setExportNote(`${format.toUpperCase()} 已导出 ${picked.length} 行`)
+    setExportNote(t('console.exported', { format: format.toUpperCase(), n: picked.length }))
     setTimeout(() => setExportNote(''), 5000)
     setSelectedRows(new Set())
   }
@@ -1559,7 +1559,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         limit: EXPORT_LIMIT,
         batch: EXPORT_BATCH,
         cancelled: () => exportCancelled.current,
-        onProgress: (count) => setExportNote(`${format.toUpperCase()} 正在取 ${formatCount(count)} 行…`),
+        onProgress: (count) => setExportNote(t('console.exportProgress', { format: format.toUpperCase(), n: formatCount(count) })),
         fetch: async ({ page: sourcePage }) => {
           const sqlText = wrapPage(connection?.dialect ?? 'mysql', base, EXPORT_BATCH, sourcePage)
           const next = await queryWithRetry(
@@ -1574,7 +1574,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         },
       })
       if (exportCancelled.current) {
-        setExportNote(`${format.toUpperCase()} 导出已取消`)
+        setExportNote(t('console.exportCancelled', { format: format.toUpperCase() }))
         setTimeout(() => setExportNote(''), 5000)
         return
       }
@@ -1588,7 +1588,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         rows: data,
       })
       downloadText(exportFilename(target?.schema ?? '', target?.table ?? 'console', format), payload.mime, payload.text)
-      setExportNote(`${format.toUpperCase()} 已导出 ${data.length} 行`)
+      setExportNote(t('console.exported', { format: format.toUpperCase(), n: data.length }))
       setTimeout(() => setExportNote(''), 5000)
     } catch (error) {
       setFailure(failureText(error))
@@ -1868,7 +1868,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
           <select
             className="dshdb-select dshdb-select-inline dshdb-console-select"
             aria-label={t('console.redisDb')}
-            title="控制台扫描键和执行命令所用的逻辑库"
+            title={t('redis.dbTitle')}
             value={activeRedisDb}
             onChange={(event) => {
               invalidateRun()
@@ -1934,8 +1934,8 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
             <input
               className="dshdb-input dshdb-qfilter-input dshdb-pattern-input"
               aria-label={t('console.keyPattern')}
-              title="服务器端 glob 匹配（* ? []），按 Enter 重新扫描"
-              placeholder="键模式，例如 shop:*"
+              title={t('redis.scanTitle')}
+              placeholder={t('redis.patternPlaceholder')}
               value={pattern}
               spellCheck={false}
               onChange={(event) => setPattern(event.target.value)}
@@ -1948,7 +1948,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               <button
                 type="button"
                 className="dshdb-row-action"
-                title="清空键模式"
+                title={t('redis.clearPattern')}
                 aria-label={t('console.clearKeyPattern')}
                 onClick={() => {
                   setPattern('*')
@@ -1959,7 +1959,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                 ×
               </button>
             )}
-            <label className="dshdb-qmeta" title="只列出设置了过期时间的键">
+            <label className="dshdb-qmeta" title={t('redis.onlyTtlTitle')}>
               <input
                 type="checkbox"
                 aria-label={t('console.onlyTtl')}
@@ -1970,13 +1970,13 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                   writeFlag(TTL_ONLY_KEY, next)
                 }}
               />
-              只看有 TTL
+              {t('redis.onlyTtl')}
             </label>
             <input
               className="dshdb-input dshdb-qfilter-input"
               aria-label={t('console.filterKeys')}
-              title="在当前已加载的键里按子串筛选，不会重新扫描"
-              placeholder="筛选键名"
+              title={t('redis.filterKeysTitle')}
+              placeholder={t('redis.filterKeysPlaceholder')}
               value={keyFilter}
               onChange={(event) => setKeyFilter(event.target.value)}
               onKeyDown={(event) => {
@@ -1987,7 +1987,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               <button
                 type="button"
                 className="dshdb-row-action"
-                title="清空键名筛选"
+                title={t('redis.clearKeyFilter')}
                 aria-label={t('console.clearKeyFilter')}
                 onClick={() => setKeyFilter('')}
               >
@@ -2004,7 +2004,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                 void loadKeys(false, event.target.value)
               }}
             >
-              <option value="">全部类型</option>
+              <option value="">{t('redis.allTypes')}</option>
               <option value="string">string</option>
               <option value="list">list</option>
               <option value="set">set</option>
@@ -2013,7 +2013,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               <option value="stream">stream</option>
             </select>
             <Button size="sm" onClick={() => void loadKeys(false)} loading={scanning}>
-              扫描
+              {t('redis.scan')}
             </Button>
             <Button
               size="sm"
@@ -2027,31 +2027,31 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                 scanQuery.pattern !== (pattern.trim() === '' ? '*' : pattern.trim()) ||
                 scanQuery.type !== scanType
               }
-              title={scan === null ? '先扫描一次' : '延续上一次扫描'}
+              title={scan === null ? t('redis.scanFirst') : t('redis.continueTitle')}
             >
-              继续
+              {t('redis.continue')}
             </Button>
             <span className="dshdb-qmeta">
               {scan === null
                 ? ''
                 : ttlOnly || keyFilter.trim() !== ''
-                  ? `${formatCount(visibleKeys.length)} / ${formatCount(scan.keys.length)} 个键`
-                  : `${formatCount(scan.keys.length)} 个键`}
+                  ? t('redis.scanCount', { visible: formatCount(visibleKeys.length), total: formatCount(scan.keys.length) })
+                  : t('redis.keysCount', { n: formatCount(scan.keys.length) })}
               {scanMs === null ? '' : ` · ${formatMs(scanMs)}`}
-              {scan !== null && scan.cursor === '0' && scan.keys.length > 0 ? ' · 已全部加载' : ''}
+              {scan !== null && scan.cursor === '0' && scan.keys.length > 0 ? t('redis.allLoaded') : ''}
               {scan !== null && scan.cursor !== '0' && scanQuery !== null &&
               (scanQuery.pattern !== (pattern.trim() === '' ? '*' : pattern.trim()) || scanQuery.type !== scanType)
-                ? ' · 条件已改，点「扫描」重新开始'
+                ? t('redis.conditionChanged')
                 : ''}
             </span>
             <Button
               size="sm"
               variant="ghost"
               disabled={visibleKeys.length === 0}
-              title="把当前列表里的键名按换行复制出来"
-              onClick={() => void copyText(visibleKeys.map((info) => info.key).join('\n')).then(noteCopied(`键名（${formatCount(visibleKeys.length)} 个）`))}
+              title={t('redis.copyKeysTitle')}
+              onClick={() => void copyText(visibleKeys.map((info) => info.key).join('\n')).then(noteCopied(t('redis.copyKeysCount', { n: formatCount(visibleKeys.length) })))}
             >
-              复制键名
+              {t('redis.copyKeys')}
             </Button>
             {exportNote !== '' ? (
               <Tag tone="business" role="status">
@@ -2076,12 +2076,12 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                       retry()
                     }}
                   >
-                    重试
+                    {t('redis.retry')}
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
-                    title="复制错误信息"
+                    title={t('redis.copyError')}
                     onClick={() =>
                       void copyText(
                         valueError.detail === undefined
@@ -2090,7 +2090,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                     )
                   }
                 >
-                  复制
+                  {t('redis.copy')}
                 </Button>
                 </>
               }
@@ -2104,10 +2104,10 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
             {scan === null || (visibleKeys.length === 0 && !ttlOnly && keyFilter.trim() === '') ? (
               scanning ? (
                 <div className="dshdb-empty">
-                  <Loading size={16} label="正在扫描键…" />
+                  <Loading size={16} label={t('redis.scanningDb')} />
                 </div>
               ) : (
-                <EmptyState icon={<DatabaseIcon size={22} />} title="没有匹配的键" description={scanType === '' ? pattern : `${pattern} · 类型 ${scanType}`} />
+                <EmptyState icon={<DatabaseIcon size={22} />} title={t('redis.emptyMatch')} description={scanType === '' ? pattern : `${pattern} · ${t('redis.type')} ${scanType}`} />
               )
             ) : (
               <KeyGrid
@@ -2115,12 +2115,12 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                 selectedKey={selectedKey}
                 emptyText={
                   keyFilter.trim() !== ''
-                    ? '没有包含这个关键字的键'
+                    ? t('redis.noKeyword')
                     : ttlOnly
-                      ? '没有带过期时间的键'
+                      ? t('redis.noTtl')
                       : pattern.trim() === '' && scanType === ''
-                        ? '这个库还没有键'
-                        : '没有匹配的键'
+                        ? t('redis.emptyDb')
+                        : t('redis.emptyMatch')
                 }
                 onSelect={pickKey}
               />
@@ -2132,10 +2132,10 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
           ) : null}
 
           <div className="dshdb-qfilter">
-            <span className="dshdb-qfilter-label">命令</span>
+            <span className="dshdb-qfilter-label">{t('redis.command')}</span>
             <input
               className="dshdb-input dshdb-qfilter-input dshdb-command-input"
-              placeholder="例如 GET shop:customer:42"
+              placeholder={t('redis.commandPlaceholder')}
                   aria-label={t('console.redisCommand')}
               value={command}
               spellCheck={false}
@@ -2197,9 +2197,9 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                 setCaretPos(0)
               }}
               disabled={command === ''}
-              title={`清空命令框（${shortcutLabel('redis.clear')}）`}
+              title={t('redis.clearCommand', { binding: shortcutLabel('redis.clear') })}
             >
-              清空
+              {t('redis.clear')}
             </Button>
             <Button
               size="sm"
@@ -2209,10 +2209,10 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               onClick={() => setHistoryOpen((open) => !open)}
               disabled={history.length === 0}
             >
-              历史
+              {t('redis.history')}
             </Button>
             <Button size="sm" variant="primary" onClick={() => void runCommand()} loading={commandRunning}>
-              执行
+              {t('redis.run')}
             </Button>
           </div>
 
@@ -2223,7 +2223,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               </pre>
               <div className="dshdb-qmeta" style={{ marginTop: 4 }}>
                 {formatMs(commandResult.elapsedMs)}
-                {commandResult.readOnly ? '' : ' · 写命令'}
+                {commandResult.readOnly ? '' : t('redis.writeCommand')}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -2232,9 +2232,9 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                       if (ok) resultFlash.flash(true)
                     })
                   }}
-                  title={resultFlash.copied ? '已复制这条命令的结果' : '复制这条命令的结果'}
+                  title={resultFlash.copied ? t('redis.copiedResultTitle') : t('redis.copyResultTitle')}
                 >
-                  {resultFlash.copied ? '已复制' : '复制结果'}
+                  {resultFlash.copied ? t('redis.copiedResult') : t('redis.copyResult')}
                 </Button>
               </div>
             </>
@@ -2361,7 +2361,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
             {suggestions !== null ? (
               <div className="dshdb-complete" id={`${completeId}-list`} role="listbox" aria-label={t('console.completionAria')}>
                 {suggestionItems.length === 0 ? (
-                  <span className="dshdb-complete-empty">没有匹配的候选</span>
+                  <span className="dshdb-complete-empty">{t('console.noCandidates')}</span>
                 ) : (
                   suggestionItems.map((item, index) => (
                     <button
@@ -2383,18 +2383,18 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                         ) : null}
                         <span className="dshdb-complete-kind">
                           {item.kind === 'column'
-                            ? '列'
+                            ? t('console.kindColumn')
                             : item.kind === 'table'
-                              ? '表'
+                              ? t('console.kindTable')
                               : item.kind === 'schema'
-                                ? '库'
+                                ? t('console.kindDatabase')
                                 : item.kind === 'function'
-                                  ? '函数'
+                                  ? t('console.kindFunction')
                                   : item.kind === 'alias'
-                                    ? '别名'
+                                    ? t('console.kindAlias')
                                     : item.kind === 'snippet'
-                                      ? '片段'
-                                      : '关键字'}
+                                      ? t('console.kindSnippet')
+                                      : t('console.kindKeyword')}
                         </span>
                       </span>
                     </button>
@@ -2494,46 +2494,46 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               >
                 {scriptResults.map((item, index) => (
                   <option key={index} value={index}>
-                    第 {index + 1} 条 · {formatCount(item.rows.length)} 行 · {formatMs(item.elapsedMs)}
+                    {t('console.statementN', { n: index + 1 })} · {formatCount(item.rows.length)} {t('table.rows')} · {formatMs(item.elapsedMs)}
                   </option>
                 ))}
               </select>
             ) : null}
             <span className="dshdb-qbar-spacer" />
-            {selectedRows.size > 0 ? <Tag tone="business">已选 {selectedRows.size} 行</Tag> : null}
+            {selectedRows.size > 0 ? <Tag tone="business">{t('console.selectedRows', { n: selectedRows.size })}</Tag> : null}
             {exportNote !== '' ? <Tag tone="business" role="status">{exportNote}</Tag> : null}
             {exporting ? (
               <button
                 type="button"
                 className="dshdb-pager-btn"
-                title="停止导出，已取到的行不会写入文件"
+                title={t('console.stopExport')}
                 onClick={() => {
                   exportCancelled.current = true
                 }}
               >
-                取消
+                {t('console.cancelExport')}
               </button>
             ) : null}
             {multiProgress !== null ? (
               <Loading
                 bare
                 className="dshdb-qmeta"
-                label={`正在执行 ${multiProgress.index}/${multiProgress.total}…`}
+                label={t('console.executing', { index: multiProgress.index, total: multiProgress.total })}
               />
             ) : null}
             {multiNote !== '' ? <Tag tone="business">{multiNote}</Tag> : null}
-            {selectedRun ? <span className="dshdb-qmeta">已执行选中内容</span> : null}
-            {tx === 'open' ? <Tag tone="warn">事务进行中</Tag> : null}
+            {selectedRun ? <span className="dshdb-qmeta">{t('console.selectedRun')}</span> : null}
+            {tx === 'open' ? <Tag tone="warn">{t('console.txOpen')}</Tag> : null}
             {txNote !== '' ? <Tag tone="business">{txNote}</Tag> : null}
-            {base !== '' && !allRows ? <span className="dshdb-qmeta">可分页查询</span> : null}
+            {base !== '' && !allRows ? <span className="dshdb-qmeta">{t('console.pageable')}</span> : null}
             {pageFallback ? (
-              <Tag tone="warn" title="这一页已经超出结果范围（可能有人删了数据或条件刚变过）">
-                这一页没有数据，已回到第一页
+              <Tag tone="warn" title={t('console.pageOutTitle')}>
+                {t('console.pageOut')}
               </Tag>
             ) : null}
             {result !== null && result.truncated ? (
-              <Tag tone="warn" title="还有更多行没有取回：调大行数上限，或用导出的「全部」">
-                结果已截断，仅取回 {formatCount(rows.length)} 行
+              <Tag tone="warn" title={t('console.truncatedTitle')}>
+                {t('console.truncated', { n: formatCount(rows.length) })}
               </Tag>
             ) : null}
           </div>
@@ -2564,14 +2564,14 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                 <Button
                   size="sm"
                   variant="ghost"
-                  title="复制错误信息"
+                  title={t('redis.copyError')}
                   onClick={() => {
                     void copyText(
                       failure.detail === undefined ? failure.message : `${failure.message}\n${failure.detail}`,
                     )
                   }}
                 >
-                  复制
+                  {t('redis.copy')}
                 </Button>
                 </>
               }
@@ -2590,7 +2590,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               </pre>
             ) : (
               <DataGrid
-                label="查询结果"
+                label={t('console.queryResult')}
                 columns={shownColumns}
                 rows={shownRows}
                 offset={offset}
@@ -2607,8 +2607,8 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                 onToggleAllRows={toggleAllRows}
                 emptyText={
                   rowFilter.trim() !== "" && visibleRows.length > 0 && filteredRows.length === 0
-                    ? "当前页没有匹配筛选条件的行"
-                    : "这条语句没有返回任何行"
+                    ? t('console.noFilteredRows')
+                    : t('console.noRowsReturned')
                 }
               />
             )
@@ -2623,8 +2623,8 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               ) : (
                 <EmptyState
                   icon={<TerminalIcon size={22} />}
-                  title={typeof result.updateCount === 'number' ? '影响行数' : '没有返回行'}
-                  description={typeof result.updateCount === 'number' ? `${formatCount(result.updateCount)} 行受影响` : result.sql}
+                  title={typeof result.updateCount === 'number' ? t('console.affectedRows') : t('console.noAffectedRows')}
+                  description={typeof result.updateCount === 'number' ? t('console.rowsAffected', { n: formatCount(result.updateCount) }) : result.sql}
                 />
               )}
             </div>
@@ -2633,14 +2633,14 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
           {result !== null && rows.length > 0 ? (
             plan === null ? (
               <div className="dshdb-pager">
-                {running ? <Tag tone="business">查询中</Tag> : null}
+                {running ? <Tag tone="business">{t('table.querying')}</Tag> : null}
                 <span className="dshdb-pager-sql" title={result.sql}>
                   {result.sql}
                 </span>
                 <button
                   type="button"
                   className="dshdb-pager-btn"
-                  title="复制实际执行的 SQL"
+                  title={t('console.copyExecutedSql')}
                   aria-label={t('console.copyExecutedSql')}
                   onClick={() => void copyText(result.sql)}
                 >
@@ -2652,7 +2652,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                     ref={filterRef}
                     className="dshdb-input dshdb-qfilter-input"
                     aria-label={t('console.filterResults')}
-                    placeholder="筛选结果"
+                    placeholder={t('console.filterResults')}
                     value={rowFilter}
                     disabled={running}
                     onChange={(event) => setRowFilter(event.target.value)}
@@ -2666,7 +2666,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                     <button
                       type="button"
                       className="dshdb-row-action"
-                      title="清空筛选"
+                      title={t('console.clearFilter')}
                       aria-label={t('console.clearFilter')}
                       onClick={() => setRowFilter('')}
                     >
@@ -2681,13 +2681,13 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                 ) : null}
                 <PagerButton
                   label="|◀"
-                  title="第一页"
+                  title={t('table.first')}
                   onClick={() => goPage(0)}
                   disabled={!hasPrevious || running || allRows}
                 />
                 <PagerButton
                   label="◀"
-                  title="上一页"
+                  title={t('table.previous')}
                   onClick={() => goPage(Math.max(page - 1, 0))}
                   disabled={!hasPrevious || running || allRows}
                 />
@@ -2701,7 +2701,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                     min={1}
                     inputMode="numeric"
                     aria-label={t('console.page')}
-                    title="输入页码后回车跳到该页"
+                    title={t('table.page')}
                     value={pageDraft}
                     disabled={running || allRows}
                     onChange={(event) => setPageDraft(event.target.value)}
@@ -2716,7 +2716,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                 </span>
                 <select
                   className="dshdb-select dshdb-select-inline dshdb-pager-size"
-                  aria-label="每页行数"
+                  aria-label={t('table.rowsPerPage')}
                   value={String(pageSize)}
                   disabled={running}
                   onChange={(event) => {
@@ -2731,21 +2731,21 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                       {formatCount(size)}
                     </option>
                   ))}
-                  <option value={ALL_PAGE_SIZE} title={`一次取回全部结果（最多 ${formatCount(ALL_ROWS)} 行）`}>
-                    全部
+                  <option value={ALL_PAGE_SIZE} title={t('console.allLimitTitle', { n: formatCount(ALL_ROWS) })}>
+                    {t('table.allRows')}
                   </option>
                 </select>
-                {allRows ? <span className="dshdb-qmeta">上限 {formatCount(ALL_ROWS)} 行</span> : null}
+                {allRows ? <span className="dshdb-qmeta">{t('console.allLimit', { n: formatCount(ALL_ROWS) })}</span> : null}
                 <PagerButton
                   label="▶"
-                  title="下一页"
+                  title={t('table.next')}
                   onClick={() => goPage(page + 1)}
                   disabled={!hasNext || running || allRows}
                 />
               </div>
             ) : (
               <div className="dshdb-pager">
-                <Tag tone="business">执行计划</Tag>
+                <Tag tone="business">{t('console.plan')}</Tag>
                 <span className="dshdb-pager-sql" title={plan.statements.join('\n')}>
                   {plan.statements[plan.statements.length - 1] ?? result.sql}
                 </span>
@@ -2754,12 +2754,12 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                   size="sm"
                   variant="ghost"
                   disabled={planCopyText === null}
-                  title={planText === null ? '把表格形式的计划复制成制表符分隔的文本' : '复制计划文本'}
+                  title={planText === null ? t('console.copyPlanTable') : t('console.copyPlanText')}
                   onClick={() => {
                     if (planCopyText !== null) void copyText(planCopyText)
                   }}
                 >
-                  复制计划
+                  {t('console.copyPlan')}
                 </Button>
                 <Button
                   size="sm"
@@ -2770,7 +2770,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                     resultBeforePlan.current = null
                   }}
                 >
-                  关闭计划
+                  {t('console.closePlan')}
                 </Button>
               </div>
             )

@@ -41,15 +41,15 @@ function HistoryRow(props: {
           <span className="dshdb-history-meta">
             {props.entry.rows === undefined
               ? formatMs(props.entry.elapsedMs ?? 0)
-              : `${formatCount(props.entry.rows)} 行 · ${formatMs(props.entry.elapsedMs ?? 0)}`}
+              : `${formatCount(props.entry.rows)} ${t('table.rows')} · ${formatMs(props.entry.elapsedMs ?? 0)}`}
           </span>
         )}
       </button>
       <button
         type="button"
         className="dshdb-history-copy"
-        aria-label="复制语句"
-        title="复制语句"
+        aria-label={t('redis.historyCopy')}
+        title={t('redis.historyCopy')}
         onClick={() => void copyText(props.entry.statement)}
       >
         <CopyIcon size={11} />
@@ -58,8 +58,8 @@ function HistoryRow(props: {
         type="button"
         className="dshdb-history-star"
         data-pinned={props.pinned}
-        aria-label={props.pinned ? '取消收藏' : '收藏该语句'}
-        title={props.pinned ? '取消收藏' : '收藏该语句'}
+        aria-label={props.pinned ? t('redis.historyUnpin') : t('redis.historyPin')}
+        title={props.pinned ? t('redis.historyUnpin') : t('redis.historyPin')}
         onClick={() => props.onTogglePin(props.entry)}
       >
         <StarIcon size={11} filled={props.pinned} />
@@ -97,8 +97,8 @@ export const HistoryPanel = memo(function HistoryPanel(props: {
           <input
             type="search"
             className="dshdb-input"
-            aria-label="搜索历史语句"
-            placeholder="搜索历史语句"
+            aria-label={t('redis.historySearch')}
+            placeholder={t('redis.historySearch')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -107,7 +107,7 @@ export const HistoryPanel = memo(function HistoryPanel(props: {
       {pins.length > 0 ? (
         <div className="dshdb-history-group">
           <div className="dshdb-history-head">
-            <span className="dshdb-history-title">收藏 · {pins.length}</span>
+            <span className="dshdb-history-title">{t('redis.historyPinned', { n: pins.length })}</span>
           </div>
           <div className="dshdb-history-list">
             {pins.map((entry, index) => (
@@ -123,12 +123,12 @@ export const HistoryPanel = memo(function HistoryPanel(props: {
         </div>
       ) : null}
       <div className="dshdb-history-head">
-        <span className="dshdb-history-title">最近执行 · {entries.length}</span>
+        <span className="dshdb-history-title">{t('redis.historyRecent', { n: entries.length })}</span>
         <Button
           size="sm"
           variant="ghost"
           icon={<ClearIcon size={12} />}
-          title={clearArmed ? '再点一次就清空最近执行' : '清空最近执行'}
+          title={clearArmed ? t('redis.historyConfirmClear') : t('redis.historyClear')}
           onClick={() => {
             if (!clearArmed) {
               setClearArmed(true)
@@ -138,12 +138,12 @@ export const HistoryPanel = memo(function HistoryPanel(props: {
             props.onClear()
           }}
         >
-          {clearArmed ? '确认清空' : '清空'}
+          {clearArmed ? t('redis.historyConfirm') : t('redis.clear')}
         </Button>
       </div>
       <div className="dshdb-history-list">
         {entries.length === 0 ? (
-          <span className="dshdb-history-empty">{needle === '' ? '还没有执行过语句' : '没有匹配的语句'}</span>
+          <span className="dshdb-history-empty">{needle === '' ? t('redis.historyEmpty') : t('redis.historyNoMatch')}</span>
         ) : (
           entries.map((entry, index) => (
             <HistoryRow
@@ -195,7 +195,7 @@ const KeyRow = memo(function KeyRow({
       <td>
         <Tag>{info.type}</Tag>
       </td>
-      <td className="dshdb-num" title={info.ttl < 0 ? '不过期' : `${String(info.ttl)} 秒`}>
+      <td className="dshdb-num" title={info.ttl < 0 ? t('redis.noExpiry') : t('redis.ttlSeconds', { n: info.ttl })}>
         {formatTtl(info.ttl)}
       </td>
       <td className="dshdb-num">{info.size === undefined ? '' : formatCount(info.size)}</td>
@@ -228,7 +228,7 @@ export const KeyGrid = memo(function KeyGrid({
   const openMenu = useCallback((event: MouseEvent<HTMLTableRowElement>, key: RedisKeyInfo): void => {
     event.preventDefault()
     const items = [
-      { label: '复制键名', run: () => void copyText(key.key) },
+      { label: t('redis.copyKey'), run: () => void copyText(key.key) },
       {
         label: t('console.copyKeys'),
         run: () => void copyText(rowsRef.current.map((info) => info.key).join('\n')),
@@ -238,24 +238,24 @@ export const KeyGrid = memo(function KeyGrid({
   }, [])
   return (
     <>
-    <table className="dshdb-grid" aria-label="Redis 键列表">
+    <table className="dshdb-grid" aria-label={t('redis.keyList')}>
       <thead>
         <tr>
           <th className="dshdb-num">#</th>
           <th
             className="dshdb-th-sortable"
-            title={sort === 'none' ? '按名称排序' : sort === 'asc' ? '按名称倒序' : '恢复扫描顺序'}
+            title={sort === 'none' ? t('redis.sortName') : sort === 'asc' ? t('redis.sortNameDesc') : t('redis.restoreScanOrder')}
             data-sorted={sort === 'none' ? undefined : sort}
             aria-sort={sort === 'asc' ? 'ascending' : sort === 'desc' ? 'descending' : 'none'}
             onClick={() => setSort(nextKeySort(sort))}
           >
-            键
+            {t('redis.key')}
             {sort === 'none' ? null : <span className="dshdb-sort-arrow">{sort === 'asc' ? '▲' : '▼'}</span>}
           </th>
-          <th>类型</th>
+          <th>{t('redis.type')}</th>
           <th
             className="dshdb-th-sortable"
-            title={ttlSort === 'none' ? '按剩余时间升序' : ttlSort === 'asc' ? '按剩余时间降序' : '恢复扫描顺序'}
+            title={ttlSort === 'none' ? t('redis.sortTtl') : ttlSort === 'asc' ? t('redis.sortTtlDesc') : t('redis.restoreScanOrder')}
             data-sorted={ttlSort === 'none' ? undefined : ttlSort}
             aria-sort={ttlSort === 'asc' ? 'ascending' : ttlSort === 'desc' ? 'descending' : 'none'}
             onClick={() => setTtlSort(nextKeySort(ttlSort))}
@@ -265,12 +265,12 @@ export const KeyGrid = memo(function KeyGrid({
           </th>
           <th
             className="dshdb-th-sortable"
-            title={sizeSort === 'none' ? '按长度升序' : sizeSort === 'asc' ? '按长度降序' : '恢复扫描顺序'}
+            title={sizeSort === 'none' ? t('redis.sortSize') : sizeSort === 'asc' ? t('redis.sortSizeDesc') : t('redis.restoreScanOrder')}
             data-sorted={sizeSort === 'none' ? undefined : sizeSort}
             aria-sort={sizeSort === 'asc' ? 'ascending' : sizeSort === 'desc' ? 'descending' : 'none'}
             onClick={() => setSizeSort(nextKeySort(sizeSort))}
           >
-            长度
+            {t('redis.length')}
             {sizeSort === 'none' ? null : <span className="dshdb-sort-arrow">{sizeSort === 'asc' ? '▲' : '▼'}</span>}
           </th>
         </tr>
@@ -279,7 +279,7 @@ export const KeyGrid = memo(function KeyGrid({
         {rows.length === 0 ? (
           <tr>
             <td className="dshdb-muted" colSpan={5} style={{ padding: '10px 12px' }}>
-              {emptyText ?? '没有匹配的键'}
+              {emptyText ?? t('redis.emptyMatch')}
             </td>
           </tr>
         ) : (

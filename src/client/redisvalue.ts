@@ -1,6 +1,7 @@
 /** Turn a stored Redis value into a two-or-three column table, like IDEA's data viewer. */
 import type { JsonValue, RedisValue } from '../shared/types'
 import { formatTtl, stringifyJson } from './format'
+import { t } from './i18n'
 
 export interface RedisTable {
   headers: string[]
@@ -57,20 +58,20 @@ export function redisValueTable(value: RedisValue): RedisTable | null {
     case 'string': {
       const raw = text(value.value)
       // JSON payloads read better as an indented block than squeezed into a cell.
-      return parseJsonContainer(raw) === null ? { headers: ['值'], rows: [[raw]] } : null
+      return parseJsonContainer(raw) === null ? { headers: [t('redis.headerValue')], rows: [[raw]] } : null
     }
     case 'hash': {
       const record = asRecord(value.value)
       if (record === null) return null
-      return { headers: ['字段', '值'], rows: Object.entries(record).map(([field, item]) => [field, text(item)]) }
+      return { headers: [t('redis.headerField'), t('redis.headerValue')], rows: Object.entries(record).map(([field, item]) => [field, text(item)]) }
     }
     case 'list':
-      return { headers: ['#', '值'], rows: asArray(value.value).map((item, index) => [String(index + 1), text(item)]) }
+      return { headers: ['#', t('redis.headerValue')], rows: asArray(value.value).map((item, index) => [String(index + 1), text(item)]) }
     case 'set':
-      return { headers: ['#', '成员'], rows: asArray(value.value).map((item, index) => [String(index + 1), text(item)]) }
+      return { headers: ['#', t('redis.headerMember')], rows: asArray(value.value).map((item, index) => [String(index + 1), text(item)]) }
     case 'zset':
       return {
-        headers: ['成员', '分数'],
+        headers: [t('redis.headerMember'), t('redis.headerScore')],
         rows: asArray(value.value).map((item) => {
           const record = asRecord(item) ?? {}
           return [text(record.member), text(record.score)]
@@ -78,7 +79,7 @@ export function redisValueTable(value: RedisValue): RedisTable | null {
       }
     case 'stream':
       return {
-        headers: ['ID', '字段'],
+        headers: [t('redis.headerId'), t('redis.headerField')],
         rows: asArray(value.value).map((item) => {
           const entry = asArray(item)
           return [text(entry[0]), text(entry[1])]
@@ -91,10 +92,10 @@ export function redisValueTable(value: RedisValue): RedisTable | null {
 
 /** `永久` when the key has no expiry, otherwise seconds; -2 means the key vanished. */
 export function redisTtlLabel(ttl: number): string {
-  if (ttl === -1) return '永久'
-  if (ttl === -2) return '已过期'
+  if (ttl === -1) return t('redis.ttlForever')
+  if (ttl === -2) return t('redis.ttlExpired')
   // Under a minute keep the precise seconds the server reported; longer spans read
   // better in the same units the key table uses.
   if (ttl >= 60) return formatTtl(ttl)
-  return `${Math.max(0, Math.round(ttl))}s`
+  return t('redis.ttlSeconds', { n: Math.max(0, Math.round(ttl)) })
 }

@@ -135,7 +135,7 @@ export function DataView(props: DataViewProps): ReactElement {
   const { connections, selectedId, servers, expanded, schemas, objects, cachedAt, detail, detailLoading } = props
   const selected = connections.find((connection) => connection.id === selectedId)
   /** What the tree filter searches, for the placeholder and the aria label. */
-  const treeFilterLabel = selected?.dialect === 'redis' ? '键' : '库表'
+  const treeFilterLabel = selected?.dialect === 'redis' ? t('data.filterKeys') : t('data.filterTables')
 
   const handleRowDragStart = (event: DragEvent<HTMLElement>, id: string): void => {
     if (props.onReorderConnections === undefined) return
@@ -808,16 +808,16 @@ export function DataView(props: DataViewProps): ReactElement {
                 onBlur={(event) => {
                   if (event.currentTarget.value === '') setFilterOpen(false)
                 }}
-                placeholder={`筛选${treeFilterLabel}…`}
-                aria-label={`筛选${treeFilterLabel}`}
+                placeholder={t('data.filterPlaceholder', { label: treeFilterLabel })}
+                aria-label={t('data.filterAria', { label: treeFilterLabel })}
                 autoFocus
               />
               {filter !== '' ? (
                 <button
                   type="button"
                   className="dshdb-row-action"
-                  title="清空筛选"
-                  aria-label="清空筛选"
+                  title={t('data.clearFilter')}
+                  aria-label={t('data.clearFilter')}
                   onClick={() => {
                     setFilter('')
                     setSettledFilter('')
@@ -828,7 +828,7 @@ export function DataView(props: DataViewProps): ReactElement {
               ) : null}
             </div>
           ) : null}
-          {loadingDetail ? <Loading label={props.redisDetailLoading ? '读取键值' : '读取结构'} /> : null}
+          {loadingDetail ? <Loading label={props.redisDetailLoading ? t('data.loadingKey') : t('data.loadingStructure')} /> : null}
         </div>
       ) : null}
 
@@ -849,7 +849,7 @@ export function DataView(props: DataViewProps): ReactElement {
             <span className="dshdb-filter-empty">{t('data.noMatches')}</span>
           ) : null}
           {filterSummary !== null && filterSummary.objects > 0 ? (
-            <span className="dshdb-filter-empty">{filterSummary.objects} 个对象匹配</span>
+            <span className="dshdb-filter-empty">{t('data.objectsMatch', { n: filterSummary.objects })}</span>
           ) : null}
           <div
             ref={containerRef}
@@ -1026,7 +1026,7 @@ export function DataView(props: DataViewProps): ReactElement {
       {!detail && !props.redisDetail && !detailLoading && !props.redisDetailLoading && connections.length > 0 ? (
         <div className="dshdb-muted" style={{ padding: '0 2px' }}>
           {selected?.dialect === 'redis'
-            ? '展开 Redis 数据源和逻辑库，选择键可查看值、TTL 与长度；行尾按钮可选择显示的数据库。'
+            ? t('data.redisHelp')
             : t('data.help')}
         </div>
       ) : null}
