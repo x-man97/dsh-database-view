@@ -5,7 +5,7 @@ export const I18N_NAMESPACE = 'dsh-database-view'
 type Dict = Record<string, string>
 
 const zh: Dict = {
-  'nav.database': '数据库',
+  'nav.database': '数据库视图',
   'nav.table': '数据表',
   'nav.console': '查询控制台',
   'app.add': '新增',
@@ -51,7 +51,7 @@ const zh: Dict = {
   'conn.cancel': '取消',
   'conn.delete': '删除',
   'conn.engine': '引擎',
-  'settings.nav': '数据库',
+  'settings.nav': '数据库视图',
   'console.action.run': '执行',
   'console.action.cancel': '取消',
   'console.action.history': '历史',
@@ -387,7 +387,7 @@ const zh: Dict = {
 }
 
 const en: Dict = {
-  'nav.database': 'Database',
+  'nav.database': 'Database View',
   'nav.table': 'Table',
   'nav.console': 'SQL Console',
   'app.add': 'Add',
@@ -433,7 +433,7 @@ const en: Dict = {
   'conn.cancel': 'Cancel',
   'conn.delete': 'Delete',
   'conn.engine': 'Engine',
-  'settings.nav': 'Database',
+  'settings.nav': 'Database View',
   'console.action.run': 'Run',
   'console.action.cancel': 'Cancel',
   'console.action.history': 'History',

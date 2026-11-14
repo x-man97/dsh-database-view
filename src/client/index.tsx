@@ -103,6 +103,10 @@ function ConsoleTabChip(): ReactElement {
   return <ConsoleTabTitle />
 }
 
+function DatabaseSettingsIcon(props: { size?: number; active?: boolean }): ReactElement {
+  return <DatabaseIcon size={props.size ?? 16} />
+}
+
 export const name = PLUGIN_ID
 export const inject: string[] = ['slots', 'locale']
 
@@ -121,6 +125,14 @@ export function apply(ctx: ClientContext): void {
       order: 40,
       label: () => t('settings.nav'),
     }, SettingsSection)
+    return undefined
+  })
+
+  ctx.slots.inject('settings.section.icon', () => {
+    ctx.slots.register({
+      name: 'settings.section.icon',
+      id: 'database',
+    }, DatabaseSettingsIcon)
     return undefined
   })
 
