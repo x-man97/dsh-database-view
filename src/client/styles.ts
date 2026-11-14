@@ -1625,6 +1625,8 @@ tr[data-deleted="true"] td { background: color-mix(in srgb, var(--dsw-alias-labe
   line-height: 1.6;
 }
 
+.dshdb-settings-section { padding: 2px 0 24px; }
+
 
 `;
 

@@ -110,7 +110,6 @@ export interface DataSources {
   toggleAllSchemasVisible: (connectionId: string, all: boolean) => void
   toggleRedisDbVisible: (connectionId: string, db: number) => void
   toggleAllRedisDbsVisible: (connectionId: string, all: boolean) => void
-  applySettings: (settings: DbSettings, env: EnvStatus) => void
 }
 
 const VISIBLE_SCHEMAS_KEY = 'dsh-database-view:visible-schemas:'
@@ -955,10 +954,6 @@ export function useDataSources(notify: Notify): DataSources {
   }, [selected, servers, redisDbs, refresh, connect, loadSchemas, loadRedisDatabases, loadRedisKeys, notify, schedulePrefetch])
 
 
-  const applySettings = useCallback((settings: DbSettings, env: EnvStatus): void => {
-    setSnapshot((previous) => (previous ? { ...previous, settings, env } : previous))
-  }, [])
-
   return {
     snapshot,
     loadError,
@@ -1014,6 +1009,5 @@ export function useDataSources(notify: Notify): DataSources {
     toggleAllSchemasVisible,
     toggleRedisDbVisible,
     toggleAllRedisDbsVisible,
-    applySettings,
   }
 }

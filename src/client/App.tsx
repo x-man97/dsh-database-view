@@ -8,7 +8,7 @@ import {
   type ReactElement,
 } from 'react'
 import { ROUTE_PREFIX } from '../shared/presets'
-import type { ClientConnection, ClientTrashedConnection, DbSettings } from '../shared/types'
+import type { ClientConnection, ClientTrashedConnection } from '../shared/types'
 import { api } from './api'
 import { downloadText } from './export'
 import { useDataSources } from './hooks/useDataSources'
@@ -26,7 +26,6 @@ import type { ToolbarActionId } from '../shared/toolbaractions'
 import { copyText } from './colmenu'
 import { MoreIcon } from './icons'
 import { ConnectionModal } from './modals/ConnectionModal'
-import { SettingsModal } from './modals/SettingsModal'
 import { TrashModal, type TrashBusy } from './modals/TrashModal'
 import { DataView } from './views/DataView'
 import { openConsoleTab, openTableTab } from './tab-open'
@@ -88,7 +87,6 @@ export function App(props: AppProps): ReactElement {
   const hidden = info?.tab?.visible === false
 
   const [toast, setToast] = useState<ToastState | null>(null)
-  const [savingSettings, setSavingSettings] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [trashOpen, setTrashOpen] = useState(false)
   const [trashBusy, setTrashBusy] = useState<TrashBusy | null>(null)
@@ -173,7 +171,6 @@ export function App(props: AppProps): ReactElement {
     toggleAllSchemasVisible,
     toggleRedisDbVisible,
     toggleAllRedisDbsVisible,
-    applySettings,
   } = useDataSources(notify)
 
   // 快捷键处理函数在下面的各个组件里，绑定统一在这里发布一次，
@@ -264,20 +261,6 @@ export function App(props: AppProps): ReactElement {
   async function copyDdl(): Promise<void> {
     const copied = await copyText(ddlModal.text)
     notify(copied ? 'DDL 已复制' : '复制失败：这个环境不允许访问剪贴板', copied ? 'success' : 'error')
-  }
-
-  async function saveSettings(next: DbSettings): Promise<void> {
-    setSavingSettings(true)
-    try {
-      const result = await api.updateSettings(next)
-      applySettings(result.settings, result.env)
-      notify('设置已保存', 'success')
-      void refresh()
-    } catch (error) {
-      notify(`保存设置失败：${errorText(error)}`, 'error')
-    } finally {
-      setSavingSettings(false)
-    }
   }
 
   async function deleteConnection(connection: ClientConnection): Promise<void> {
@@ -393,12 +376,6 @@ export function App(props: AppProps): ReactElement {
       label: '回收站',
       title: trash.length > 0 ? `回收站（${String(trash.length)}）` : '回收站',
       onClick: () => setTrashOpen(true),
-    },
-    {
-      id: 'settings',
-      label: '设置',
-      title: '设置',
-      onClick: () => setSettingsOpen(true),
     },
   ]
   const toolbarActionById = new Map(toolbarActions.map((action) => [action.id, action]))
@@ -722,15 +699,7 @@ export function App(props: AppProps): ReactElement {
         onDelete={(connection) => void deleteConnection(connection)}
         notify={notify}
       />
-      {snapshot ? (
-        <SettingsModal
-          open={settingsOpen}
-          settings={snapshot.settings}
-          saving={savingSettings}
-          onClose={() => setSettingsOpen(false)}
-          onSave={(next) => void saveSettings(next)}
-        />
-      ) : null}
+
       <Modal
         open={ddlModal.open}
         title={ddlModal.title}

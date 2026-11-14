@@ -3,6 +3,7 @@ import { App, type AppProps } from './App'
 import { ConsoleTab, ConsoleTabTitle, type ConsoleTabProps } from './ConsoleTab'
 import { TableTab, TableTabTitle, type TableTabProps } from './TableTab'
 import { DatabaseIcon } from './icons'
+import { SettingsSection } from './SettingsSection'
 import { setConsoleTabOpener, setTableTabOpener, type ConsoleTabParams, type TableTabParams } from './tab-open'
 import { injectStyles } from './styles'
 
@@ -41,7 +42,10 @@ interface SidebarTabDefinition {
 
 interface SlotDefinition {
   name: string
-  key: string
+  key?: string
+  id?: string
+  order?: number
+  label?: () => string
 }
 
 type Disposer = (() => void) | void
@@ -103,6 +107,18 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     return injectStyles()
   }, 'dsh-database-view: styles')
+
+  // DSH's own Settings panel owns plugin preferences; there is no separate
+  // database settings dialog any more.
+  ctx.slots.inject('settings.section', () => {
+    ctx.slots.register({
+      name: 'settings.section',
+      id: 'database',
+      order: 40,
+      label: () => '数据库',
+    }, SettingsSection)
+    return undefined
+  })
 
   // The right Sidebar owns both the tab type list and the keyed body slot.
   // Inject lazily so hosts without the native sidebar do not fail activation.
