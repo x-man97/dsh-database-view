@@ -123,6 +123,30 @@ describe('ConfigStore', () => {
     expect(later.readOnly).toBe(false)
   })
 
+  it('round-trips a native SQLite connection without a host', () => {
+    const { config, dir } = store()
+    const saved = config.saveConnection({
+      name: 'SQLite Demo',
+      driver: 'sqlite',
+      host: '',
+      port: 0,
+      user: '',
+      database: '/tmp/demo.db',
+      params: {},
+      readOnly: false,
+      nativeEngine: true,
+    })
+    expect(saved.nativeEngine).toBe(true)
+    const reloaded = new ConfigStore(join(dir, 'connections.json'), new SecretStore(join(dir, 'secrets.json')))
+    reloaded.load()
+    expect(reloaded.connection(saved.id)).toMatchObject({
+      driver: 'sqlite',
+      host: '',
+      database: '/tmp/demo.db',
+      nativeEngine: true,
+    })
+  })
+
   it('rejects invalid ports and oversized row limits', () => {
     const { config } = store()
     expect(() =>

@@ -73,11 +73,23 @@ export class OracleEngine implements DatabaseEngine {
         password: ctx.credentials.password,
         connectString,
       })
-      const result = await this.connection.execute("SELECT banner AS version FROM v$version WHERE ROWNUM = 1")
-      const row = (result.rows?.[0] ?? []) as unknown[]
+      let version = 'unknown'
+      try {
+        const result = await this.connection.execute("SELECT banner AS version FROM v$version WHERE ROWNUM = 1")
+        const row = (result.rows?.[0] ?? []) as unknown[]
+        version = String(row[0] ?? 'unknown').split('\n')[0]
+      } catch {
+        try {
+          const result = await this.connection.execute("SELECT version FROM product_component_version WHERE product LIKE 'Oracle Database%' AND ROWNUM = 1")
+          const row = (result.rows?.[0] ?? []) as unknown[]
+          version = String(row[0] ?? 'unknown')
+        } catch {
+          // keep unknown; the user may lack v$version privileges
+        }
+      }
       return {
         product: 'Oracle',
-        version: String(row[0] ?? 'unknown').split('\n')[0],
+        version,
         user: ctx.connection.user,
         database: ctx.connection.database,
         url: connectString,
