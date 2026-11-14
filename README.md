@@ -4,6 +4,8 @@
 >
 > 本仓库是 [`qwq1999/dsh-ide-database`](https://github.com/qwq1999/dsh-ide-database) 的 fork，正在按「B + 可选 C」方案改造为 Java-free、内置 SSH、驱动按需下载的版本。当前处于设计阶段，代码尚未开始改造。
 >
+> 本轮只改造主流库 T1：MySQL、MariaDB、PostgreSQL、SQLite；SQL Server/Oracle/达梦/OceanBase/JDBC 扩展只保留扩展点，不在本轮实现。
+>
 > - [设计方案（B + 可选 C）](docs/design.md)
 > - [可行性研究报告](docs/feasibility.md)
 > - [POC 验证脚本](poc/README.md)

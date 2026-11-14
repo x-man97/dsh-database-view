@@ -64,11 +64,13 @@ Fork 现有插件
 
 | 范围 | 内容 |
 |---|---|
-| **MVP（T1）** | MySQL、MariaDB、PostgreSQL、SQLite；SSH（密码/私钥/agent，主机密钥确认）；**统一驱动下载/缓存**；连接管理、树、表预览、DDL、只读 SQL 控制台、结构缓存、只读 Agent 工具 |
-| **P2（T2）** | SQL Server、Oracle（Thin）、达梦（许可允许时）、Redis 走 SSH；写操作/事务；TLS 完整适配 |
-| **P3（T3）** | OceanBase MySQL、JDBC 扩展包、第三方 Engine 包、多跳 SSH、数据编辑 |
+| **本轮（T1）** | MySQL、MariaDB、PostgreSQL、SQLite；SSH（密码/私钥/agent，主机密钥确认）；**统一驱动下载/缓存**；连接管理、树、表预览、DDL、只读 SQL 控制台、结构缓存、只读 Agent 工具 |
+| **后续（T2，本轮不做）** | SQL Server、Oracle（Thin）、达梦（许可允许时）、Redis 走 SSH；写操作/事务；TLS 完整适配 |
+| **后续（T3，本轮不做）** | OceanBase MySQL、JDBC 扩展包、第三方 Engine 包、多跳 SSH、数据编辑 |
 
-> 工作量在可行性报告的 9–12 人周基础上，增加约 0.5–1 人周用于 SPI、契约测试和贡献文档。
+> 本轮只实现 T1；T2/T3 只保留 Engine SPI、目录结构、文档和扩展点，不写对应 Engine 实现。
+>
+> 工作量：本轮 T1 约 **7–10 人周**（含 SPI、DriverManager、SSH、测试与文档）；后续 T2 约再加 4–6 人周。
 
 ---
 
@@ -101,6 +103,8 @@ Fork 现有插件
 | **T3** | 第三方 Engine | 由 Engine 包声明 | P3 | 社区 PR | 通过契约测试 + 安全审查 |
 
 > `bundled` = 随可选 offline 包/手动导入携带的自包含 driver pack，离线可用；`download` = 首次连接时从发布源下载并校验；`builtin` = Node 内置；`user-provided` = 因许可证/体积原因由用户提供文件；`jdbc` 见第 8 章。
+>
+> **本轮范围**：只实现 T1（MySQL、MariaDB、PostgreSQL、SQLite）。T2/T3 的 Engine、驱动 manifest、测试和 UI 文案可以留占位，但不进入本轮验收。
 
 ### 1.3 非目标
 
@@ -1478,7 +1482,7 @@ if (readOnly) db.exec('PRAGMA query_only = ON')
 - `:memory:` 每个连接独立；不支持跨连接共享。
 - Web 形态 Node <22.13：检测 `node:sqlite`，不可用时回退 `sql.js`（WASM），并在能力里标注。
 
-### 6.4 SQL Server（P2）
+### 6.4 SQL Server（后续，本轮不实现）
 
 **文件**：`engines/mssql/*`
 
@@ -1511,7 +1515,7 @@ new tedious.Connection({
 - 默认加密协商；自签证书需显式信任，不能默认 `trustServerCertificate:true`。
 - 取消 `request.cancel()`；连接失败要区分登录失败/网络/TLS。
 
-### 6.5 Oracle（P2）
+### 6.5 Oracle（后续，本轮不实现）
 
 **文件**：`engines/oracle/*`
 
@@ -1538,7 +1542,7 @@ oracledb.fetchAsString = [oracledb.DATE, oracledb.TIMESTAMP, oracledb.NUMBER, or
 - TCPS/钱包/证书穿隧道需实测；默认 `ssl_server_dn_match` 行为要在 Engine 文档写清。
 - `V$VERSION` 可能无权限；用 `product_component_version` 兜底。
 
-### 6.6 达梦（P2）
+### 6.6 达梦（后续，本轮不实现）
 
 **文件**：`engines/dameng/*`
 
@@ -1556,7 +1560,7 @@ oracledb.fetchAsString = [oracledb.DATE, oracledb.TIMESTAMP, oracledb.NUMBER, or
 - 或者达梦连接走可选 JDBC 包（达梦 JDBC 驱动从 Maven 获取）。
 - 具体策略见开放问题 Q3。
 
-### 6.7 Redis
+### 6.7 Redis（本轮保留现有实现，不做 SSH 改造）
 
 **文件**：`engines/redis/*` 或保留 `host/redis.ts`
 
@@ -1704,7 +1708,7 @@ sequenceDiagram
 
 ---
 
-## 8. 可选 C：JDBC 扩展包
+## 8. 可选 C：JDBC 扩展包（架构预留，本轮不做）
 
 ### 8.1 边界
 
@@ -2352,10 +2356,10 @@ PR 必须通过：
 | **M0** 骨架 | 1–2 周 | Fork、改名、Engine SPI、Catalog、DriverManager、MySQL driver pack、SSH、连接弹窗（MySQL） | 不装 Java 连 MySQL；删驱动后能提示下载并恢复 |
 | **M1** T1 | 2–3 周 | PostgreSQL、SQLite、元数据/DDL/EXPLAIN、v1 迁移、表预览/缓存 | T1 三库契约测试通过；驱动下载/离线导入可用 |
 | **M2** 体验 | 2 周 | 控制台、导出、Agent 工具、只读限制、错误/主机密钥/驱动下载 UX | 日常只读预览可用 |
-| **M3** T2 | 2–3 周 | SQL Server、Oracle、达梦、Redis 隧道；T2 driver pack 下载/导入 | T2 矩阵通过；download/user-provided 流程可用 |
-| **M4** 扩展/硬化 | 1–2 周 | JDBC 扩展包、外部 Engine 文档、性能/安全/发布 | 可选包可安装；JDBC jar 下载/校验通过；验收清单通过 |
+| **M3** 硬化/发布 | 1–2 周 | 性能/安全、打包、文档、外部 Engine 贡献指南、发布 | 验收清单通过；T1 发布 |
+| **后续 T2** | 4–6 周 | SQL Server、Oracle、达梦、Redis 隧道；JDBC 扩展包 | 不在本轮范围 |
 
-总计约 **9–12 人周**（与可行性报告一致，含 SPI/文档增量）；DriverManager/Driver Pack 的构建与下载流程会占用 M0 的 0.5–1 周，若团队没有现成的发布流水线，按 **10–13 人周** 估算。
+本轮 T1 约 **7–10 人周**（含 SPI、DriverManager、SSH、测试与文档）；如果团队没有现成的 Driver Pack 发布流水线，按 **8–11 人周** 估算。T2/T3 不在本轮范围，后续约再加 4–6 人周。
 
 **并行建议**：
 
