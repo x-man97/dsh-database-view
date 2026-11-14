@@ -166,16 +166,22 @@ export class NativeSqlService {
     const id = draft.id ?? probeId()
     let config = draftConfig(draft, id)
     const existing = draft.id === undefined ? undefined : this.config.connection(draft.id)
+    const copyFrom = draft.id === undefined && draft.copyFromId !== undefined ? this.config.connection(draft.copyFromId) : undefined
     if (existing?.secretName !== undefined) config = { ...config, secretName: existing.secretName }
+    else if (copyFrom?.secretName !== undefined) config = { ...config, secretName: copyFrom.secretName }
     let session: Session | undefined
     try {
       const password = this.passwordFor(config, draft.password)
       const sshPassword = draft.sshPassword !== undefined && draft.sshPassword !== ''
         ? draft.sshPassword
-        : draft.id === undefined ? undefined : this.secrets.resolve(Secrets.nameForSshPassword(draft.id))?.value
+        : draft.id === undefined
+          ? this.secrets.resolve(Secrets.nameForSshPassword(copyFrom?.id ?? ''))?.value
+          : this.secrets.resolve(Secrets.nameForSshPassword(draft.id))?.value
       const sshPassphrase = draft.sshPassphrase !== undefined && draft.sshPassphrase !== ''
         ? draft.sshPassphrase
-        : draft.id === undefined ? undefined : this.secrets.resolve(Secrets.nameForSshPassphrase(draft.id))?.value
+        : draft.id === undefined
+          ? this.secrets.resolve(Secrets.nameForSshPassphrase(copyFrom?.id ?? ''))?.value
+          : this.secrets.resolve(Secrets.nameForSshPassphrase(draft.id))?.value
       session = await this.open(config, password, sshPassword, sshPassphrase)
       return { ok: true, server: session.server, latencyMs: Date.now() - started }
     } catch (error) {
