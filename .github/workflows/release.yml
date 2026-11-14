@@ -42,12 +42,6 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: 安装 JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
       - name: 校验 tag 与清单版本一致
         run: |
           set -euo pipefail
@@ -64,7 +58,7 @@ jobs:
       - name: 校验（typecheck + 单元测试）
         run: npm run verify
 
-      - name: 构建（Java 桥接 + 宿主 + 客户端）
+      - name: 构建（驱动 pack + 宿主 + 客户端）
         run: npm run build
 
       - name: 打包

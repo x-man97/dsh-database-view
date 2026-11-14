@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { DataGrid } from '../../src/client/DataGrid'
 
-const columns = [{ name: 'body', typeName: 'LONGTEXT', jdbcType: 12 }]
+const columns = [{ name: 'body', typeName: 'LONGTEXT' }]
 
 afterEach(() => {
   cleanup()

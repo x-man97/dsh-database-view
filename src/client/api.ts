@@ -8,9 +8,7 @@ import type {
   DbSettings,
   DdlResult,
   DescribeResult,
-  DriverConfig,
   DriverPackStatus,
-  DriverStatus,
   EnvStatus,
   ExplainResult,
   ObjectListResult,
@@ -71,7 +69,6 @@ async function post<T>(path: string, body: unknown = {}): Promise<T> {
 
 export interface StatusSnapshot {
   config: ClientConfig
-  drivers: DriverStatus[]
   driverPacks: DriverPackStatus[]
   env: EnvStatus
   /** Background description walks currently running on the host. */
@@ -138,13 +135,7 @@ export const api = {
   redisCommand: (id: string, command: string, allowWrite: boolean, db?: number) =>
     post<RedisCommandResult>('/redis/command', { id, command, allowWrite, ...(db === undefined ? {} : { db }) }),
 
-  downloadDriver: (driverId: string) => post<DriverStatus>('/drivers/download', { driverId }),
-  downloadDriverPack: (driverId: string) => post<DriverPackStatus>('/drivers/packs/download', { driverId }),
   /** Downloads and unpacks a JRE into the data directory; resolves with the refreshed env. */
-  downloadJava: () => post<EnvStatus>('/java/download'),
-  saveCustomDriver: (driver: Partial<DriverConfig> & { jars?: unknown }) =>
-    post<{ driver: DriverConfig; drivers: DriverStatus[] }>('/drivers/custom/save', { driver }),
-  deleteCustomDriver: (id: string) => post<{ drivers: DriverStatus[] }>('/drivers/custom/delete', { id }),
 
   updateSettings: (settings: Partial<DbSettings>) =>
     post<{ settings: DbSettings; env: EnvStatus }>('/settings/update', { settings }),

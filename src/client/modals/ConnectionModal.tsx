@@ -1,54 +1,31 @@
-import { useEffect, useMemo, useState, type ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { PRESET_LABEL, PRESET_ORDER, PRESETS, presetOf } from '../../shared/presets'
-import type {
-  ClientConnection,
-  ConnectionDraft,
-  ConnectionTestResult,
-  DriverStatus,
-  PresetId,
-} from '../../shared/types'
+import type { ClientConnection, ConnectionDraft, ConnectionTestResult, PresetId } from '../../shared/types'
 import { api } from '../api'
 import { copyText } from '../colmenu'
 import { dialectLabel, formatMs } from '../format'
-import { DatabaseIcon, PlusIcon, TrashIcon } from '../icons'
-import { Banner, Button, Field, Loading, Modal, Select, Switch, Tag, TextArea, TextInput } from '../ui'
+import { DatabaseIcon, TrashIcon } from '../icons'
+import { Banner, Button, Field, Loading, Modal, Select, Switch, TextInput } from '../ui'
 
 export interface ConnectionModalProps {
   open: boolean
   editing: ClientConnection | null
-  drivers: DriverStatus[]
   onClose: () => void
   onSaved: () => void
   onDelete: (connection: ClientConnection) => void
   notify: (text: string, tone?: 'info' | 'success' | 'error') => void
 }
 
-function toParamsText(params: Record<string, string>): string {
-  return Object.entries(params)
-    .map(([key, value]) => `${key}=${value}`)
-    .join('\n')
-}
-
-function parseParamsText(text: string): Record<string, string> {
-  const params: Record<string, string> = {}
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim()
-    if (trimmed === '' || trimmed.startsWith('#')) continue
-    const index = trimmed.indexOf('=')
-    if (index <= 0) continue
-    params[trimmed.slice(0, index).trim()] = trimmed.slice(index + 1).trim()
-  }
-  return params
-}
-
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-const NATIVE_DRIVERS = new Set(['mysql', 'mariadb', 'postgres', 'sqlite', 'mssql', 'oracle'])
+const SQL_PRESETS = new Set<PresetId>(['mysql', 'mariadb', 'oracle', 'postgres', 'sqlite', 'mssql'])
+const TLS_PRESETS = new Set<PresetId>(['mysql', 'mariadb', 'postgres', 'mssql'])
+const SSH_PRESETS = new Set<PresetId>(['mysql', 'mariadb', 'oracle', 'postgres', 'mssql'])
 
 export function ConnectionModal(props: ConnectionModalProps): ReactElement | null {
-  const [choice, setChoice] = useState<string>('mysql')
+  const [choice, setChoice] = useState<PresetId>('mysql')
   const [name, setName] = useState('')
   const [host, setHost] = useState('127.0.0.1')
   const [port, setPort] = useState('3306')
@@ -57,9 +34,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
   const [clearPassword, setClearPassword] = useState(false)
   const [database, setDatabase] = useState('')
   const [redisDb, setRedisDb] = useState('0')
-  const [paramsText, setParamsText] = useState('')
   const [readOnly, setReadOnly] = useState(false)
-  const [nativeEngine, setNativeEngine] = useState(false)
   const [sshEnabled, setSshEnabled] = useState(false)
   const [sshHost, setSshHost] = useState('')
   const [sshPort, setSshPort] = useState('22')
@@ -77,7 +52,6 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
   const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null)
   const [error, setError] = useState('')
 
-  const customDrivers = useMemo(() => props.drivers.filter((driver) => driver.preset === null), [props.drivers])
   const editing = props.editing
 
   useEffect(() => {
@@ -87,16 +61,14 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     setTesting(false)
     if (!props.open) return
     if (editing) {
-      setChoice(editing.driver === 'custom' ? `custom:${editing.customDriverId ?? ''}` : editing.driver)
+      setChoice(editing.driver)
       setName(editing.name)
       setHost(editing.host)
       setPort(String(editing.port))
       setUser(editing.user)
       setDatabase(editing.database)
       setRedisDb(String(editing.redisDb))
-      setParamsText(toParamsText(editing.params))
       setReadOnly(editing.readOnly)
-      setNativeEngine(editing.nativeEngine === true)
       setSshEnabled(editing.ssh !== undefined)
       setSshHost(editing.ssh?.host ?? '')
       setSshPort(String(editing.ssh?.port ?? 22))
@@ -120,9 +92,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     setUser('')
     setDatabase('')
     setRedisDb('0')
-    setParamsText('')
     setReadOnly(false)
-    setNativeEngine(true)
     setSshEnabled(false)
     setSshHost('')
     setSshPort('22')
@@ -141,45 +111,36 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
 
   if (!props.open) return null
 
-  const isCustom = choice.startsWith('custom:')
-  const customId = isCustom ? choice.slice('custom:'.length) : undefined
-  const customDriver = customDrivers.find((driver) => driver.id === customId)
-  const preset = !isCustom ? presetOf(choice) : undefined
-  /** File based engines have no host, port or credentials to fill in. */
-  const fileBased = preset?.hostOptional === true
-  const dialect = isCustom ? customDriver?.dialect : preset?.dialect
-  const isRedis = dialect === 'redis'
-  const supportsNative = !isCustom && NATIVE_DRIVERS.has(choice)
-  const useNative = supportsNative && nativeEngine
-  const supportsTls = useNative && !fileBased && ['mysql', 'mariadb', 'postgres', 'mssql'].includes(choice)
-
-  const driverOptions = [
-    ...PRESET_ORDER.map((id) => ({
-      value: id as string,
-      label: `${PRESET_LABEL[id]}${PRESETS[id].needsJava ? '' : ''}`,
-    })),
-    ...customDrivers.map((driver) => ({ value: `custom:${driver.id}`, label: `${driver.name}（自定义）` })),
-  ]
+  const preset = presetOf(choice) ?? PRESETS.mysql
+  const fileBased = preset.hostOptional === true
+  const isRedis = choice === 'redis'
+  const supportsTls = TLS_PRESETS.has(choice)
+  const supportsSsh = SSH_PRESETS.has(choice)
+  const driverLabel = isRedis
+    ? '内置 Redis 客户端（ioredis）'
+    : choice === 'sqlite'
+      ? '内置 SQLite（Node.js node:sqlite）'
+      : `内置 ${PRESET_LABEL[choice]} 驱动（driver pack 随插件打包）`
 
   const changeChoice = (value: string) => {
-    setChoice(value)
+    const next = value as PresetId
+    setChoice(next)
     setTestResult(null)
     setError('')
-    if (value.startsWith('custom:')) {
-      setNativeEngine(false)
-      return
+    const spec = presetOf(next)
+    if (spec !== undefined) setPort(String(spec.defaultPort))
+    if (!SSH_PRESETS.has(next)) setSshEnabled(false)
+    if (!TLS_PRESETS.has(next)) {
+      setTlsEnabled(false)
+      setTlsAllowInvalid(false)
+      setTlsCaPath('')
     }
-    const spec = presetOf(value)
-    if (spec) setPort(String(spec.defaultPort))
-    setNativeEngine(NATIVE_DRIVERS.has(value))
-    if (value === 'sqlite') setSshEnabled(false)
   }
 
   const buildDraft = (): ConnectionDraft => ({
     id: editing?.id,
     name: name.trim(),
-    driver: isCustom ? 'custom' : (choice as PresetId),
-    customDriverId: isCustom ? customId : undefined,
+    driver: choice,
     // File based engines keep no host; do not persist whatever the previous preset left behind.
     host: fileBased ? '' : host.trim(),
     port: fileBased ? 0 : Number.parseInt(port, 10) || 0,
@@ -188,12 +149,10 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     ...(clearPassword ? { clearPassword: true } : {}),
     database: isRedis ? '' : database.trim(),
     redisDb: Number.parseInt(redisDb, 10) || 0,
-    params: isRedis ? {} : parseParamsText(paramsText),
     // The read-only flag is chosen once, when the connection is created; an edit
     // always keeps the stored value (the switch is disabled for existing rows).
     readOnly: editing ? editing.readOnly : readOnly,
-    ...(useNative ? { nativeEngine: true } : {}),
-    ...(useNative && sshEnabled && !fileBased
+    ...(supportsSsh && sshEnabled
       ? {
           ssh: {
             enabled: true as const,
@@ -206,8 +165,8 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
           },
         }
       : {}),
-    ...(useNative && sshEnabled && !fileBased && sshPassword !== '' ? { sshPassword } : {}),
-    ...(useNative && sshEnabled && !fileBased && sshPassphrase !== '' ? { sshPassphrase } : {}),
+    ...(supportsSsh && sshEnabled && sshPassword !== '' ? { sshPassword } : {}),
+    ...(supportsSsh && sshEnabled && sshPassphrase !== '' ? { sshPassphrase } : {}),
     ...(supportsTls && tlsEnabled
       ? {
           tls: {
@@ -221,15 +180,10 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
 
   const validate = (draft: ConnectionDraft): string => {
     if (draft.name === '') return '请填写连接名称'
-    const spec = isCustom ? undefined : PRESETS[choice as PresetId]
-    const hostOptional = spec?.hostOptional === true
-    if (draft.host === '' && !hostOptional) return '请填写主机地址'
-    if (!hostOptional && (!Number.isInteger(draft.port) || draft.port < 1 || draft.port > 65535)) {
-      return '端口需在 1-65535 之间'
-    }
-    if (hostOptional && draft.database === '') return '请填写数据库文件路径'
-    if (isCustom && !customDriver) return '请选择或先新增一个自定义驱动'
-    if (useNative && sshEnabled && !fileBased) {
+    if (!fileBased && draft.host === '') return '请填写主机地址'
+    if (!fileBased && (!Number.isInteger(draft.port) || draft.port < 1 || draft.port > 65535)) return '端口需在 1-65535 之间'
+    if (fileBased && draft.database === '') return '请填写数据库文件路径'
+    if (supportsSsh && sshEnabled) {
       if (draft.ssh?.host === undefined || draft.ssh.host === '') return '请填写 SSH 主机'
       if (!Number.isInteger(draft.ssh.port) || draft.ssh.port < 1 || draft.ssh.port > 65535) return 'SSH 端口需在 1-65535 之间'
       if (draft.ssh.user === '') return '请填写 SSH 用户名'
@@ -315,41 +269,22 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
       <div className="dshdb-form">
         <div className="dshdb-form-grid">
           <Field label="名称" required span>
-            <TextInput
-              value={name}
-              autoFocus
-              placeholder="例如 本地 MySQL"
-              onChange={(event) => setName(event.target.value)}
+            <TextInput value={name} autoFocus placeholder="例如 本地 MySQL" onChange={(event) => setName(event.target.value)} />
+          </Field>
+          <Field label="数据库类型" required span hint={`方言：${dialectLabel(preset.dialect)}`}>
+            <Select
+              options={PRESET_ORDER.map((id) => ({ value: id, label: PRESET_LABEL[id] }))}
+              value={choice}
+              onValueChange={changeChoice}
             />
           </Field>
-          <Field label="驱动" required span hint={dialect ? `方言：${dialectLabel(dialect)}` : undefined}>
-            <Select options={driverOptions} value={choice} onValueChange={changeChoice} />
-          </Field>
-          {supportsNative ? (
-            <div className="dshdb-span-2 dshdb-list">
-              <Switch
-                checked={nativeEngine}
-                onChange={setNativeEngine}
-                label={fileBased ? '使用内置 SQLite 引擎（无需 Java）' : '使用内置引擎（无需 Java；支持 SSH 隧道）'}
-              />
-            </div>
-          ) : null}
-          {isCustom && !customDriver ? (
-            <div className="dshdb-span-2">
-              <Banner tone="warn">还没有自定义驱动，请先在「设置」标签页新增。</Banner>
-            </div>
-          ) : null}
           {fileBased ? null : (
             <>
               <Field label="主机" required>
                 <TextInput value={host} onChange={(event) => setHost(event.target.value)} placeholder="127.0.0.1" />
               </Field>
               <Field label="端口" required>
-                <TextInput
-                  value={port}
-                  inputMode="numeric"
-                  onChange={(event) => setPort(event.target.value.replace(/[^0-9]/g, ''))}
-                />
+                <TextInput value={port} inputMode="numeric" onChange={(event) => setPort(event.target.value.replace(/[^0-9]/g, ''))} />
               </Field>
               <Field label="用户名">
                 <TextInput value={user} onChange={(event) => setUser(event.target.value)} placeholder={isRedis ? 'default' : '用户名'} />
@@ -364,7 +299,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
                 />
               </Field>
               {editing?.hasPassword ? (
-                <div className="dshdb-span-2">
+                <div className="dshdb-span-2 dshdb-list">
                   <Switch checked={clearPassword} onChange={setClearPassword} label="清除已保存的密码" />
                 </div>
               ) : null}
@@ -372,14 +307,10 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
           )}
           {isRedis ? (
             <Field label="逻辑库序号" hint="Redis 数据库编号，默认 0">
-              <TextInput
-                value={redisDb}
-                inputMode="numeric"
-                onChange={(event) => setRedisDb(event.target.value.replace(/[^0-9]/g, ''))}
-              />
+              <TextInput value={redisDb} inputMode="numeric" onChange={(event) => setRedisDb(event.target.value.replace(/[^0-9]/g, ''))} />
             </Field>
           ) : (
-            <Field label="数据库 / 服务名" span={fileBased} hint={preset?.databaseHint ?? '可留空，连接后再选择 schema'}>
+            <Field label={choice === 'sqlite' ? '数据库文件' : '数据库 / 服务名'} span={fileBased} hint={preset.databaseHint}>
               <TextInput
                 value={database}
                 onChange={(event) => setDatabase(event.target.value)}
@@ -387,22 +318,18 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
               />
             </Field>
           )}
-          {useNative && !fileBased ? (
+          {supportsSsh ? (
             <div className="dshdb-span-2 dshdb-list">
               <Switch checked={sshEnabled} onChange={setSshEnabled} label="通过 SSH 隧道连接" />
             </div>
           ) : null}
-          {useNative && sshEnabled && !fileBased ? (
+          {supportsSsh && sshEnabled ? (
             <>
               <Field label="SSH 主机" required>
                 <TextInput value={sshHost} onChange={(event) => setSshHost(event.target.value)} placeholder="bastion.example.com" />
               </Field>
               <Field label="SSH 端口" required>
-                <TextInput
-                  value={sshPort}
-                  inputMode="numeric"
-                  onChange={(event) => setSshPort(event.target.value.replace(/[^0-9]/g, ''))}
-                />
+                <TextInput value={sshPort} inputMode="numeric" onChange={(event) => setSshPort(event.target.value.replace(/[^0-9]/g, ''))} />
               </Field>
               <Field label="SSH 用户名" required>
                 <TextInput value={sshUser} onChange={(event) => setSshUser(event.target.value)} placeholder="ops" />
@@ -473,15 +400,6 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
               </div>
             </>
           ) : null}
-          {!isRedis && !useNative ? (
-            <Field label="额外 JDBC 参数" span hint="每行一个 key=value，例如 useSSL=false">
-              <TextArea
-                value={paramsText}
-                onChange={(event) => setParamsText(event.target.value)}
-                placeholder={'useSSL=false\nconnectTimeout=10000'}
-              />
-            </Field>
-          ) : null}
           <div className="dshdb-span-2 dshdb-list">
             <Switch
               checked={readOnly}
@@ -495,7 +413,6 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
             />
           </div>
         </div>
-
         {testResult ? (
           <Banner tone={testResult.ok ? 'success' : 'error'}>
             {testResult.ok
@@ -520,17 +437,9 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
             <Loading label="正在测试连接…" />
           </span>
         ) : null}
-        {isCustom ? <Tag tone="business">自定义驱动</Tag> : null}
-        {!isRedis && dialect && !useNative ? (
-          <span className="dshdb-muted" style={{ fontSize: 11 }}>
-            驱动类：{customDriver?.driverClass ?? preset?.driverClass ?? '—'}
-          </span>
-        ) : null}
-        {useNative ? (
-          <span className="dshdb-muted" style={{ fontSize: 11 }}>
-            引擎：内置 MySQL（driver pack：mysql2）
-          </span>
-        ) : null}
+        <span className="dshdb-muted" style={{ fontSize: 11 }}>
+          引擎：{driverLabel}
+        </span>
         {!editing ? null : (
           <span className="dshdb-muted" style={{ fontSize: 11 }}>
             连接 ID：{editing.id}

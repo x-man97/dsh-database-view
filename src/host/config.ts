@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { dirname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 
-import { isPresetId, isSqlDialect, PRESETS, presetOf } from '../shared/presets.js'
+import { isPresetId, PRESETS, presetOf } from '../shared/presets.js'
 import { lenientKeybindings, parseKeybindings } from '../shared/keymap.js'
 import { readConsoleActionOrder } from '../shared/consoleactions.js'
 import { readToolbarActionOrder } from '../shared/toolbaractions.js'
@@ -14,10 +14,6 @@ import type {
   ConnectionDraft,
   DbConfigFile,
   DbSettings,
-  DriverConfig,
-  DriverChoice,
-  JarRef,
-  SqlDialect,
   SshConfig,
   TlsConfig,
   TrashedConnection,
@@ -30,8 +26,6 @@ export const DEFAULT_SETTINGS: DbSettings = {
   maxRows: 200,
   queryTimeoutSec: 30,
   connectTimeoutSec: 10,
-  javaPath: '',
-  mavenMirror: 'central',
   allowAgentWrites: false,
   redisScanCount: 200,
   confirmDestructive: true,
@@ -44,20 +38,12 @@ export const DEFAULT_SETTINGS: DbSettings = {
 const NAME_MAX = 80
 const TEXT_MAX = 255
 const DATABASE_MAX = 256
-const PARAM_KEYS_MAX = 32
-const JARS_MAX = 8
-
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
-const DRIVER_CLASS_PATTERN = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+$/
-const JAR_PART_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
-const PARAM_KEY_PATTERN = /^[A-Za-z0-9._-]{1,64}$/
 
 export const SETTING_KEYS: (keyof DbSettings)[] = [
   'maxRows',
   'queryTimeoutSec',
   'connectTimeoutSec',
-  'javaPath',
-  'mavenMirror',
   'allowAgentWrites',
   'redisScanCount',
   'confirmDestructive',
@@ -113,32 +99,6 @@ function asInt(value: unknown, field: string, min: number, max: number, fallback
   return parsed
 }
 
-function sanitizeParams(value: unknown): Record<string, string> {
-  if (value === undefined || value === null) return {}
-  if (!isRecord(value)) throw new DbError('invalid', '连接参数必须是对象')
-  const entries = Object.entries(value)
-  if (entries.length > PARAM_KEYS_MAX) throw new DbError('invalid', `连接参数不能超过 ${PARAM_KEYS_MAX} 项`)
-  const out: Record<string, string> = {}
-  for (const [key, raw] of entries) {
-    if (!PARAM_KEY_PATTERN.test(key)) throw new DbError('invalid', `非法的参数名：${key}`)
-    if (typeof raw !== 'string') throw new DbError('invalid', `参数 ${key} 的值必须是字符串`)
-    if (raw.length > 2048) throw new DbError('invalid', `参数 ${key} 的值过长`)
-    out[key] = raw
-  }
-  return out
-}
-
-function sanitizeJar(raw: unknown): JarRef {
-  if (!isRecord(raw)) throw new DbError('invalid', 'jar 必须是对象')
-  const group = asString(raw.group, 'jar.group', 200, true)
-  const artifact = asString(raw.artifact, 'jar.artifact', 200, true)
-  const version = asString(raw.version, 'jar.version', 100, true)
-  if (!JAR_PART_PATTERN.test(group) || !JAR_PART_PATTERN.test(artifact) || !JAR_PART_PATTERN.test(version)) {
-    throw new DbError('invalid', `非法的 Maven 坐标：${group}:${artifact}:${version}`)
-  }
-  return { group, artifact, version }
-}
-
 function sanitizeSsh(raw: unknown): SshConfig | undefined {
   if (raw === undefined || raw === null) return undefined
   if (!isRecord(raw)) throw new DbError('invalid', 'SSH 配置必须是对象')
@@ -189,7 +149,7 @@ function sanitizeTls(raw: unknown): TlsConfig | undefined {
 }
 
 export class ConfigStore {
-  private data: DbConfigFile = { version: 1, connections: [], trash: [], drivers: [], settings: { ...DEFAULT_SETTINGS } }
+  private data: DbConfigFile = { version: 2, connections: [], trash: [], settings: { ...DEFAULT_SETTINGS } }
 
   constructor(
     readonly file: string,
@@ -199,7 +159,7 @@ export class ConfigStore {
 
   load(): void {
     if (!existsSync(this.file)) {
-      this.data = { version: 1, connections: [], trash: [], drivers: [], settings: { ...DEFAULT_SETTINGS } }
+      this.data = { version: 2, connections: [], trash: [], settings: { ...DEFAULT_SETTINGS } }
       return
     }
     try {
@@ -207,17 +167,14 @@ export class ConfigStore {
       if (!isRecord(parsed)) throw new Error('config root is not an object')
       const connections = Array.isArray(parsed.connections) ? parsed.connections : []
       const trash = Array.isArray(parsed.trash) ? parsed.trash : []
-      const drivers = Array.isArray(parsed.drivers) ? parsed.drivers : []
       const settings = isRecord(parsed.settings) ? parsed.settings : {}
-      const hydratedDrivers = drivers.flatMap((entry) => this.hydrateDriver(entry))
       this.data = {
-        version: 1,
+        version: 2,
         connections: [],
         trash: [],
-        drivers: hydratedDrivers,
         settings: this.hydrateSettings(settings),
       }
-      // Connections are resolved after their custom drivers exist on `this.data`.
+      // Legacy/unsupported connections are dropped here.
       this.data.connections = connections.flatMap((entry) => this.hydrateConnection(entry))
       const active = new Set(this.data.connections.map((entry) => entry.id))
       this.data.trash = trash
@@ -231,7 +188,7 @@ export class ConfigStore {
         // keep the original if the backup cannot be written
       }
       this.log(`connections.json is corrupt (${errorMessage(error)}); moved to ${backup}`)
-      this.data = { version: 1, connections: [], trash: [], drivers: [], settings: { ...DEFAULT_SETTINGS } }
+      this.data = { version: 2, connections: [], trash: [], settings: { ...DEFAULT_SETTINGS } }
     }
   }
 
@@ -252,12 +209,6 @@ export class ConfigStore {
             break
           case 'redisScanCount':
             settings.redisScanCount = asInt(value, 'redisScanCount', 10, 10000, settings.redisScanCount)
-            break
-          case 'javaPath':
-            settings.javaPath = typeof value === 'string' ? value.trim().slice(0, 1024) : settings.javaPath
-            break
-          case 'mavenMirror':
-            settings.mavenMirror = value === 'aliyun' ? 'aliyun' : settings.mavenMirror
             break
           case 'allowAgentWrites':
             settings.allowAgentWrites = value === true
@@ -285,60 +236,23 @@ export class ConfigStore {
     return settings
   }
 
-  private hydrateDriver(raw: unknown): DriverConfig[] {
-    if (!isRecord(raw)) return []
-    try {
-      const id = asString(raw.id, 'driver.id', 64, true)
-      if (!ID_PATTERN.test(id) || isPresetId(id)) return []
-      const dialect = asString(raw.dialect, 'driver.dialect', 32, true)
-      if (!isSqlDialect(dialect)) return []
-      const jarsRaw = Array.isArray(raw.jars) ? raw.jars.slice(0, JARS_MAX) : []
-      const jars = jarsRaw.flatMap((jar) => {
-        try {
-          return [sanitizeJar(jar)]
-        } catch {
-          return []
-        }
-      })
-      if (jars.length === 0) return []
-      const driverClass = asString(raw.driverClass, 'driver.driverClass', 255, true)
-      const urlTemplate = asString(raw.urlTemplate, 'driver.urlTemplate', 1024, true)
-      if (!DRIVER_CLASS_PATTERN.test(driverClass) || !urlTemplate.includes('{{host}}') || !urlTemplate.includes('{{port}}')) return []
-      return [{
-        id,
-        name: asString(raw.name, 'driver.name', NAME_MAX, true),
-        dialect: dialect as SqlDialect,
-        driverClass,
-        urlTemplate,
-        jars,
-        createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : nowIso(),
-      }]
-    } catch {
-      return []
-    }
-  }
-
   private hydrateConnection(raw: unknown): ConnectionConfig[] {
     if (!isRecord(raw)) return []
     try {
       const id = asString(raw.id, 'connection.id', 64, true)
       if (!ID_PATTERN.test(id)) return []
       const driverRaw = asString(raw.driver, 'connection.driver', 64, true)
-      const driver: DriverChoice = driverRaw === 'custom' ? 'custom' : isPresetId(driverRaw) ? driverRaw : 'mysql'
-      const preset = driver === 'custom' ? undefined : presetOf(driver)
-      const customDriverId = driver === 'custom' ? asString(raw.customDriverId, 'connection.customDriverId', 64, true) : undefined
-      const dialect = preset !== undefined ? preset.dialect : this.data.drivers.find((d) => d.id === customDriverId)?.dialect
-      if (dialect === undefined) return []
+      if (!isPresetId(driverRaw)) return []
+      const preset = PRESETS[driverRaw]
       const secretName = typeof raw.secretName === 'string' && raw.secretName !== '' ? raw.secretName : undefined
       const ssh = sanitizeSsh(raw.ssh)
       const tls = sanitizeTls(raw.tls)
-      const hostOptional = preset?.hostOptional === true
+      const hostOptional = preset.hostOptional === true
       return [{
         id,
         name: asString(raw.name, 'connection.name', NAME_MAX, true),
-        driver,
-        ...(customDriverId === undefined ? {} : { customDriverId }),
-        dialect,
+        driver: driverRaw,
+        dialect: preset.dialect,
         host: asString(raw.host, 'connection.host', TEXT_MAX, !hostOptional),
         port: hostOptional ? asPortOptional(raw.port, 'connection.port', 0) : asPort(raw.port, 'connection.port', 0),
         user: asString(raw.user, 'connection.user', 128),
@@ -346,9 +260,7 @@ export class ConfigStore {
         hasPassword: typeof secretName === 'string' && this.secrets.has(secretName),
         database: asString(raw.database, 'connection.database', DATABASE_MAX),
         redisDb: asInt(raw.redisDb, 'connection.redisDb', 0, 255, 0),
-        params: sanitizeParams(raw.params),
         readOnly: raw.readOnly === true,
-        ...(raw.nativeEngine === true ? { nativeEngine: true } : {}),
         ...(ssh === undefined ? {} : { ssh }),
         ...(tls === undefined ? {} : { tls }),
         createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : nowIso(),
@@ -378,7 +290,6 @@ export class ConfigStore {
       id: conn.id,
       name: conn.name,
       driver: conn.driver,
-      ...(conn.customDriverId === undefined ? {} : { customDriverId: conn.customDriverId }),
       dialect: conn.dialect,
       host: conn.host,
       port: conn.port,
@@ -386,9 +297,7 @@ export class ConfigStore {
       hasPassword: conn.secretName !== undefined && this.secrets.has(conn.secretName),
       database: conn.database,
       redisDb: conn.redisDb,
-      params: { ...conn.params },
       readOnly: conn.readOnly,
-      ...(conn.nativeEngine === true ? { nativeEngine: true } : {}),
       ...(conn.ssh === undefined ? {} : { ssh: { ...conn.ssh } }),
       ...(conn.tls === undefined ? {} : { tls: { ...conn.tls } }),
       hasSshPassword: conn.ssh !== undefined && this.secrets.has(Store.nameForSshPassword(conn.id)),
@@ -407,13 +316,8 @@ export class ConfigStore {
     return {
       connections,
       trash,
-      drivers: this.data.drivers.map((driver) => ({ ...driver, jars: driver.jars.map((jar) => ({ ...jar })) })),
       settings: { ...this.data.settings },
     }
-  }
-
-  driver(id: string): DriverConfig | undefined {
-    return this.data.drivers.find((driver) => driver.id === id)
   }
 
   connection(id: string): ConnectionConfig | undefined {
@@ -429,34 +333,22 @@ export class ConfigStore {
     const draft = raw as unknown as ConnectionDraft
     const name = asString(draft.name, '名称', NAME_MAX, true)
     const driverRaw = asString(draft.driver, '驱动', 64, true)
-    if (driverRaw !== 'custom' && !isPresetId(driverRaw)) throw new DbError('invalid', `未知的驱动：${driverRaw}`)
-    const driver = driverRaw as DriverChoice
-    let dialect: ConnectionConfig['dialect']
-    let customDriverId: string | undefined
-    if (driver === 'custom') {
-      const id = asString(draft.customDriverId, '自定义驱动', 64, true)
-      const custom = this.driver(id)
-      if (custom === undefined) throw new DbError('not-found', `自定义驱动不存在：${id}`)
-      dialect = custom.dialect
-      customDriverId = id
-    } else {
-      dialect = PRESETS[driver].dialect
-    }
-    const preset = driver === 'custom' ? undefined : PRESETS[driver]
-    const hostOptional = preset?.hostOptional === true
+    if (!isPresetId(driverRaw)) throw new DbError('invalid', `不支持的数据库驱动：${driverRaw}`)
+    const driver = driverRaw
+    const dialect = PRESETS[driver].dialect
+    const preset = PRESETS[driver]
+    const hostOptional = preset.hostOptional === true
     const host = asString(draft.host, '主机', TEXT_MAX, !hostOptional)
-    const port = hostOptional ? asPortOptional(draft.port, '端口', preset?.defaultPort ?? 0) : asPort(draft.port, '端口', preset?.defaultPort)
+    const port = hostOptional ? asPortOptional(draft.port, '端口', preset.defaultPort) : asPort(draft.port, '端口', preset.defaultPort)
     const user = asString(draft.user, '用户名', 128)
     const database = dialect === 'redis' ? '' : asString(draft.database, '数据库', DATABASE_MAX)
     if (dialect === 'sqlite' && database.trim() === '') {
       throw new DbError('invalid', 'SQLite 连接需要数据库文件路径（database），例如 D:/data/app.db 或 :memory:')
     }
     const redisDb = dialect === 'redis' ? asInt(draft.redisDb, 'Redis 库序号', 0, 255, 0) : 0
-    const params = sanitizeParams(draft.params)
     // The read-only flag is decided when the connection is created and is immutable
     // afterwards: edits always keep the stored value, even if a caller sends another.
     const readOnly = existing === undefined ? draft.readOnly === true : existing.readOnly
-    const nativeEngine = draft.nativeEngine === true && ['mysql', 'mariadb', 'postgres', 'sqlite', 'mssql', 'oracle'].includes(driver)
     const ssh = sanitizeSsh(draft.ssh)
     const tls = sanitizeTls(draft.tls)
 
@@ -476,7 +368,6 @@ export class ConfigStore {
       id,
       name,
       driver,
-      ...(customDriverId === undefined ? {} : { customDriverId }),
       dialect,
       host,
       port,
@@ -485,9 +376,7 @@ export class ConfigStore {
       hasPassword: this.secrets.has(secretName),
       database,
       redisDb,
-      params,
       readOnly,
-      ...(nativeEngine ? { nativeEngine: true } : {}),
       ...(ssh === undefined ? {} : { ssh }),
       ...(tls === undefined ? {} : { tls }),
       createdAt: existing?.createdAt ?? nowIso(),
@@ -598,13 +487,6 @@ export class ConfigStore {
         case 'redisScanCount':
           next.redisScanCount = asInt(value, 'Redis SCAN 数量', 10, 10000, next.redisScanCount)
           break
-        case 'javaPath':
-          next.javaPath = asString(value, 'Java 路径', 1024)
-          break
-        case 'mavenMirror':
-          if (value !== 'central' && value !== 'aliyun') throw new DbError('invalid', 'Maven 镜像只能是 central 或 aliyun')
-          next.mavenMirror = value
-          break
         case 'allowAgentWrites':
           if (typeof value !== 'boolean') throw new DbError('invalid', 'allowAgentWrites 必须是布尔值')
           next.allowAgentWrites = value
@@ -638,50 +520,6 @@ export class ConfigStore {
     this.data.settings = next
     this.persist()
     return next
-  }
-
-  upsertDriver(raw: unknown): DriverConfig {
-    if (!isRecord(raw)) throw new DbError('invalid', '驱动内容无效')
-    const existingId = typeof raw.id === 'string' && raw.id !== '' ? raw.id : undefined
-    const existing = existingId === undefined ? undefined : this.driver(existingId)
-    if (existingId !== undefined) {
-      if (isPresetId(existingId)) throw new DbError('conflict', '内置驱动的 ID 不可修改')
-      if (existing === undefined) throw new DbError('not-found', `自定义驱动不存在：${existingId}`)
-    }
-    const name = asString(raw.name, '驱动名称', NAME_MAX, true)
-    const dialectRaw = asString(raw.dialect, '数据库类型', 32, true)
-    if (!isSqlDialect(dialectRaw)) throw new DbError('invalid', '自定义驱动只支持 SQL 数据库')
-    const driverClass = asString(raw.driverClass, '驱动类', 255, true)
-    if (!DRIVER_CLASS_PATTERN.test(driverClass)) throw new DbError('invalid', `非法的驱动类：${driverClass}`)
-    const urlTemplate = asString(raw.urlTemplate, 'JDBC URL 模板', 1024, true)
-    if (!urlTemplate.includes('{{host}}') || !urlTemplate.includes('{{port}}')) {
-      throw new DbError('invalid', 'URL 模板必须包含 {{host}} 与 {{port}} 占位符')
-    }
-    const jarsRaw = Array.isArray(raw.jars) ? raw.jars : []
-    if (jarsRaw.length === 0 || jarsRaw.length > JARS_MAX) throw new DbError('invalid', `请提供 1-${JARS_MAX} 个 jar 坐标`)
-    const jars = jarsRaw.map(sanitizeJar)
-    const id = existing?.id ?? randId('custom')
-    const driver: DriverConfig = {
-      id,
-      name,
-      dialect: dialectRaw,
-      driverClass,
-      urlTemplate,
-      jars,
-      createdAt: existing?.createdAt ?? nowIso(),
-    }
-    if (existing === undefined) this.data.drivers.push(driver)
-    else this.data.drivers = this.data.drivers.map((entry) => (entry.id === id ? driver : entry))
-    this.persist()
-    return driver
-  }
-
-  deleteDriver(id: string): void {
-    if (this.driver(id) === undefined) throw new DbError('not-found', `自定义驱动不存在：${id}`)
-    const used = [...this.data.connections, ...this.data.trash].filter((connection) => connection.customDriverId === id)
-    if (used.length > 0) throw new DbError('conflict', `该驱动仍被 ${used.length} 个连接使用：${used.map((c) => c.name).join('、')}`)
-    this.data.drivers = this.data.drivers.filter((entry) => entry.id !== id)
-    this.persist()
   }
 
   private persist(): void {

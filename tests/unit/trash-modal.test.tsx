@@ -19,7 +19,6 @@ function item(overrides: Partial<ClientTrashedConnection> = {}): ClientTrashedCo
     hasPassword: true,
     database: 'shop',
     redisDb: 0,
-    params: {},
     readOnly: false,
     createdAt: '2026-10-29T00:00:00.000Z',
     deletedAt: '2026-10-30T12:34:00.000Z',

@@ -13,14 +13,10 @@ import { clearWidths, readWidths, writeWidths } from './columnWidths'
 import { formatCell } from './format'
 
 /** Rows are rendered with a fixed height so offsets need no measurement. */
-export /**
- * JDBC type codes that display right-aligned: integers, decimals and floats.
- * Everything else (text, dates, blobs) stays left-aligned.
- */
-const NUMERIC_JDBC_TYPES = new Set([-6, -5, 2, 3, 4, 5, 6, 7, 8])
+export const NUMERIC_TYPE = /(?:^|\b)(?:tiny|small|medium|big)?int\b|decimal|numeric|float|double|real|number|money/i
 
 function numericColumn(column: ColumnInfo): boolean {
-  return column.jdbcType !== undefined && NUMERIC_JDBC_TYPES.has(column.jdbcType)
+  return NUMERIC_TYPE.test(column.typeName)
 }
 
 const GRID_ROW_HEIGHT = 22

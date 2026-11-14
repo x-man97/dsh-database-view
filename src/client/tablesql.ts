@@ -33,7 +33,7 @@ export function orderByForPaging(dialect: ClientConnection['dialect'], orderBy: 
 
 /** One page of rows: LIMIT/OFFSET on MySQL-family servers, OFFSET FETCH elsewhere. */
 export function pageClause(dialect: ClientConnection['dialect'], limit: number, offset: number): string {
-  if (dialect === 'oracle' || dialect === 'oceanbase-oracle' || dialect === 'mssql') {
+  if (dialect === 'oracle' || dialect === 'mssql') {
     return `OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`
   }
   return `LIMIT ${limit} OFFSET ${offset}`
@@ -108,7 +108,7 @@ export function isTemporalType(typeName: string | undefined): boolean {
 export function temporalLiteral(dialect: ClientConnection['dialect'], typeName: string, text: string): string {
   const literal = quoteLiteral(text, dialect)
   if (!isTemporalType(typeName)) return literal
-  if (dialect !== 'oracle' && dialect !== 'oceanbase-oracle' && dialect !== 'dameng') return literal
+  if (dialect !== 'oracle') return literal
   if (!/^\d{4}-\d{2}-\d{2}/u.test(text)) return literal
   const base = typeName.replace(/[\s(].*$/u, '').toLowerCase()
   const escaped = text.replace(/'/gu, "''")
@@ -133,7 +133,7 @@ export function temporalLiteral(dialect: ClientConnection['dialect'], typeName: 
  * back is not the one that was exported; standard SQL dialects take the text
  * verbatim and only need the quote doubled.
  */
-export function quoteLiteral(text: string, dialect: ClientConnection['dialect'] = 'generic'): string {
+export function quoteLiteral(text: string, dialect: ClientConnection['dialect'] = 'mysql'): string {
   const escaped = dialect === 'mysql' ? text.replace(/\\/gu, '\\\\') : text
   return `'${escaped.replace(/'/gu, "''")}'`
 }

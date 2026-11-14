@@ -327,7 +327,6 @@ export class RedisManager {
       enableReadyCheck: false,
       maxRetriesPerRequest: 1,
       retryStrategy: () => null,
-      ...conn.params,
     }
   }
 

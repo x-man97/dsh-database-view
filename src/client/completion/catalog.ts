@@ -4,7 +4,7 @@
  * The completion engine never talks to the server itself: it asks this catalog
  * for schemas, relations and columns. The host already keeps a structure cache,
  * so every entry is asked from `/completion/metadata` first (a cache hit costs
- * no bridge round trip) and only falls back to the older per-object endpoints
+ * no extra round trip) and only falls back to the older per-object endpoints
  * when the host has nothing cached yet.
  *
  * Both caches are bounded LRUs: a long console session can touch many schemas

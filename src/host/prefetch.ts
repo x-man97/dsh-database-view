@@ -3,7 +3,7 @@ import type { SqlService } from './sql.js'
 import type { StructureStore } from './structure.js'
 import type { ObjectKind, PrefetchProgress, SqlDialect, TableDescription } from '../shared/types.js'
 
-/** Keep the background walk gentle: metadata reads share the JDBC bridge. */
+/** Keep the background walk gentle: metadata reads share the live connection. */
 export const DESCRIPTION_CONCURRENCY = 2
 
 /**

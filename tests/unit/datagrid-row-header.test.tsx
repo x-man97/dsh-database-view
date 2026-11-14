@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { DataGrid } from '../../src/client/DataGrid'
 
-const columns = [{ name: 'total', typeName: 'INTEGER', jdbcType: 4 }]
+const columns = [{ name: 'total', typeName: 'INTEGER' }]
 
 afterEach(() => {
   cleanup()

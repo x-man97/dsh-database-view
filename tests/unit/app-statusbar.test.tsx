@@ -23,7 +23,6 @@ const connection: ClientConnection = {
   hasPassword: false,
   database: '',
   redisDb: 0,
-  params: {},
   readOnly: false,
   createdAt: '2026-11-05T04:00:00.000Z',
 }
@@ -32,8 +31,6 @@ const settings: DbSettings = {
   maxRows: 200,
   queryTimeoutSec: 30,
   connectTimeoutSec: 10,
-  javaPath: '',
-  mavenMirror: 'central',
   allowAgentWrites: true,
   redisScanCount: 200,
   confirmDestructive: true,
@@ -41,11 +38,8 @@ const settings: DbSettings = {
 }
 
 const env = {
-  java: { available: false, source: 'missing' },
   dataDir: '',
   configPath: '',
-  bridgeJar: '',
-  bridgeBuilt: false,
   pluginVersion: '0.3.2',
   platform: 'win32',
 }
@@ -53,7 +47,6 @@ const env = {
 beforeEach(() => {
   mocks.status.mockResolvedValue({
     config: { connections: [connection], trash: [], drivers: [], settings },
-    drivers: [],
     env,
     prefetch: [],
   })
@@ -88,7 +81,6 @@ describe('App status bar', () => {
   it('shows a spinner and live progress while descriptions are cached', async () => {
     mocks.status.mockResolvedValue({
       config: { connections: [connection], trash: [], drivers: [], settings },
-      drivers: [],
       env,
       prefetch: [{ connectionId: connection.id, total: 120, done: 45 }],
     })
@@ -103,7 +95,6 @@ describe('App status bar', () => {
   it('picks the selected data source out of several running walks', async () => {
     mocks.status.mockResolvedValue({
       config: { connections: [connection], trash: [], drivers: [], settings },
-      drivers: [],
       env,
       prefetch: [
         { connectionId: 'conn-other', total: 80, done: 20 },
@@ -120,7 +111,6 @@ describe('App status bar', () => {
   it('hides the counter when only another data source is caching', async () => {
     mocks.status.mockResolvedValue({
       config: { connections: [connection], trash: [], drivers: [], settings },
-      drivers: [],
       env,
       prefetch: [{ connectionId: 'conn-other', total: 80, done: 20 }],
     })

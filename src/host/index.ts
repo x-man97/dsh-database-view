@@ -1,9 +1,6 @@
 import { ROUTE_PREFIX } from '../shared/presets.js'
 import { ConfigStore } from './config.js'
-import { DriverManager } from './drivers.js'
 import { DriverManager as NativeDriverManager } from './drivers/manager.js'
-import { JavaLocator } from './java.js'
-import { JreManager } from './jre.js'
 import { pluginPaths } from './paths.js'
 import { DescriptionPrefetcher } from './prefetch.js'
 import { RedisManager } from './redis.js'
@@ -29,11 +26,8 @@ export function apply(ctx: HostContext): void {
   const secrets = new SecretStore(paths.secretsFile, log)
   const config = new ConfigStore(paths.configFile, secrets, log)
   config.load()
-  const java = new JavaLocator(paths.jreDir)
-  const jre = new JreManager(paths, log)
-  const drivers = new DriverManager(paths, config, log)
   const nativeDrivers = new NativeDriverManager(paths, log)
-  const sql = new SqlService(paths, config, secrets, drivers, java, log, nativeDrivers)
+  const sql = new SqlService(paths, config, secrets, log, nativeDrivers)
   const redis = new RedisManager(config, secrets, log)
   const structure = new StructureStore(paths.structureFile, log)
   // Trashed connections keep their cached structure so restoring one stays
@@ -51,7 +45,7 @@ export function apply(ctx: HostContext): void {
     log,
   })
 
-  const handler = createRouteHandler({ ctx, paths, config, secrets, drivers, nativeDrivers, java, jre, sql, redis, structure, prefetch, log })
+  const handler = createRouteHandler({ ctx, paths, config, secrets, nativeDrivers, sql, redis, structure, prefetch, log })
 
   ctx.effect(() => {
     const dispose = ctx.webServer.register({ kind: 'prefix', path: ROUTE_PREFIX, handler })
@@ -65,7 +59,7 @@ export function apply(ctx: HostContext): void {
   })
 
   ctx.effect(() => {
-    const disposers = createDatabaseTools({ config, drivers, sql, redis, paths, structure }).map((tool) => ctx.tools.register(tool))
+    const disposers = createDatabaseTools({ config, sql, redis, paths, structure }).map((tool) => ctx.tools.register(tool))
     return () => {
       for (const dispose of disposers) {
         try {

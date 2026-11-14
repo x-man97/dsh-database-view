@@ -4,7 +4,6 @@ import { isReadOnlySql } from './sql.js'
 import type { SqlService } from './sql.js'
 import type { RedisManager } from './redis.js'
 import type { ConfigStore } from './config.js'
-import type { DriverManager } from './drivers.js'
 import { DbError, errorMessage } from './errors.js'
 import type { PluginPaths } from './paths.js'
 import type { StructureStore } from './structure.js'
@@ -13,7 +12,6 @@ import { PRESETS, PRESET_ORDER } from '../shared/presets.js'
 
 export interface ToolDeps {
   config: ConfigStore
-  drivers: DriverManager
   sql: SqlService
   redis: RedisManager
   paths: PluginPaths
@@ -74,22 +72,8 @@ function resolveConnection(config: ConfigStore, reference: string): ConnectionCo
   return byName
 }
 
-/** Connection params may carry credentials (e.g. a JDBC `password`); never hand them to a model verbatim. */
-const SECRET_PARAM = /pass|secret|token|credential|key/i
-
 function maskConnection(connection: ConnectionConfig): ConnectionConfig {
-  const params = connection.params ?? {}
-  const masked: Record<string, string> = {}
-  let changed = false
-  for (const [key, value] of Object.entries(params)) {
-    if (SECRET_PARAM.test(key)) {
-      masked[key] = '***'
-      changed = true
-    } else {
-      masked[key] = value
-    }
-  }
-  return changed ? { ...connection, params: masked } : connection
+  return connection
 }
 
 async function ensureSql(deps: ToolDeps, connection: ConnectionConfig): Promise<SqlService> {
@@ -167,22 +151,18 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
     tool({
       name: 'db_list_connections',
       description:
-        'List configured database connections (MySQL, Oracle, Dameng, OceanBase, Redis) with their id, dialect, read-only flag and driver availability. Agent tools accept either the id or the name as the "connection" argument. Call this first when the user asks about a database.',
+        'List configured database connections (MySQL/MariaDB, Oracle, PostgreSQL, SQLite, SQL Server, Redis) with their id, dialect and read-only flag. Agent tools accept either the id or the name as the "connection" argument. Call this first when the user asks about a database.',
       parameters: {
         type: 'object',
-        properties: {
-          includeDrivers: { type: 'boolean', description: 'Include JDBC driver jar status (default true).' },
-        },
+        properties: {},
         required: [],
       },
-      execute: (args) => {
+      execute: () => {
         try {
           const snapshot = deps.config.snapshot()
-          const includeDrivers = args.includeDrivers !== false
           return {
             connections: snapshot.connections.map(maskConnection),
             settings: snapshot.settings,
-            ...(includeDrivers ? { drivers: deps.drivers.statuses() } : {}),
           }
         } catch (error) {
           return fail(error)
@@ -193,15 +173,15 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
     tool({
       name: 'db_create_connection',
       description:
-        'Create and save a database connection (MySQL/MariaDB, Oracle, Dameng, OceanBase, Postgres, SQLite, SQL Server, Redis or a custom JDBC driver). The password goes to the plugin secret store, never to the config file. host/port are optional: the preset supplies the standard port, and SQLite only needs database (a file path).',
+        'Create and save a database connection (MySQL/MariaDB, Oracle, PostgreSQL, SQLite, SQL Server, Redis). All SQL presets use the bundled native driver. The password goes to the plugin secret store, never to the config file. host/port are optional: the preset supplies the standard port, and SQLite only needs database (a file path).',
       parameters: {
         type: 'object',
         properties: {
           name: { type: 'string', description: 'Display name, for example 演示 MySQL.' },
           driver: {
             type: 'string',
-            enum: [...PRESET_ORDER, 'custom'],
-            description: 'Driver preset id, or "custom" together with customDriverId.',
+            enum: PRESET_ORDER,
+            description: 'Database preset id；不支持自定义驱动。',
           },
           host: { type: 'string', description: 'Host name or IP address. Optional for SQLite.' },
           port: { type: 'number', description: 'Port. Optional: the preset default is used (3306 MySQL, 5432 Postgres, 6379 Redis, ...).' },
@@ -213,8 +193,6 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
             type: 'boolean',
             description: 'Mark the connection read-only (default false). Fixed when the connection is created; it cannot be changed later.',
           },
-          params: { type: 'object', additionalProperties: true, description: 'Extra JDBC parameters.' },
-          customDriverId: { type: 'string', description: 'Custom driver id to use when driver=custom.' },
         },
         required: ['name', 'driver'],
       },
@@ -222,8 +200,9 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
       execute: (args) => {
         try {
           const driver = text(args, 'driver')
-          const preset = driver === 'custom' ? undefined : PRESETS[driver as PresetId]
-          const hostOptional = preset?.hostOptional === true
+          const preset = PRESETS[driver as PresetId]
+          if (preset === undefined) throw new DbError('invalid', `不支持的数据库驱动：${driver}`)
+          const hostOptional = preset.hostOptional === true
           const draft: Record<string, unknown> = {
             name: text(args, 'name'),
             driver,
@@ -233,12 +212,9 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
             database: text(args, 'database', false),
             redisDb: integer(args, 'redisDb', 0, 0, 255),
             readOnly: args.readOnly === true,
-            params: objectArg(args, 'params') ?? {},
           }
           const password = maybeText(args, 'password')
           if (password !== undefined && password !== '') draft.password = password
-          const customDriverId = maybeText(args, 'customDriverId')
-          if (customDriverId !== undefined && customDriverId !== '') draft.customDriverId = customDriverId
           const created = deps.config.saveConnection(draft as never)
           return { created, note: '已保存；可用 db_test_connection 验证，或 db_refresh_connection 拉取结构缓存。' }
         } catch (error) {
@@ -267,7 +243,6 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
             type: 'boolean',
             description: 'Read-only flag. It is fixed when the connection was created; passing a different value is rejected.',
           },
-          params: { type: 'object', additionalProperties: true, description: 'Replacement JDBC parameters.' },
         },
         required: ['connection'],
       },
@@ -289,9 +264,7 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
             database: maybeText(args, 'database') ?? existing.database,
             redisDb: args.redisDb === undefined ? existing.redisDb : integer(args, 'redisDb', existing.redisDb, 0, 255),
             readOnly: existing.readOnly,
-            params: objectArg(args, 'params') ?? existing.params,
           }
-          if (existing.customDriverId !== undefined) draft.customDriverId = existing.customDriverId
           const password = maybeText(args, 'password')
           if (password !== undefined && password !== '') draft.password = password
           if (args.clearPassword === true) draft.clearPassword = true
@@ -407,7 +380,7 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
           draft: {
             type: 'object',
             additionalProperties: true,
-            description: 'Draft connection: {driver, host, port, user, password?, database, redisDb, params, readOnly, customDriverId?}.',
+            description: 'Draft connection: {driver, host, port, user, password?, database, redisDb, readOnly}.',
           },
         },
         required: [],
@@ -429,13 +402,11 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
             id: connection.id,
             name: connection.name,
             driver: connection.driver,
-            ...(connection.customDriverId === undefined ? {} : { customDriverId: connection.customDriverId }),
             host: connection.host,
             port: connection.port,
             user: connection.user,
             database: connection.database,
             redisDb: connection.redisDb,
-            params: connection.params,
             readOnly: connection.readOnly,
           })
         } catch (error) {
@@ -447,7 +418,7 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
     tool({
       name: 'db_list_schemas',
       description:
-        'List schemas/databases visible on a SQL connection. For MySQL/OceanBase-MySQL this lists databases, for Oracle/Dameng/OceanBase-Oracle it lists schemas. Use db_list_objects next to explore one schema.',
+        'List schemas/databases visible on a SQL connection. MySQL lists databases; Oracle/PostgreSQL/SQL Server list schemas; SQLite has one main schema. Use db_list_objects next to explore one schema.',
       parameters: {
         type: 'object',
         properties: {
@@ -643,7 +614,7 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
     tool({
       name: 'db_explain',
       description:
-        'Explain a SQL statement and return the plan rows. MySQL/OceanBase-MySQL/MariaDB use EXPLAIN; Oracle/OceanBase-Oracle run EXPLAIN PLAN FOR then read DBMS_XPLAN; Dameng uses EXPLAIN; PostgreSQL uses EXPLAIN FORMAT JSON; SQLite uses EXPLAIN QUERY PLAN; SQL Server reads SHOWPLAN_ALL instead of running the statement. EXPLAIN ANALYZE executes its statement, so it is subject to the same write protection as db_execute_sql.',
+        'Explain a SQL statement and return the plan rows. MySQL/MariaDB use EXPLAIN; Oracle runs EXPLAIN PLAN FOR then reads DBMS_XPLAN; PostgreSQL uses EXPLAIN; SQLite uses EXPLAIN QUERY PLAN; SQL Server reads SHOWPLAN_ALL instead of running the statement. EXPLAIN ANALYZE executes its statement, so it is subject to the same write protection as db_execute_sql.',
       parameters: {
         type: 'object',
         properties: {
@@ -771,32 +742,5 @@ export function createDatabaseTools(deps: ToolDeps): ToolDefinition[] {
       },
     }),
 
-    tool({
-      name: 'db_download_driver',
-      description:
-        'Download the JDBC driver jars for a preset (mysql, oracle, dameng, postgres, oceanbase-mysql, oceanbase-oracle) or a custom driver into the plugin data directory. Needed before a JDBC connection can be opened.',
-      parameters: {
-        type: 'object',
-        properties: {
-          driver: { type: 'string', description: 'Preset id (mysql, mariadb, postgres, oracle, dameng, oceanbase-mysql, oceanbase-oracle, sqlite, mssql) or a custom driver id.' },
-        },
-        required: ['driver'],
-      },
-      timeoutMs: 300_000,
-      execute: async (args) => {
-        try {
-          const driverId = text(args, 'driver')
-          const status = deps.drivers.statuses().find((entry) => entry.id === driverId)
-          if (status === undefined) throw new DbError('not-found', `驱动不存在：${driverId}`)
-          if (!status.needsJava) return { driverId, needsJava: false, status }
-          const resolved =
-            status.preset !== null ? deps.drivers.resolvePreset(status.preset as PresetId) : deps.drivers.resolveCustom(status.id)
-          const jars = await deps.drivers.ensureJars(resolved)
-          return { driverId, needsJava: true, jars, dataDir: deps.paths.dataDir }
-        } catch (error) {
-          return fail(error)
-        }
-      },
-    }),
   ]
 }

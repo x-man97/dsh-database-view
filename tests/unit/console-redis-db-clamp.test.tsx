@@ -28,8 +28,6 @@ function settings() {
     maxRows: 500,
     queryTimeoutSec: 30,
     connectTimeoutSec: 10,
-    javaPath: '',
-    mavenMirror: '',
     allowAgentWrites: false,
     redisScanCount: 200,
     confirmDestructive: true,
@@ -59,9 +57,7 @@ describe('remembered Redis database', () => {
           },
         ],
         settings: settings(),
-        drivers: [],
       },
-      drivers: [],
       env: {},
     })
     mocks.schemas.mockResolvedValue({ schemas: [] })

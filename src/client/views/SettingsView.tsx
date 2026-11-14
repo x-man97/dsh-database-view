@@ -1,5 +1,5 @@
 import { useEffect, useState, type KeyboardEvent, type ReactElement } from 'react'
-import type { CustomDriverStatus, DbSettings, DriverStatus, EnvStatus } from '../../shared/types'
+import type { DbSettings } from '../../shared/types'
 import {
   SHORTCUTS,
   SHORTCUT_SCOPE_LABEL,
@@ -11,14 +11,13 @@ import {
   type ShortcutDef,
   type ShortcutScope,
 } from '../../shared/keymap'
-import { formatBytes } from '../format'
 import { IS_MAC } from '../keymap'
-import { ArrowDownIcon, ArrowUpIcon, DatabaseIcon, DownloadIcon, EditIcon, PlusIcon, RefreshIcon, TrashIcon } from '../icons'
+import { ArrowDownIcon, ArrowUpIcon } from '../icons'
 import { CONSOLE_ACTION_LABEL, consoleActionIcon } from '../consoleactions'
 import { orderConsoleActions, type ConsoleActionId } from '../../shared/consoleactions'
 import { TOOLBAR_ACTION_LABEL, toolbarActionIcon } from '../toolbaractions'
 import { orderToolbarActions, type ToolbarActionId } from '../../shared/toolbaractions'
-import { Banner, Button, Field, Loading, Panel, Select, Switch, Tag, TextInput } from '../ui'
+import { Button, Field, Panel, Switch, TextInput } from '../ui'
 
 /** Panel order: the editor first, then everything the user reaches with a mouse. */
 const SHORTCUT_SCOPES: ShortcutScope[] = ['console', 'result', 'table', 'tree', 'redis']
@@ -85,12 +84,7 @@ function ShortcutRow(props: {
         onBlur={() => setRecording(false)}
         onKeyDown={capture}
       />
-      <Button
-        size="sm"
-        variant="ghost"
-        disabled={overrides[def.id] === undefined}
-        onClick={() => onChange(null)}
-      >
+      <Button size="sm" variant="ghost" disabled={overrides[def.id] === undefined} onClick={() => onChange(null)}>
         恢复默认
       </Button>
     </div>
@@ -99,68 +93,8 @@ function ShortcutRow(props: {
 
 export interface SettingsViewProps {
   settings: DbSettings
-  env: EnvStatus
-  drivers: DriverStatus[]
   saving: boolean
-  downloading: string
-  downloadingJava: boolean
   onSave: (settings: DbSettings) => void
-  onRefresh: () => void
-  onDownload: (driverId: string) => void
-  onDownloadJava: () => void
-  onAddCustomDriver: () => void
-  onEditCustomDriver: (driver: DriverStatus) => void
-  onDeleteCustomDriver: (driver: DriverStatus) => void
-}
-
-const JAVA_SOURCE_LABEL: Record<string, string> = {
-  setting: '设置指定',
-  bundled: '随包内置',
-  downloaded: '已下载',
-  JAVA_HOME: 'JAVA_HOME',
-  PATH: 'PATH',
-  jdks: 'JDK 目录',
-  missing: '未找到',
-}
-
-function JavaBadge({ env }: { env: EnvStatus }): ReactElement {
-  const java = env.java
-  return (
-    <div className="dshdb-kv" style={{ padding: 0 }}>
-      <span className="dshdb-kv-key">Java</span>
-      <span className="dshdb-kv-val dshdb-inline">
-        {java.available ? <Tag tone="success">可用</Tag> : <Tag tone="error">未找到</Tag>}
-        <span className="dshdb-mono">{java.version ?? java.message ?? '未检测到 Java'}</span>
-      </span>
-      <span className="dshdb-kv-key">来源</span>
-      <span className="dshdb-kv-val dshdb-mono" title={java.source}>
-        {JAVA_SOURCE_LABEL[java.source] ?? java.source}
-      </span>
-      {java.path ? (
-        <>
-          <span className="dshdb-kv-key">路径</span>
-          <span className="dshdb-kv-val dshdb-mono" title={java.path}>
-            {java.path}
-          </span>
-        </>
-      ) : null}
-      <span className="dshdb-kv-key">数据目录</span>
-      <span className="dshdb-kv-val dshdb-mono" title={env.configPath}>
-        {env.configPath}
-      </span>
-      <span className="dshdb-kv-key">JDBC 桥</span>
-      <span className="dshdb-kv-val dshdb-inline">
-        {env.bridgeBuilt ? <Tag tone="success">已构建</Tag> : <Tag tone="warn">缺失</Tag>}
-        <span className="dshdb-mono" title={env.bridgeJar}>
-          {env.bridgeJar}
-        </span>
-      </span>
-      <span className="dshdb-kv-key">版本</span>
-      <span className="dshdb-kv-val dshdb-mono">
-        v{env.pluginVersion} · {env.platform}
-      </span>
-    </div>
-  )
 }
 
 export function SettingsView(props: SettingsViewProps): ReactElement {
@@ -180,23 +114,6 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
     else update(key, 1)
   }
 
-  const javaCandidates = props.env.java.candidates ?? []
-  const knownJavaPaths = new Set(javaCandidates.map((candidate) => candidate.path))
-  const customJavaPath =
-    draft.javaPath.trim() !== '' && !knownJavaPaths.has(draft.javaPath) ? draft.javaPath : undefined
-  const javaOptions = [
-    { value: '', label: '自动（按 JAVA_HOME、PATH、JDK 目录查找）' },
-    ...javaCandidates.map((candidate, index) => ({
-      value: candidate.path,
-      label: `Java ${candidate.major} · ${candidate.version}${
-        candidate.source === 'bundled' ? '（内置）' : candidate.source === 'downloaded' ? '（已下载）' : ''
-      }${index === 0 ? ' · 最新' : ''}`,
-    })),
-    ...(customJavaPath !== undefined ? [{ value: customJavaPath, label: customJavaPath }] : []),
-  ]
-
-  const presets = props.drivers.filter((driver) => driver.preset !== null)
-  const customs = props.drivers.filter((driver) => driver.preset === null)
   const keybindings = draft.keybindings ?? {}
   const actionOrder = orderConsoleActions(draft.consoleActions)
   /** Swap one step up or down; the header buttons are disabled at the ends. */
@@ -223,79 +140,10 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
   return (
     <div className="dshdb-scroll dshdb-scroll-thin" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <Panel
-        title="运行环境"
-        collapsible
-        actions={
-          <div className="dshdb-inline">
-            <Button size="sm" variant="ghost" loading={props.saving} onClick={() => props.onSave(draft)}>
-              保存
-            </Button>
-            {/* Downloading a JRE only helps when nothing usable was found; once a
-                runtime exists (bundled, JAVA_HOME, PATH...) the button is noise. */}
-            {props.env.java.available && props.env.java.source !== 'downloaded' ? null : (
-              <Button
-                size="sm"
-                variant="primary"
-                icon={<DownloadIcon size={12} />}
-                loading={props.downloadingJava}
-                disabled={props.downloadingJava}
-                onClick={props.onDownloadJava}
-              >
-                {props.env.java.available ? '重新下载 Java' : '下载 Java'}
-              </Button>
-            )}
-          </div>
-        }
-        bodyClassName="dshdb-panel-body-pad"
-      >
-        <JavaBadge env={props.env} />
-        <div style={{ marginTop: 8 }}>
-          <Field
-            label="Java 可执行文件"
-            hint="留空时优先使用随包内置或已下载的 Java，再按 JAVA_HOME、PATH、常见 JDK 目录查找"
-          >
-            {javaOptions.length > 1 ? (
-              <Select
-                options={javaOptions}
-                value={draft.javaPath}
-                onValueChange={(value) => update('javaPath', value)}
-              />
-            ) : null}
-            <TextInput
-              value={draft.javaPath}
-              placeholder="例如 C:\\\\Program Files\\\\Java\\\\jdk-21\\\\bin\\\\java.exe"
-              onChange={(event) => update('javaPath', event.target.value)}
-            />
-          </Field>
-        </div>
-        <div className="dshdb-muted" style={{ marginTop: 6, fontSize: 11 }}>
-          下载的 Java 运行环境保存在数据目录的 jre 文件夹，随面板一起升级，不会影响系统已有的 JDK。
-        </div>
-        {!props.env.bridgeBuilt ? (
-          <div style={{ marginTop: 6 }}>
-            <Banner tone="warn">JDBC 桥接器缺失，SQL 连接将不可用。运行 `npm run build:bridge` 后重试。</Banner>
-          </div>
-        ) : null}
-        {!props.env.java.available && presets.some((driver) => driver.needsJava) ? (
-          <div style={{ marginTop: 6 }}>
-            <Banner tone="warn">
-              未检测到 Java，关系型数据库驱动需要 Java 8 及以上运行环境。可点击右上角「下载 Java」自动安装。
-            </Banner>
-          </div>
-        ) : null}
-      </Panel>
-
-      <Panel
         title="查询与安全"
         collapsible
-        defaultOpen={false}
         actions={
-          <Button
-            size="sm"
-            variant="primary"
-            loading={props.saving}
-            onClick={() => props.onSave(draft)}
-          >
+          <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
             保存
           </Button>
         }
@@ -337,16 +185,6 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
                 max={2000}
                 value={String(draft.redisScanCount)}
                 onChange={(event) => updateNumber('redisScanCount', event.target.value)}
-              />
-            </Field>
-            <Field label="Maven 镜像" hint="驱动 jar 下载源">
-              <Select
-                options={[
-                  { value: 'central', label: 'Maven Central' },
-                  { value: 'aliyun', label: '阿里云镜像' },
-                ]}
-                value={draft.mavenMirror}
-                onValueChange={(value) => update('mavenMirror', value === 'aliyun' ? 'aliyun' : 'central')}
               />
             </Field>
           </div>
@@ -526,119 +364,6 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
           ))}
         </div>
       </Panel>
-
-      <Panel
-        title="预置驱动"
-        collapsible
-        defaultOpen={false}
-        actions={
-          <Button size="sm" variant="ghost" icon={<RefreshIcon size={12} />} onClick={props.onRefresh}>
-            重新检测
-          </Button>
-        }
-        bodyClassName="dshdb-panel-body-pad"
-      >
-        <div className="dshdb-list">
-          {presets.map((driver) => (
-            <div className="dshdb-driver-row" key={driver.id}>
-              <DatabaseIcon size={15} />
-              <div className="dshdb-driver-main">
-                <div className="dshdb-driver-name">
-                  {driver.name}
-                  <Tag>{driver.dialect}</Tag>
-                  {driver.allJarsPresent ? <Tag tone="success">已就绪</Tag> : <Tag tone="warn">缺少驱动</Tag>}
-                </div>
-                <div className="dshdb-driver-sub" title={driver.jars.map((jar) => jar.coordinates).join(', ')}>
-                  {driver.driverClass ?? '—'}
-                  {driver.jars.length > 0 ? ` · ${driver.jars.map((jar) => jar.file).join(', ')}` : ''}
-                </div>
-                {driver.jars.length > 0 ? (
-                  <div style={{ marginTop: 3 }}>
-                    {driver.jars.map((jar) => (
-                      <div className="dshdb-file-row" key={jar.coordinates}>
-                        <span className={`dshdb-dot`} data-tone={jar.downloaded ? 'success' : 'warn'} />
-                        <span className="dshdb-mono" title={jar.coordinates}>
-                          {jar.file}
-                        </span>
-                        <span className="dshdb-muted">{jar.downloaded ? formatBytes(jar.sizeBytes) : '未下载'}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-              {driver.jars.length > 0 ? (
-                <Button
-                  size="sm"
-                  icon={<DownloadIcon size={12} />}
-                  loading={props.downloading === driver.id}
-                  disabled={driver.allJarsPresent}
-                  onClick={() => props.onDownload(driver.id)}
-                >
-                  {driver.allJarsPresent ? '已安装' : '下载'}
-                </Button>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </Panel>
-
-      <Panel
-        title="自定义驱动"
-        collapsible
-        defaultOpen={false}
-        actions={
-          <Button size="sm" icon={<PlusIcon size={12} />} onClick={props.onAddCustomDriver}>
-            新增
-          </Button>
-        }
-        bodyClassName="dshdb-panel-body-pad"
-      >
-        {customs.length === 0 ? (
-          <div className="dshdb-muted" style={{ fontSize: 11.5, lineHeight: 1.6 }}>
-            没有自定义驱动。若数据库不在预置列表中，可填写 Maven 坐标、驱动类与 JDBC URL 模板自行扩展。
-          </div>
-        ) : (
-          <div className="dshdb-list">
-            {customs.map((driver) => (
-              <div className="dshdb-driver-row" key={driver.id}>
-                <DatabaseIcon size={15} />
-                <div className="dshdb-driver-main">
-                  <div className="dshdb-driver-name">
-                    {driver.name}
-                    <Tag>{driver.dialect}</Tag>
-                  </div>
-                  <div className="dshdb-driver-sub" title={driver.urlTemplate}>
-                    {driver.driverClass} · {driver.urlTemplate}
-                  </div>
-                  <div className="dshdb-driver-sub">
-                    {driver.jars.map((jar) => jar.coordinates).join(' · ') || '未配置 jar'}
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  icon={<EditIcon size={12} />}
-                  aria-label={`编辑 ${driver.name}`}
-                  onClick={() => props.onEditCustomDriver(driver)}
-                />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  icon={<TrashIcon size={12} />}
-                  aria-label={`删除 ${driver.name}`}
-                  onClick={() => props.onDeleteCustomDriver(driver)}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-      </Panel>
-
-      {props.downloading !== '' ? (
-        <Loading label="正在下载驱动依赖…" />
-      ) : null}
     </div>
   )
 }
-
-export type { CustomDriverStatus }

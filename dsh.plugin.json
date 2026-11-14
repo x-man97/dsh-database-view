@@ -23,8 +23,7 @@
       "db_explain",
       "db_redis_scan",
       "db_redis_inspect",
-      "db_redis_command",
-      "db_download_driver"
+      "db_redis_command"
     ],
     "skills": []
   }

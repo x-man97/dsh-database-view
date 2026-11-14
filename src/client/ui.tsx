@@ -462,7 +462,7 @@ export function Modal({
   width?: number
 }) {
   const boxRef = useRef<HTMLDivElement | null>(null)
-  // Nested dialogs (e.g. "新增自定义驱动" opened from the settings dialog) share
+  // Nested dialogs opened from another dialog share
   // the same overlay z-index, so the later one has to be lifted above its host.
   const tokenRef = useRef<symbol | null>(null)
   const [layer, setLayer] = useState(0)

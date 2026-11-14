@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { DataGrid } from '../../src/client/DataGrid'
 
 const columns = [
-  { name: 'total', typeName: 'INTEGER', jdbcType: 4 },
-  { name: 'name', typeName: 'VARCHAR', jdbcType: 12 },
+  { name: 'total', typeName: 'INTEGER' },
+  { name: 'name', typeName: 'VARCHAR' },
 ]
 
 afterEach(() => {

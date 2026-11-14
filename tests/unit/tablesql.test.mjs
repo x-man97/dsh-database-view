@@ -44,7 +44,6 @@ describe('tablesql quoting', () => {
   it('builds the page clause per dialect', () => {
     expect(pageClause('mysql', 500, 1000)).toBe('LIMIT 500 OFFSET 1000')
     expect(pageClause('oracle', 200, 0)).toBe('OFFSET 0 ROWS FETCH NEXT 200 ROWS ONLY')
-    expect(pageClause('oceanbase-oracle', 100, 300)).toBe('OFFSET 300 ROWS FETCH NEXT 100 ROWS ONLY')
   })
 })
 

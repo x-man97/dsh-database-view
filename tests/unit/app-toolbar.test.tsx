@@ -23,7 +23,6 @@ const connection: ClientConnection = {
   hasPassword: false,
   database: '',
   redisDb: 0,
-  params: {},
   readOnly: false,
   createdAt: '2026-11-05T04:00:00.000Z',
 }
@@ -32,8 +31,6 @@ const settings: DbSettings = {
   maxRows: 200,
   queryTimeoutSec: 30,
   connectTimeoutSec: 10,
-  javaPath: '',
-  mavenMirror: 'central',
   allowAgentWrites: true,
   redisScanCount: 200,
   confirmDestructive: true,
@@ -43,13 +40,9 @@ const settings: DbSettings = {
 function mockStatus(toolbarActions?: string[], connections: ClientConnection[] = [connection]): void {
   mocks.status.mockResolvedValue({
     config: { connections, trash: [], drivers: [], settings: { ...settings, toolbarActions } },
-    drivers: [],
     env: {
-      java: { available: false, source: 'missing' },
       dataDir: '',
       configPath: '',
-      bridgeJar: '',
-      bridgeBuilt: false,
       pluginVersion: '0.3.2',
       platform: 'win32',
     },

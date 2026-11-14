@@ -16,7 +16,6 @@ import {
 describe('format helpers', () => {
   it('labels dialects', () => {
     expect(dialectLabel('mysql')).toBe('MySQL')
-    expect(dialectLabel('oceanbase-oracle')).toBe('OceanBase (Oracle)')
     expect(dialectLabel(undefined)).toBe('未选择')
   })
 

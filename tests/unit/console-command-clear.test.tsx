@@ -26,8 +26,6 @@ function redisSettings() {
     maxRows: 500,
     queryTimeoutSec: 30,
     connectTimeoutSec: 10,
-    javaPath: '',
-    mavenMirror: '',
     allowAgentWrites: false,
     redisScanCount: 200,
     confirmDestructive: true,
@@ -51,9 +49,7 @@ describe('Redis command box', () => {
           },
         ],
         settings: redisSettings(),
-        drivers: [],
       },
-      drivers: [],
       env: {},
     })
     mocks.schemas.mockResolvedValue({ schemas: [] })

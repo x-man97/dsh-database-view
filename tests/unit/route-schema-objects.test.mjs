@@ -18,7 +18,6 @@ const connection = {
   hasPassword: true,
   database: 'shop',
   redisDb: 0,
-  params: {},
   readOnly: false,
   createdAt: '2026-01-01T00:00:00.000Z',
 }
@@ -46,11 +45,10 @@ afterEach(async () => {
 function deps() {
   return {
     ctx: {},
-    paths: { dataDir: '/tmp', configFile: '/tmp/config.json', bridgeJar: '/tmp/bridge.jar', version: '0.0.0' },
+    paths: { dataDir: '/tmp', configFile: '/tmp/config.json', version: '0.0.0' },
     config: { settings: () => ({}), snapshot: () => ({}), connection: (id) => (id === 'm1' ? connection : undefined) },
     secrets: {},
     drivers: { statuses: () => [] },
-    java: { locate: () => ({}), bridgeReady: () => false },
     sql: {
       objects: async (...args) => {
         calls.objects.push(args)

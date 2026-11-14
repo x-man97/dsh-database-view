@@ -30,7 +30,6 @@ describe('table sorting expressions', () => {
   it('quotes per dialect', () => {
     expect(quoteSortColumn('mysql', 'order')).toBe('`order`')
     expect(quoteSortColumn('oracle', 'order')).toBe('"order"')
-    expect(quoteSortColumn('dameng', 'a"b')).toBe('"a""b"')
   })
   it('strips a leading ORDER BY keyword, whatever its case or spelling', () => {
     expect(stripOrderBy('ORDER BY total DESC')).toBe('total DESC')

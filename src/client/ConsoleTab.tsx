@@ -387,7 +387,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
   const defaultSchema =
     connection === undefined
       ? ''
-      : connection.dialect === 'mysql' || connection.dialect === 'generic'
+      : connection.dialect === 'mysql'
         ? connection.database
         : connection.dialect === 'postgres'
           ? 'public'
@@ -479,7 +479,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
   // fall back instead of sending the host a name it can no longer resolve.
   useEffect(() => {
     if (selectedId === '' || schema === '' || schemas.length === 0) return
-    const insensitive = connection?.dialect === 'mysql' || connection?.dialect === 'generic'
+    const insensitive = connection?.dialect === 'mysql'
     const known = schemas.some((item) =>
       insensitive ? item.name.toLowerCase() === schema.toLowerCase() : item.name === schema,
     )
@@ -815,7 +815,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     setMultiNote('')
     setHistory(pushHistory('sql', body))
     lastRun.current = null
-    // The splitter is what drops the trailing `;`: JDBC parses the text itself and
+    // The splitter is what drops the trailing `;`: the native client parses the text and
     // Oracle answers a terminator with ORA-00933, so send the split statement, not
     // the editor text. A single statement still goes through `execute` for paging.
     await execute({ statement: parts[0] ?? body, page: 0, size: pageSize, allowWrite: isWrite })
@@ -1223,7 +1223,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     const fallbackSchema =
       connection === undefined
         ? ''
-        : connection.dialect === 'mysql' || connection.dialect === 'generic'
+        : connection.dialect === 'mysql'
           ? connection.database
           : connection.user
     // Per connection, so a schema picked once survives switching tabs around.

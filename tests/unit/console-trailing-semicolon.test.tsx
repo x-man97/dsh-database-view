@@ -53,7 +53,6 @@ const oracle = {
   hasPassword: false,
   database: 'orcl',
   redisDb: 0,
-  params: {},
   readOnly: false,
   createdAt: '2026-01-01T00:00:00.000Z',
 }
@@ -62,8 +61,6 @@ const settings = {
   maxRows: 200,
   queryTimeoutSec: 30,
   connectTimeoutSec: 10,
-  javaPath: '',
-  mavenMirror: 'central',
   allowAgentWrites: false,
   redisScanCount: 200,
   confirmDestructive: false,
@@ -81,7 +78,7 @@ describe('trailing statement terminator', () => {
     vi.clearAllMocks()
     mocks.status.mockResolvedValue({ config: { connections: [oracle], settings, drivers: [] }, drivers: [], env: {} })
     mocks.schemas.mockResolvedValue({ schemas: [{ name: 'DEMO' }] })
-    // Oracle's JDBC driver parses the text itself: a trailing `;` is ORA-00933.
+    // Oracle's native driver parses the text itself: a trailing `;` is ORA-00933.
     mocks.query.mockImplementation(async (request: { sql: string }) => {
       if (request.sql.trimEnd().endsWith(';')) throw new Error('ORA-00933: SQL 命令未正确结束')
       return { columns: [], rows: [], rowCount: 0, updateCount: 0, elapsedMs: 1, warnings: [] }

@@ -18,7 +18,6 @@ const mysql = {
   hasPassword: true,
   database: 'shop',
   redisDb: 0,
-  params: {},
   readOnly: false,
   createdAt: '2026-01-01T00:00:00.000Z',
 }
@@ -48,7 +47,7 @@ afterEach(async () => {
 function deps() {
   return {
     ctx: {},
-    paths: { dataDir: '/tmp', configFile: '/tmp/config.json', bridgeJar: '/tmp/bridge.jar', version: '0.0.0' },
+    paths: { dataDir: '/tmp', configFile: '/tmp/config.json', version: '0.0.0' },
     config: {
       settings: () => ({}),
       snapshot: () => ({}),
@@ -60,7 +59,6 @@ function deps() {
     },
     secrets: {},
     drivers: { statuses: () => [] },
-    java: { locate: () => ({}), bridgeReady: () => false },
     sql: {
       test: async (draft) => {
         calls.test.push(draft)
@@ -191,7 +189,7 @@ describe('POST /connections/prefetch over HTTP', () => {
 })
 
 describe('POST /connections/disconnect over HTTP', () => {
-  it('closes both pools so a stale JDBC session cannot linger', async () => {
+  it('closes both pools so a stale native session cannot linger', async () => {
     const url = await start('/connections/disconnect')
 
     await post(url, { id: 'm1' })

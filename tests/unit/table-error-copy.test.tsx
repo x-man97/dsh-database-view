@@ -42,13 +42,10 @@ const config = {
     maxRows: 200,
     queryTimeoutSec: 30,
     connectTimeoutSec: 10,
-    javaPath: '',
-    mavenMirror: '',
     allowAgentWrites: false,
     redisScanCount: 200,
     confirmDestructive: true,
   },
-  drivers: [],
 } as unknown as AppConfig
 
 describe('table error banner', () => {

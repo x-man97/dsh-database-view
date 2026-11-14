@@ -43,7 +43,7 @@ describe('wrapPage', () => {
   })
 
   it('wraps with OFFSET ... FETCH on Oracle-family dialects', () => {
-    for (const dialect of ['oracle', 'oceanbase-oracle', 'dameng']) {
+    for (const dialect of ['oracle']) {
       expect(wrapPage(dialect, 'SELECT * FROM t', 100, 0)).toBe(
         'SELECT * FROM (\nSELECT * FROM t\n) dshdb_page OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY',
       )

@@ -7,94 +7,20 @@
 import type { ConsoleActionId } from './consoleactions.js'
 import type { ToolbarActionId } from './toolbaractions.js'
 
-export type Dialect =
-  | 'mysql'
-  | 'oracle'
-  | 'dameng'
-  | 'postgres'
-  | 'sqlite'
-  | 'mssql'
-  | 'oceanbase-oracle'
-  | 'generic'
-  | 'redis'
+export type Dialect = 'mysql' | 'oracle' | 'postgres' | 'sqlite' | 'mssql' | 'redis'
 
 export type SqlDialect = Exclude<Dialect, 'redis'>
 
-export type PresetId =
-  | 'mysql'
-  | 'mariadb'
-  | 'oceanbase-mysql'
-  | 'oceanbase-oracle'
-  | 'oracle'
-  | 'dameng'
-  | 'postgres'
-  | 'sqlite'
-  | 'mssql'
-  | 'redis'
-
-export type DriverChoice = PresetId | 'custom'
-
-export interface JarRef {
-  group: string
-  artifact: string
-  version: string
-  /** Maven artifact classifier, e.g. `sources`. */
-  classifier?: string
-}
-
-export interface JarStatus extends JarRef {
-  /** `com.mysql:mysql-connector-j:8.4.0` */
-  coordinates: string
-  downloaded: boolean
-  file: string
-  sizeBytes?: number
-}
+export type PresetId = 'mysql' | 'mariadb' | 'oracle' | 'postgres' | 'sqlite' | 'mssql' | 'redis'
 
 export interface PresetSpec {
   id: PresetId
   dialect: Dialect
   defaultPort: number
-  driverClass?: string
-  /** URL template with {{host}} {{port}} {{database}} placeholders. */
-  urlTemplate?: string
-  jar?: JarRef
   /** Shown in the connection form under the database field. */
   databaseHint: string
   /** File-based engines (SQLite) do not use host or port. */
   hostOptional?: boolean
-  needsJava: boolean
-}
-
-export interface DriverConfig {
-  id: string
-  name: string
-  dialect: SqlDialect
-  driverClass: string
-  urlTemplate: string
-  jars: JarRef[]
-  createdAt: string
-}
-
-export interface CustomDriverStatus {
-  id: string
-  name: string
-  dialect: SqlDialect
-  driverClass: string
-  urlTemplate: string
-  jars: JarStatus[]
-  allJarsPresent: boolean
-}
-
-export interface DriverStatus {
-  id: string
-  name: string
-  preset: PresetId | null
-  dialect: Dialect
-  driverClass?: string
-  urlTemplate?: string
-  jars: JarStatus[]
-  needsJava: boolean
-  allJarsPresent: boolean
 }
 
 export interface DbSettings {
@@ -102,9 +28,6 @@ export interface DbSettings {
   maxRows: number
   queryTimeoutSec: number
   connectTimeoutSec: number
-  /** Explicit java executable; empty = JAVA_HOME / PATH discovery. */
-  javaPath: string
-  mavenMirror: 'central' | 'aliyun'
   /** Agent tools may run INSERT/UPDATE/DELETE/DDL on non-read-only connections. */
   allowAgentWrites: boolean
   redisScanCount: number
@@ -160,8 +83,7 @@ export interface TlsConfig {
 export interface ConnectionConfig {
   id: string
   name: string
-  driver: DriverChoice
-  customDriverId?: string
+  driver: PresetId
   dialect: Dialect
   host: string
   port: number
@@ -173,10 +95,7 @@ export interface ConnectionConfig {
   database: string
   /** Redis logical database index. */
   redisDb: number
-  params: Record<string, string>
   readOnly: boolean
-  /** Use the built-in Node.js engine for this connection instead of the JDBC bridge. */
-  nativeEngine?: boolean
   ssh?: SshConfig
   tls?: TlsConfig
   createdAt: string
@@ -186,8 +105,7 @@ export interface ConnectionConfig {
 export interface ClientConnection {
   id: string
   name: string
-  driver: DriverChoice
-  customDriverId?: string
+  driver: PresetId
   dialect: Dialect
   host: string
   port: number
@@ -195,9 +113,7 @@ export interface ClientConnection {
   hasPassword: boolean
   database: string
   redisDb: number
-  params: Record<string, string>
   readOnly: boolean
-  nativeEngine?: boolean
   ssh?: SshConfig
   tls?: TlsConfig
   hasSshPassword?: boolean
@@ -219,8 +135,7 @@ export interface ClientTrashedConnection extends ClientConnection {
 export interface ConnectionDraft {
   id?: string
   name: string
-  driver: DriverChoice
-  customDriverId?: string
+  driver: PresetId
   host: string
   port: number
   user: string
@@ -228,9 +143,7 @@ export interface ConnectionDraft {
   clearPassword?: boolean
   database: string
   redisDb: number
-  params: Record<string, string>
   readOnly: boolean
-  nativeEngine?: boolean
   ssh?: SshConfig
   tls?: TlsConfig
   sshPassword?: string
@@ -238,11 +151,10 @@ export interface ConnectionDraft {
 }
 
 export interface DbConfigFile {
-  version: 1
+  version: 2
   connections: ConnectionConfig[]
   /** Deleted connections, newest first; purged or restored from the recycle bin. */
   trash: TrashedConnection[]
-  drivers: DriverConfig[]
   settings: DbSettings
 }
 
@@ -250,41 +162,18 @@ export interface ClientConfig {
   connections: ClientConnection[]
   /** Deleted connections shown in the recycle bin, newest first. */
   trash: ClientTrashedConnection[]
-  drivers: DriverConfig[]
   settings: DbSettings
 }
 
-export interface JavaCandidate {
-  path: string
-  version: string
-  major: number
-  source: Exclude<JavaStatus['source'], 'missing'>
-}
-
-export interface JavaStatus {
-  available: boolean
-  path?: string
-  version?: string
-  major?: number
-  source: 'setting' | 'bundled' | 'downloaded' | 'JAVA_HOME' | 'PATH' | 'jdks' | 'missing'
-  message?: string
-  /** Every runtime discovery found, newest major first, for the settings picker. */
-  candidates?: JavaCandidate[]
-}
-
 export interface EnvStatus {
-  java: JavaStatus
   dataDir: string
   configPath: string
-  bridgeJar: string
-  bridgeBuilt: boolean
   pluginVersion: string
   platform: string
 }
 
 export interface ConfigSnapshot {
   config: ClientConfig
-  drivers: DriverStatus[]
   env: EnvStatus
 }
 
@@ -299,7 +188,6 @@ export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiErrorB
 export interface ColumnInfo {
   name: string
   typeName: string
-  jdbcType?: number
   nullable?: boolean
 }
 

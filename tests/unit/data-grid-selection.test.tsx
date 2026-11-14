@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { DataGrid } from '../../src/client/DataGrid'
 
-const columns = [{ name: 'id', typeName: 'INT', jdbcType: 4 }]
+const columns = [{ name: 'id', typeName: 'INT' }]
 const rows = [[1], [2], [3]]
 
 afterEach(() => {

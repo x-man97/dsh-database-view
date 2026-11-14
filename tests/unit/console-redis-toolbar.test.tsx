@@ -37,8 +37,6 @@ const settings = {
   maxRows: 5000,
   queryTimeoutSec: 60,
   connectTimeoutSec: 15,
-  javaPath: '',
-  mavenMirror: '',
   allowAgentWrites: false,
   redisScanCount: 200,
   confirmDestructive: false,

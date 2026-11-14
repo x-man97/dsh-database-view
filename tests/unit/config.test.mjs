@@ -26,8 +26,7 @@ describe('ConfigStore', () => {
     const { config } = store()
     expect(config.snapshot()).toMatchObject({
       connections: [],
-      drivers: [],
-      settings: { maxRows: 200, allowAgentWrites: false, connectTimeoutSec: 10, mavenMirror: 'central' },
+      settings: { maxRows: 200, allowAgentWrites: false, connectTimeoutSec: 10 },
     })
   })
 
@@ -41,7 +40,6 @@ describe('ConfigStore', () => {
       user: 'root',
       password: 's3cret',
       database: 'app',
-      params: {},
       readOnly: false,
     })
     expect(saved.hasPassword).toBe(true)
@@ -61,9 +59,7 @@ describe('ConfigStore', () => {
       user: 'root',
       password: 'dbpass',
       database: 'app',
-      params: {},
       readOnly: false,
-      nativeEngine: true,
       ssh: {
         enabled: true,
         host: 'bastion.example.com',
@@ -75,7 +71,6 @@ describe('ConfigStore', () => {
       },
       sshPassphrase: 'ssh-passphrase-value-42',
     })
-    expect(saved.nativeEngine).toBe(true)
     expect(saved.ssh?.host).toBe('bastion.example.com')
     expect(saved.ssh?.privateKeyPath).toBe('~/.ssh/id_ed25519')
     expect(secrets.has(SecretStore.nameForSshPassphrase(saved.id))).toBe(true)
@@ -83,7 +78,6 @@ describe('ConfigStore', () => {
 
     const reloaded = new ConfigStore(join(dir, 'connections.json'), new SecretStore(join(dir, 'secrets.json')))
     reloaded.load()
-    expect(reloaded.connection(saved.id)?.nativeEngine).toBe(true)
     expect(reloaded.connection(saved.id)?.ssh?.user).toBe('ops')
   })
 
@@ -132,18 +126,14 @@ describe('ConfigStore', () => {
       port: 0,
       user: '',
       database: '/tmp/demo.db',
-      params: {},
       readOnly: false,
-      nativeEngine: true,
     })
-    expect(saved.nativeEngine).toBe(true)
     const reloaded = new ConfigStore(join(dir, 'connections.json'), new SecretStore(join(dir, 'secrets.json')))
     reloaded.load()
     expect(reloaded.connection(saved.id)).toMatchObject({
       driver: 'sqlite',
       host: '',
       database: '/tmp/demo.db',
-      nativeEngine: true,
     })
   })
 
@@ -208,24 +198,13 @@ describe('ConfigStore', () => {
     expect(reloaded.snapshot().settings.consoleAutoComplete).toBe(false)
   })
 
-  it('persists custom drivers and settings to disk', () => {
+  it('persists settings to disk', () => {
     const { config, dir } = store()
-    config.upsertDriver({
-      name: 'H2',
-      dialect: 'generic',
-      driverClass: 'org.h2.Driver',
-      urlTemplate: 'jdbc:h2:tcp://{{host}}:{{port}}/{{database}}',
-      jars: [{ group: 'com.h2database', artifact: 'h2', version: '2.2.224' }],
-    })
     config.updateSettings({ allowAgentWrites: true, maxRows: 50 })
-    expect(config.snapshot().drivers).toHaveLength(1)
-    expect(config.snapshot().settings).toMatchObject({ allowAgentWrites: true, maxRows: 50 })
-
     const secrets = new SecretStore(join(dir, 'secrets.json'))
     const reloaded = new ConfigStore(join(dir, 'connections.json'), secrets)
     reloaded.load()
-    expect(reloaded.snapshot().drivers[0].name).toBe('H2')
-    expect(reloaded.snapshot().settings.allowAgentWrites).toBe(true)
+    expect(reloaded.snapshot().settings).toMatchObject({ allowAgentWrites: true, maxRows: 50 })
   })
 
   it('trashes a connection but keeps its password and persists it', () => {
@@ -294,24 +273,6 @@ describe('ConfigStore', () => {
     expect(config.snapshot().trash).toEqual([])
     expect(secrets.has(first.secretName)).toBe(false)
     expect(secrets.has(second.secretName)).toBe(false)
-  })
-
-  it('still refuses to delete a driver used by a trashed connection', () => {
-    const { config } = store()
-    config.upsertDriver({
-      name: 'H2',
-      dialect: 'generic',
-      driverClass: 'org.h2.Driver',
-      urlTemplate: 'jdbc:h2:tcp://{{host}}:{{port}}/{{database}}',
-      jars: [{ group: 'com.h2database', artifact: 'h2', version: '2.2.224' }],
-    })
-    const driverId = config.snapshot().drivers[0].id
-    const saved = config.saveConnection({
-      name: 'Custom', driver: 'custom', customDriverId: driverId, host: '127.0.0.1', port: 1, user: 'u', database: 'app',
-    })
-    config.trashConnection(saved.id)
-
-    expect(() => config.deleteDriver(driverId)).toThrow(/仍被/)
   })
 
   it('reorders connections and remembers the order after a reload', () => {

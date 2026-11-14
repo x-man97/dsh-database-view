@@ -66,13 +66,10 @@ const config = {
     maxRows: 200,
     queryTimeoutSec: 30,
     connectTimeoutSec: 10,
-    javaPath: '',
-    mavenMirror: '',
     allowAgentWrites: false,
     redisScanCount: 200,
     confirmDestructive: true,
   },
-  drivers: [],
 } as unknown as AppConfig
 
 function result(rows: QueryResult['rows']): QueryResult {

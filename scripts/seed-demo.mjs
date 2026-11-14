@@ -21,7 +21,6 @@ const demos = [
     password: '',
     database: 'app',
     redisDb: 0,
-    params: {},
     readOnly: false,
   },
   {
@@ -33,7 +32,6 @@ const demos = [
     password: '',
     database: 'analytics',
     redisDb: 0,
-    params: {},
     readOnly: true,
   },
   {
@@ -45,7 +43,6 @@ const demos = [
     password: '',
     database: '',
     redisDb: 0,
-    params: {},
     readOnly: false,
   },
   {
@@ -57,32 +54,7 @@ const demos = [
     password: '',
     database: 'ORCL',
     redisDb: 0,
-    params: {},
     readOnly: true,
-  },
-  {
-    name: '达梦生产',
-    driver: 'dameng',
-    host: '10.0.0.30',
-    port: 5236,
-    user: 'SYSDBA',
-    password: '',
-    database: 'DAMENG',
-    redisDb: 0,
-    params: {},
-    readOnly: false,
-  },
-  {
-    name: 'OceanBase 集群',
-    driver: 'oceanbase',
-    host: '10.0.0.20',
-    port: 2881,
-    user: 'root@sys',
-    password: '',
-    database: 'app',
-    redisDb: 0,
-    params: {},
-    readOnly: false,
   },
 ]
 

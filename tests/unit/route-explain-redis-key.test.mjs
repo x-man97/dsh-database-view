@@ -19,7 +19,6 @@ const mysql = {
   hasPassword: true,
   database: 'shop',
   redisDb: 0,
-  params: {},
   readOnly: false,
   createdAt: '2026-01-01T00:00:00.000Z',
 }
@@ -51,7 +50,7 @@ afterEach(async () => {
 function deps() {
   return {
     ctx: {},
-    paths: { dataDir: '/tmp', configFile: '/tmp/config.json', bridgeJar: '/tmp/bridge.jar', version: '0.0.0' },
+    paths: { dataDir: '/tmp', configFile: '/tmp/config.json', version: '0.0.0' },
     config: {
       settings: () => ({}),
       snapshot: () => ({}),
@@ -59,7 +58,6 @@ function deps() {
     },
     secrets: {},
     drivers: { statuses: () => [] },
-    java: { locate: () => ({}), bridgeReady: () => false },
     sql: {
       explain: async (...args) => {
         if (args[0] === 'r1') throw new DbError('unsupported', '该连接不是 SQL 连接')

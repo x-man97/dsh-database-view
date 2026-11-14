@@ -24,7 +24,6 @@ const existing = {
   hasPassword: true,
   database: 'shop',
   redisDb: 0,
-  params: {},
   readOnly: false,
   createdAt: '2026-01-01T00:00:00.000Z',
 }

@@ -17,7 +17,7 @@ function sha256(data: Buffer): string {
 
 /**
  * Downloads and loads the self-contained ESM driver packs described by
- * drivers.json. The JDBC bridge is not involved; the loaded module is handed to
+ * drivers.json. The loaded module is handed to
  * an Engine.
  */
 export class DriverManager {

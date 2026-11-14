@@ -10,8 +10,6 @@ const settings = {
   maxRows: 200,
   queryTimeoutSec: 30,
   connectTimeoutSec: 10,
-  javaPath: '',
-  mavenMirror: 'central',
   allowAgentWrites: false,
   redisScanCount: 200,
   confirmDestructive: false,
@@ -19,11 +17,8 @@ const settings = {
 }
 
 const env = {
-  java: { available: true, source: 'PATH', version: '21.0.5', major: 21, candidates: [] },
   dataDir: 'C:/data',
   configPath: 'C:/data/config.json',
-  bridgeJar: 'C:/data/bridge.jar',
-  bridgeBuilt: true,
   pluginVersion: '0.1.0',
   platform: 'win32',
 }

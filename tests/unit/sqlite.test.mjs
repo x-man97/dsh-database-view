@@ -10,9 +10,6 @@ describe('SQLite preset', () => {
     expect(preset.dialect).toBe('sqlite')
     expect(preset.defaultPort).toBe(0)
     expect(preset.hostOptional).toBe(true)
-    expect(preset.driverClass).toBe('org.sqlite.JDBC')
-    expect(preset.urlTemplate).toBe('jdbc:sqlite:{{database}}')
-    expect(preset.jar).toEqual({ group: 'org.xerial', artifact: 'sqlite-jdbc', version: '3.46.1.3' })
     expect(preset.databaseHint).toContain('数据库文件路径')
   })
 

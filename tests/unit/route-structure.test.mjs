@@ -21,11 +21,10 @@ afterEach(async () => {
 function structureDeps(structuresJson) {
   return {
     ctx: {},
-    paths: { dataDir: '/tmp', configFile: '/tmp/config.json', bridgeJar: '/tmp/bridge.jar', version: '0.0.0' },
+    paths: { dataDir: '/tmp', configFile: '/tmp/config.json', version: '0.0.0' },
     config: { settings: () => ({}), snapshot: () => ({}) },
     secrets: {},
     drivers: { statuses: () => [] },
-    java: { locate: () => ({}), bridgeReady: () => false },
     sql: {},
     redis: {},
     structure: { snapshotJson: () => structuresJson },

@@ -35,7 +35,6 @@ const redis = {
   hasPassword: false,
   database: '',
   redisDb: 0,
-  params: {},
   readOnly: false,
   createdAt: '2026-10-23T00:00:00.000Z',
 }
@@ -44,8 +43,6 @@ const settings = {
   maxRows: 5000,
   queryTimeoutSec: 60,
   connectTimeoutSec: 15,
-  javaPath: '',
-  mavenMirror: '',
   allowAgentWrites: false,
   redisScanCount: 200,
   confirmDestructive: false,

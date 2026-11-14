@@ -36,7 +36,6 @@ const connection = {
   hasPassword: false,
   database: 'shop',
   redisDb: 0,
-  params: {},
   readOnly: false,
   createdAt: '2026-01-01T00:00:00.000Z',
 }
@@ -45,8 +44,6 @@ const settings = {
   maxRows: 200,
   queryTimeoutSec: 30,
   connectTimeoutSec: 10,
-  javaPath: '',
-  mavenMirror: 'central',
   allowAgentWrites: false,
   redisScanCount: 200,
   confirmDestructive: false,
@@ -58,7 +55,6 @@ describe('offline object definitions', () => {
     vi.clearAllMocks()
     mocks.status.mockResolvedValue({
       config: { connections: [connection], settings, drivers: [] },
-      drivers: [],
       env: {},
       prefetch: [],
     })

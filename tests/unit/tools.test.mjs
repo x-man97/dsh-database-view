@@ -13,7 +13,6 @@ function connection(overrides = {}) {
     user: 'root',
     database: 'app',
     redisDb: 0,
-    params: {},
     readOnly: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     hasPassword: true,
@@ -28,8 +27,6 @@ function harness(initial = {}) {
     maxRows: 200,
     queryTimeoutSec: 30,
     connectTimeoutSec: 10,
-    javaPath: '',
-    mavenMirror: 'central',
     allowAgentWrites: false,
     redisScanCount: 200,
     confirmDestructive: true,
@@ -49,10 +46,10 @@ function harness(initial = {}) {
   const trashConnection = vi.fn(() => ({ ...sqlConnection, deletedAt: '2026-10-30T12:00:00.000Z' }))
   const purgeConnection = vi.fn(() => sqlConnection)
   const config = {
-    snapshot: () => ({ connections: [sqlConnection, redisConnection], trash: [], settings, drivers: [] }),
+    snapshot: () => ({ connections: [sqlConnection, redisConnection], trash: [], settings }),
     settings: () => settings,
     connection: (reference) => [sqlConnection, redisConnection].find((entry) => entry.id === reference || entry.name === reference),
-    get: () => ({ connections: [sqlConnection, redisConnection], trash: [], settings, drivers: [] }),
+    get: () => ({ connections: [sqlConnection, redisConnection], trash: [], settings }),
     saveConnection,
     deleteConnection,
     trashConnection,
@@ -61,7 +58,6 @@ function harness(initial = {}) {
   const structure = { clear: vi.fn(), putSchemas: vi.fn(), get: vi.fn(() => undefined) }
   const deps = {
     config,
-    drivers: { statuses: () => [{ id: 'mysql', allJarsPresent: true, jars: [] }] },
     sql: {
       isConnected: () => true,
       query,
@@ -106,7 +102,6 @@ describe('createDatabaseTools', () => {
       'db_create_connection',
       'db_delete_connection',
       'db_describe_table',
-      'db_download_driver',
       'db_execute_sql',
       'db_explain',
       'db_get_ddl',
@@ -127,13 +122,11 @@ describe('createDatabaseTools', () => {
     }
   })
 
-  it('lists connections with driver status by default', async () => {
+  it('lists connections without driver payloads', async () => {
     const { byName } = harness()
     const value = await byName('db_list_connections').execute({})
     expect(value.connections.map((entry) => entry.id)).toEqual(['c1', 'r1'])
-    expect(value.drivers[0].id).toBe('mysql')
-    const withoutDrivers = await byName('db_list_connections').execute({ includeDrivers: false })
-    expect(withoutDrivers.drivers).toBeUndefined()
+    expect(value.drivers).toBeUndefined()
   })
 
   it('runs read-only SQL with agent writes disabled', async () => {
@@ -269,13 +262,6 @@ describe('createDatabaseTools', () => {
     expect(blocks).toHaveLength(1)
     expect(blocks[0].type).toBe('text')
     expect(JSON.parse(blocks[0].text).connections).toHaveLength(2)
-  })
-
-  it('masks credential-like connection params', async () => {
-    const { byName } = harness({ connection: { params: { password: 'p@ss', sslMode: 'require', apiToken: 't' } } })
-    const value = await byName('db_list_connections').execute({})
-    const masked = value.connections.find((entry) => entry.id === 'c1')
-    expect(masked.params).toEqual({ password: '***', sslMode: 'require', apiToken: '***' })
   })
 
   it('lets the preset supply host and port', async () => {

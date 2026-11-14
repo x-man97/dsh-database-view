@@ -172,7 +172,7 @@ export function functionCompletions(dialect: ClientConnection['dialect']): Compl
 ```
 
 - 关键字按语境分组：语句开头（SELECT/INSERT/UPDATE/DELETE/WITH/EXPLAIN…）、关系后（WHERE/JOIN/ON/GROUP/ORDER/HAVING/LIMIT…）、表达式内（AND/OR/NOT/CASE/WHEN…）等；`relation` 语境只给少量可接关键字（如 `WHERE` 不出现在 FROM 后）。
-- 方言函数：mysql / oracle / oceanbase-oracle / dameng / postgres / sqlserver / sqlite 各自补充（P0 先覆盖 mysql、oracle、dameng、postgres，其余回退通用集）。函数名大写、`insert` 带左括号。
+- 方言函数：mysql / oracle / postgres / sqlserver / sqlite 各自补充（P0 覆盖 mysql、oracle、postgres，其余回退通用集）。函数名大写、`insert` 带左括号。
 
 ### 3.5 候选与排序（`providers.ts` / `rank.ts`）
 

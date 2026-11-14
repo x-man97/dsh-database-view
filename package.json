@@ -1,7 +1,7 @@
 {
   "name": "dsh-database-view",
   "version": "0.1.0",
-  "description": "DeepSeek Harness database table preview plugin: Java-free, SSH tunnel, on-demand drivers.",
+  "description": "DeepSeek Harness database table preview plugin: native Node.js drivers, SSH tunnels, no Java/JDBC.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/x-man97/dsh-database-view.git"
@@ -20,9 +20,6 @@
   },
   "files": [
     "lib",
-    "bridge/dsh-db-bridge.jar",
-    "bridge/src",
-    "jre",
     "assets",
     "cordis.patch.yml",
     "dsh.plugin.json",
@@ -82,13 +79,11 @@
   },
   "scripts": {
     "build": "npm run build:drivers && npm run build:host && npm run build:client",
-    "build:bridge": "node scripts/build-bridge.mjs",
     "build:host": "tsc -p tsconfig.host.json",
     "build:client": "node scripts/build-client.mjs",
     "typecheck": "tsc -p tsconfig.host.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "test": "vitest run",
     "pretest": "npm run build:host",
-    "test:integration": "node scripts/integration-http.mjs",
     "test:completion": "vitest run tests/unit/completion- tests/unit/complete-smart.test.mjs tests/unit/console-complete",
     "qa:ui": "node scripts/qa-ui.mjs",
     "changelog": "node scripts/build-changelog.mjs",
@@ -101,7 +96,6 @@
     "deepseek-harness",
     "plugin",
     "database",
-    "jdbc",
     "redis"
   ],
   "license": "MIT"

@@ -37,7 +37,6 @@ beforeEach(() => {
           hasPassword: false,
           database: '',
           redisDb: 0,
-          params: {},
           readOnly: false,
           createdAt: '2026-01-01T00:00:00.000Z',
         },
@@ -46,15 +45,11 @@ beforeEach(() => {
         maxRows: 500,
         queryTimeoutSec: 60,
         connectTimeoutSec: 15,
-        javaPath: '',
-        mavenMirror: '',
         allowAgentWrites: false,
         redisScanCount: 200,
         confirmDestructive: false,
       },
-      drivers: [],
     },
-    drivers: [],
     env: {},
   })
   mocks.schemas.mockResolvedValue({ schemas: [] })

@@ -38,8 +38,6 @@ const settings = {
   maxRows: 5000,
   queryTimeoutSec: 60,
   connectTimeoutSec: 15,
-  javaPath: '',
-  mavenMirror: '',
   allowAgentWrites: false,
   redisScanCount: 200,
   confirmDestructive: false,
@@ -60,12 +58,10 @@ beforeEach(() => {
         hasPassword: false,
         database: '',
         redisDb: 0,
-        params: {},
         readOnly: true,
         createdAt: '2026-10-23T00:00:00.000Z',
       },
       ], settings, drivers: [] },
-    drivers: [],
     env: {},
   })
   mocks.redisDatabases.mockResolvedValue({ databases: 16 })

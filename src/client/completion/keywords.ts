@@ -259,8 +259,6 @@ function dialectWordGroup(dialect: ClientConnection['dialect']): DialectWordGrou
     case 'mysql':
       return MYSQL_KEYWORDS
     case 'oracle':
-    case 'oceanbase-oracle':
-    case 'dameng':
       return ORACLE_KEYWORDS
     case 'postgres':
       return POSTGRES_KEYWORDS
@@ -922,7 +920,7 @@ function contextWords(context: CompletionExpectation): readonly string[] {
  */
 export function keywordCompletions(
   context: CompletionExpectation = 'any',
-  dialect: ClientConnection['dialect'] = 'generic',
+  dialect: ClientConnection['dialect'] = 'mysql',
 ): Completion[] {
   const words = [...contextWords(context)]
   const group = dialectWordGroup(dialect)
@@ -1035,8 +1033,6 @@ function dialectFunctions(dialect: ClientConnection['dialect']): readonly string
     case 'mysql':
       return [...COMMON_FUNCTIONS, ...MYSQL_FUNCTIONS]
     case 'oracle':
-    case 'oceanbase-oracle':
-    case 'dameng':
       return [...COMMON_FUNCTIONS, ...ORACLE_FUNCTIONS]
     case 'postgres':
       return [...COMMON_FUNCTIONS, ...POSTGRES_FUNCTIONS]
@@ -1050,7 +1046,7 @@ function dialectFunctions(dialect: ClientConnection['dialect']): readonly string
  * parenthesis so picking `COUNT` leaves the caret inside the call.
  */
 export function functionCompletions(
-  dialect: ClientConnection['dialect'] = 'generic',
+  dialect: ClientConnection['dialect'] = 'mysql',
 ): Completion[] {
   const seen = new Set<string>()
   const items: Completion[] = []

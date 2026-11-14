@@ -8,7 +8,7 @@ import {
   type ReactElement,
 } from 'react'
 import { ROUTE_PREFIX } from '../shared/presets'
-import type { ClientConnection, ClientTrashedConnection, DbSettings, DriverStatus } from '../shared/types'
+import type { ClientConnection, ClientTrashedConnection, DbSettings } from '../shared/types'
 import { api } from './api'
 import { downloadText } from './export'
 import { useDataSources } from './hooks/useDataSources'
@@ -26,7 +26,6 @@ import type { ToolbarActionId } from '../shared/toolbaractions'
 import { copyText } from './colmenu'
 import { MoreIcon } from './icons'
 import { ConnectionModal } from './modals/ConnectionModal'
-import { DriverModal } from './modals/DriverModal'
 import { SettingsModal } from './modals/SettingsModal'
 import { TrashModal, type TrashBusy } from './modals/TrashModal'
 import { DataView } from './views/DataView'
@@ -90,8 +89,6 @@ export function App(props: AppProps): ReactElement {
 
   const [toast, setToast] = useState<ToastState | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
-  const [downloading, setDownloading] = useState('')
-  const [downloadingJava, setDownloadingJava] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [trashOpen, setTrashOpen] = useState(false)
   const [trashBusy, setTrashBusy] = useState<TrashBusy | null>(null)
@@ -100,10 +97,6 @@ export function App(props: AppProps): ReactElement {
   const [confirm, setConfirm] = useState<{ request: ConfirmRequest; resolve: (ok: boolean) => void } | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [connModal, setConnModal] = useState<{ open: boolean; editing: ClientConnection | null }>({
-    open: false,
-    editing: null,
-  })
-  const [driverModal, setDriverModal] = useState<{ open: boolean; editing: DriverStatus | null }>({
     open: false,
     editing: null,
   })
@@ -180,10 +173,7 @@ export function App(props: AppProps): ReactElement {
     toggleAllSchemasVisible,
     toggleRedisDbVisible,
     toggleAllRedisDbsVisible,
-    updateDrivers,
     applySettings,
-    setupError,
-    dismissSetupError,
   } = useDataSources(notify)
 
   // 快捷键处理函数在下面的各个组件里，绑定统一在这里发布一次，
@@ -287,45 +277,6 @@ export function App(props: AppProps): ReactElement {
       notify(`保存设置失败：${errorText(error)}`, 'error')
     } finally {
       setSavingSettings(false)
-    }
-  }
-
-  async function downloadDriver(driverId: string): Promise<void> {
-    setDownloading(driverId)
-    try {
-      const status = await api.downloadDriver(driverId)
-      updateDrivers((snapshot?.drivers ?? []).map((driver) => (driver.id === status.id ? status : driver)))
-      notify('驱动依赖已就绪', 'success')
-    } catch (error) {
-      notify(`下载失败：${errorText(error)}`, 'error')
-    } finally {
-      setDownloading('')
-    }
-  }
-
-  async function downloadJava(): Promise<void> {
-    setDownloadingJava(true)
-    try {
-      const env = await api.downloadJava()
-      if (snapshot != null) applySettings(snapshot.settings, env)
-      if (env.java.available) notify('Java 运行环境已就绪', 'success')
-      else notify('Java 已下载，但没有检测到可执行文件', 'error')
-    } catch (error) {
-      notify(`下载 Java 失败：${errorText(error)}`, 'error')
-    } finally {
-      setDownloadingJava(false)
-    }
-  }
-
-  async function deleteCustomDriver(driver: DriverStatus): Promise<void> {
-    const ok = await askConfirm(`删除自定义驱动「${driver.name}」？使用它的连接将无法连接。`)
-    if (!ok) return
-    try {
-      const result = await api.deleteCustomDriver(driver.id)
-      updateDrivers(result.drivers)
-      notify('自定义驱动已删除', 'success')
-    } catch (error) {
-      notify(`删除失败：${errorText(error)}`, 'error')
     }
   }
 
@@ -636,43 +587,6 @@ export function App(props: AppProps): ReactElement {
 
         {snapshot ? (
           <div className="dshdb-view" style={{ padding: '8px 10px 12px', minHeight: 0 }}>
-            {setupError ? (
-              <Banner
-                tone="error"
-                onClose={dismissSetupError}
-                actions={
-                  <Button size="sm" variant="primary" onClick={() => setSettingsOpen(true)}>
-                    去设置
-                  </Button>
-                }
-              >
-                {setupError.message}
-              </Banner>
-            ) : null}
-            {setupError === null && !snapshot.env.java.available && snapshot.drivers.some((driver) => driver.needsJava) ? (
-              <Banner
-                tone="warn"
-                actions={
-                  <Button size="sm" onClick={() => setSettingsOpen(true)}>
-                    去设置
-                  </Button>
-                }
-              >
-                未检测到 Java，关系型数据库暂时无法连接。可在「运行环境」里下载 Java 或填写已有的 java 路径。
-              </Banner>
-            ) : null}
-            {setupError === null && !snapshot.env.bridgeBuilt ? (
-              <Banner
-                tone="warn"
-                actions={
-                  <Button size="sm" onClick={() => setSettingsOpen(true)}>
-                    去设置
-                  </Button>
-                }
-              >
-                JDBC 桥接器缺失，SQL 连接将不可用。可在插件目录运行 npm run build:bridge。
-              </Banner>
-            ) : null}
             <DataView
               connections={connections}
               selectedId={selectedId}
@@ -785,26 +699,7 @@ export function App(props: AppProps): ReactElement {
         ) : null}
         {snapshot ? (
           <span title={snapshot.env.configPath}>
-            {snapshot.connections.length > 0 && snapshot.connections.every((connection) => connection.nativeEngine === true) ? (
-              <>内置引擎（无需 Java）</>
-            ) : (
-              <>
-                JDBC Java{' '}
-                {snapshot.env.java.available ? (
-                  snapshot.env.java.version ?? '可用'
-                ) : (
-                  <button
-                    type="button"
-                    className="dshdb-link"
-                    title="打开设置 → 运行环境"
-                    onClick={() => setSettingsOpen(true)}
-                  >
-                    未找到 · 去设置
-                  </button>
-                )}
-              </>
-            )}{' '}
-            · v{snapshot.env.pluginVersion}
+            内置引擎 · v{snapshot.env.pluginVersion}
           </span>
         ) : null}
       </footer>
@@ -822,36 +717,18 @@ export function App(props: AppProps): ReactElement {
       <ConnectionModal
         open={connModal.open}
         editing={connModal.editing}
-        drivers={snapshot?.drivers ?? []}
         onClose={() => setConnModal({ open: false, editing: null })}
         onSaved={() => void refresh()}
         onDelete={(connection) => void deleteConnection(connection)}
-        notify={notify}
-      />
-      <DriverModal
-        open={driverModal.open}
-        editing={driverModal.editing}
-        onClose={() => setDriverModal({ open: false, editing: null })}
-        onSaved={updateDrivers}
         notify={notify}
       />
       {snapshot ? (
         <SettingsModal
           open={settingsOpen}
           settings={snapshot.settings}
-          env={snapshot.env}
-          drivers={snapshot.drivers}
           saving={savingSettings}
-          downloading={downloading}
-          downloadingJava={downloadingJava}
           onClose={() => setSettingsOpen(false)}
           onSave={(next) => void saveSettings(next)}
-          onRefresh={() => void refresh()}
-          onDownload={(driverId) => void downloadDriver(driverId)}
-          onDownloadJava={() => void downloadJava()}
-          onAddCustomDriver={() => setDriverModal({ open: true, editing: null })}
-          onEditCustomDriver={(driver) => setDriverModal({ open: true, editing: driver })}
-          onDeleteCustomDriver={(driver) => void deleteCustomDriver(driver)}
         />
       ) : null}
       <Modal

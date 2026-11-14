@@ -70,7 +70,7 @@ async function runSql(id: string, sql: string, maxRows: number): Promise<QueryRe
   try {
     return await api.query({ id, sql, maxRows })
   } catch (error) {
-    // A tab opened from a cold app has no bridge connection yet; open it once.
+    // A tab opened from a cold app has no live connection yet; open it once.
     if (error instanceof ApiError && error.code === 'not-connected') {
       await api.connect(id)
       return await api.query({ id, sql, maxRows })

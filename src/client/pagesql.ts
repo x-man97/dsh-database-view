@@ -92,7 +92,7 @@ export function wrapPage(
 ): string {
   const text = statement.trim().replace(/;+\s*$/u, '')
   const offset = page * size
-  if (dialect === 'oracle' || dialect === 'oceanbase-oracle' || dialect === 'dameng') {
+  if (dialect === 'oracle' || false) {
     return `SELECT * FROM (
 ${text}
 ) dshdb_page OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY`

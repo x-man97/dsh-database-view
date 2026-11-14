@@ -5,9 +5,7 @@ import type {
   ApiResult,
   ClientConnection,
   ConnectionDraft,
-  DriverStatus,
   EnvStatus,
-  JavaStatus,
   QueryResult,
   RedisCommandResult,
   RedisDatabasesResult,
@@ -25,11 +23,8 @@ import type {
   TableDescription,
 } from '../shared/types.js'
 import type { ConfigStore } from './config.js'
-import type { DriverManager } from './drivers.js'
 import type { DriverManager as NativeDriverManager } from './drivers/manager.js'
 import { DbError, toWireError } from './errors.js'
-import type { JavaLocator } from './java.js'
-import type { JreManager } from './jre.js'
 import type { PluginPaths } from './paths.js'
 import type { DescriptionPrefetcher } from './prefetch.js'
 import type { RedisManager } from './redis.js'
@@ -46,10 +41,7 @@ export interface RouteDeps {
   paths: PluginPaths
   config: ConfigStore
   secrets: SecretStore
-  drivers: DriverManager
   nativeDrivers?: NativeDriverManager
-  java: JavaLocator
-  jre: JreManager
   sql: SqlService
   redis: RedisManager
   structure: StructureStore
@@ -208,14 +200,9 @@ function errorText(error: unknown): string {
 }
 
 function envStatus(deps: RouteDeps): EnvStatus {
-  const settings = deps.config.settings()
-  const java: JavaStatus = deps.java.locate(settings.javaPath)
   return {
-    java,
     dataDir: deps.paths.dataDir,
     configPath: deps.paths.configFile,
-    bridgeJar: deps.paths.bridgeJar,
-    bridgeBuilt: deps.java.bridgeReady(deps.paths.bridgeJar),
     pluginVersion: deps.paths.version,
     platform: `${process.platform}-${process.arch}`,
   }
@@ -230,7 +217,6 @@ async function handle(deps: RouteDeps, request: IncomingMessage, response: Serve
         ok: true,
         data: {
           config: deps.config.snapshot(),
-          drivers: deps.drivers.statuses(),
           driverPacks: deps.nativeDrivers?.list() ?? [],
           env: envStatus(deps),
           prefetch: deps.prefetch?.progress() ?? [],
@@ -257,15 +243,12 @@ async function handle(deps: RouteDeps, request: IncomingMessage, response: Serve
           data.clearPassword === true
         const targetChanged =
           previous.driver !== saved.driver ||
-          previous.customDriverId !== saved.customDriverId ||
           previous.host !== saved.host ||
           previous.port !== saved.port ||
           previous.user !== saved.user ||
           previous.database !== saved.database ||
           previous.redisDb !== saved.redisDb ||
           previous.readOnly !== saved.readOnly ||
-          previous.nativeEngine !== saved.nativeEngine ||
-          JSON.stringify(previous.params) !== JSON.stringify(saved.params) ||
           JSON.stringify(previous.ssh) !== JSON.stringify(saved.ssh) ||
           JSON.stringify(previous.tls) !== JSON.stringify(saved.tls)
         if (credentialsChanged || targetChanged) {
@@ -355,7 +338,7 @@ async function handle(deps: RouteDeps, request: IncomingMessage, response: Serve
       return
     }
     // Completion resolves several schemas/tables per keystroke. Everything here
-    // comes from the structure cache, so the popup costs no bridge round-trip.
+    // comes from the structure cache, so the popup costs no extra round-trip.
     case '/completion/metadata': {
       const id = typeof data.id === 'string' ? data.id : ''
       const connection = sqlConnection(deps, id)
@@ -587,63 +570,17 @@ async function handle(deps: RouteDeps, request: IncomingMessage, response: Serve
       sendJson(response, 200, { ok: true, data: result })
       return
     }
-    case '/java/download': {
-      await deps.jre.install()
-      // A freshly unpacked runtime has to win over the cached "missing" result.
-      deps.java.invalidate()
-      sendJson(response, 200, { ok: true, data: envStatus(deps) })
-      return
-    }
-    case '/drivers/packs/list': {
-      sendJson(response, 200, { ok: true, data: { drivers: deps.nativeDrivers?.list() ?? [] } })
-      return
-    }
-    case '/drivers/packs/download': {
-      const driverId = typeof data.driverId === 'string' ? data.driverId : ''
-      if (driverId === '') throw new DbError('invalid', '缺少 driverId')
-      if (deps.nativeDrivers === undefined) throw new DbError('unsupported', '未启用内置驱动管理')
-      const status = await deps.nativeDrivers.download(driverId)
-      sendJson(response, 200, { ok: true, data: status })
-      return
-    }
-    case '/drivers/download': {
-      const driverId = typeof data.driverId === 'string' ? data.driverId : ''
-      if (driverId === '') throw new DbError('invalid', '缺少 driverId')
-      const status = await ensureDriver(deps, driverId)
-      sendJson(response, 200, { ok: true, data: status })
-      return
-    }
-    case '/drivers/custom/save': {
-      const driver = deps.config.upsertDriver(data.driver)
-      sendJson(response, 200, { ok: true, data: { driver, drivers: deps.drivers.statuses() } })
-      return
-    }
-    case '/drivers/custom/delete': {
-      const id = typeof data.id === 'string' ? data.id : ''
-      deps.config.deleteDriver(id)
-      sendJson(response, 200, { ok: true, data: { drivers: deps.drivers.statuses() } })
-      return
-    }
     case '/settings/update': {
-      const before = deps.config.settings().javaPath
       const settings = deps.config.updateSettings(data.settings)
-      if (settings.javaPath !== before) deps.java.invalidate()
       sendJson(response, 200, { ok: true, data: { settings, env: envStatus(deps) } })
       return
     }
     case '/health': {
-      const java = deps.java.locate(deps.config.settings().javaPath)
-      let bridgePing: unknown = null
-      if (java.available && deps.java.bridgeReady(deps.paths.bridgeJar)) {
-        bridgePing = await deps.sql.ping().catch((error: unknown) => ({ error: toWireError(error).body }))
-      }
       sendJson(response, 200, {
         ok: true,
         data: {
           plugin: PLUGIN_NAME,
           version: deps.paths.version,
-          java,
-          bridgePing,
           connected: deps.sql.connectedIds(),
         },
       })
@@ -652,19 +589,6 @@ async function handle(deps: RouteDeps, request: IncomingMessage, response: Serve
     default:
       throw new DbError('not-found', `未知的接口：${path}`)
   }
-}
-
-async function ensureDriver(deps: RouteDeps, driverId: string): Promise<DriverStatus> {
-  const presets = deps.drivers.statuses().filter((status) => status.preset !== null)
-  const status = deps.drivers.statuses().find((entry) => entry.id === driverId)
-  if (status === undefined) throw new DbError('not-found', `驱动不存在：${driverId}`)
-  if (!status.needsJava) return status
-  const resolved =
-    status.preset !== null && presets.some((entry) => entry.id === status.id)
-      ? deps.drivers.resolvePreset(status.preset)
-      : deps.drivers.resolveCustom(status.id)
-  await deps.drivers.ensureJars(resolved)
-  return deps.drivers.statuses().find((entry) => entry.id === driverId) ?? status
 }
 
 export function createRouteHandler(deps: RouteDeps) {

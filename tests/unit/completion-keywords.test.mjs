@@ -117,7 +117,7 @@ describe('keywordCompletions', () => {
   })
 
   it('adds the Oracle-only words on Oracle-family connections', () => {
-    for (const dialect of ['oracle', 'oceanbase-oracle', 'dameng']) {
+    for (const dialect of ['oracle']) {
       const words = names(keywordCompletions('any', dialect))
       expect(words, dialect).toContain('CONNECT')
       expect(words, dialect).toContain('PIVOT')
@@ -129,13 +129,6 @@ describe('keywordCompletions', () => {
     const words = names(keywordCompletions('any', 'postgres'))
     expect(words).toContain('CONFLICT')
     expect(words).toContain('WITHIN')
-  })
-
-  it('does not leak dialect words into the generic popup', () => {
-    const words = names(keywordCompletions('any', 'generic'))
-    for (const word of ['STRAIGHT_JOIN', 'CONNECT', 'PIVOT', 'CONFLICT', 'WITHIN']) {
-      expect(words, word).not.toContain(word)
-    }
   })
 
   it('only offers dialect words in clauses that can use them', () => {
@@ -151,7 +144,7 @@ describe('keywordCompletions', () => {
   })
 
   it('never returns functions from the keyword provider', () => {
-    for (const dialect of ['generic', 'mysql', 'oracle', 'postgres']) {
+    for (const dialect of ['mysql', 'oracle', 'postgres']) {
       for (const item of keywordCompletions('column', dialect)) {
         expect(item.kind).toBe('keyword')
       }
@@ -169,9 +162,8 @@ describe('functionCompletions', () => {
   const dialectFunctions = {
     mysql: 'DATE_ADD',
     oracle: 'LISTAGG',
-    dameng: 'LISTAGG',
     postgres: 'TO_JSONB',
-    generic: 'COUNT',
+    sqlite: 'COUNT',
   }
 
   it('offers the dialect-specific functions', () => {
@@ -183,12 +175,12 @@ describe('functionCompletions', () => {
 
   it('only offers MySQL-only functions on MySQL', () => {
     expect(names(functionCompletions('oracle'))).not.toContain('DATE_ADD')
-    expect(names(functionCompletions('generic'))).not.toContain('DATE_ADD')
+    expect(names(functionCompletions('sqlite'))).not.toContain('DATE_ADD')
     expect(names(functionCompletions('mysql'))).not.toContain('LISTAGG')
   })
 
   it('returns unique upper-case names whose insert opens the call', () => {
-    for (const dialect of ['generic', 'mysql', 'oracle', 'dameng', 'postgres']) {
+    for (const dialect of ['mysql', 'oracle', 'sqlite', 'postgres', 'mssql']) {
       const items = functionCompletions(dialect)
       const seen = new Set()
       for (const item of items) {

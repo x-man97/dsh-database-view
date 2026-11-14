@@ -18,7 +18,6 @@ const redis = {
   hasPassword: false,
   database: '',
   redisDb: 3,
-  params: {},
   readOnly: false,
   createdAt: '2026-01-01T00:00:00.000Z',
 }
@@ -39,7 +38,7 @@ afterEach(async () => {
 function deps() {
   return {
     ctx: {},
-    paths: { dataDir: '/tmp', configFile: '/tmp/config.json', bridgeJar: '/tmp/bridge.jar', version: '0.0.0' },
+    paths: { dataDir: '/tmp', configFile: '/tmp/config.json', version: '0.0.0' },
     config: {
       settings: () => ({ redisScanCount: 321 }),
       snapshot: () => ({}),
@@ -47,7 +46,6 @@ function deps() {
     },
     secrets: {},
     drivers: { statuses: () => [] },
-    java: { locate: () => ({}), bridgeReady: () => false },
     sql: {},
     redis: {
       scan: async (...args) => {

@@ -17,7 +17,6 @@ const redis = {
   hasPassword: false,
   database: '',
   redisDb: 0,
-  params: {},
   readOnly: false,
   createdAt: '2026-10-23T00:00:00.000Z',
 } as ClientConnection

@@ -13,13 +13,10 @@ export type DbErrorCode =
   | 'read-only'
   | 'timeout'
   | 'cancelled'
-  | 'java-missing'
   | 'driver-missing'
-  | 'jar-missing'
   | 'download-failed'
   | 'connect-failed'
   | 'query-failed'
-  | 'bridge'
   | 'redis'
   | 'busy'
 
@@ -32,13 +29,10 @@ const STATUS: Record<DbErrorCode, number> = {
   'read-only': 403,
   timeout: 408,
   cancelled: 408,
-  'java-missing': 503,
   'driver-missing': 422,
-  'jar-missing': 409,
   'download-failed': 502,
   'connect-failed': 422,
   'query-failed': 422,
-  bridge: 502,
   redis: 422,
   busy: 409,
 }
