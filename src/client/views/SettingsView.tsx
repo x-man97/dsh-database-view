@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import type { DbSettings } from '../../shared/types'
 import {
   SHORTCUTS,
@@ -102,10 +102,38 @@ export interface SettingsViewProps {
 export function SettingsView(props: SettingsViewProps): ReactElement {
   const t = useI18n()
   const [draft, setDraft] = useState<DbSettings>(props.settings)
+  const saved = useRef(JSON.stringify(props.settings))
+  const pending = useRef<DbSettings | null>(null)
+  const saveRef = useRef(props.onSave)
+  saveRef.current = props.onSave
 
   useEffect(() => {
+    const serialized = JSON.stringify(props.settings)
+    if (serialized === saved.current) return
+    saved.current = serialized
     setDraft(props.settings)
   }, [props.settings])
+
+  // Auto-save: text fields wait for a short pause, switches/order changes save after the same debounce.
+  useEffect(() => {
+    const serialized = JSON.stringify(draft)
+    if (serialized === saved.current) {
+      pending.current = null
+      return
+    }
+    pending.current = draft
+    const timer = window.setTimeout(() => {
+      saved.current = serialized
+      pending.current = null
+      saveRef.current(draft)
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [draft])
+
+  // Closing the settings page before the debounce fires must not discard the last edit.
+  useEffect(() => () => {
+    if (pending.current !== null) saveRef.current(pending.current)
+  }, [])
 
   const update = <K extends keyof DbSettings>(key: K, value: DbSettings[K]) => {
     setDraft((previous) => ({ ...previous, [key]: value }))
@@ -142,11 +170,7 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
 
   return (
     <div className="dshdb-scroll dshdb-scroll-thin" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div className="dshdb-inline" style={{ justifyContent: 'flex-end', padding: '2px 0' }}>
-        <Button size="sm" variant="primary" loading={props.saving} onClick={() => props.onSave(draft)}>
-          {t('settings.save')}
-        </Button>
-      </div>
+      {props.saving ? <div className="dshdb-muted" style={{ padding: '2px 0' }}>{t('settings.saving')}</div> : null}
       <Panel
         title={t('settings.querySecurity')}
         collapsible

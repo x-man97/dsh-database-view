@@ -67,13 +67,12 @@ describe('settings console auto complete', () => {
     expect(toggle.getAttribute('aria-checked')).toBe('true')
   })
 
-  it('saves the switch turned off', () => {
+  it('saves the switch turned off', async () => {
     const onSave = setup()
     const panel = openPanel()
     fireEvent.click(within(panel).getByRole('switch', { name: switchName }))
     expect(within(panel).getByRole('switch', { name: switchName }).getAttribute('aria-checked')).toBe('false')
-    fireEvent.click(screen.getByRole('button', { name: '保存' }))
-    expect(onSave).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
     expect(onSave.mock.calls[0]?.[0]).toMatchObject({ consoleAutoComplete: false })
   })
 

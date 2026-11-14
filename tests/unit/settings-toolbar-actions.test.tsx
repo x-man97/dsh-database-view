@@ -70,7 +70,7 @@ describe('settings data-source toolbar order', () => {
     }
   })
 
-  it('moves an action down and saves the new order', () => {
+  it('moves an action down and saves the new order', async () => {
     const onSave = setup()
     const panel = openPanel()
     fireEvent.click(within(panel).getByLabelText('下移 新增'))
@@ -78,18 +78,18 @@ describe('settings data-source toolbar order', () => {
       (row) => row.textContent,
     )
     expect(order.slice(0, 2)).toEqual(['编辑', '新增'])
-    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await vi.waitFor(() => expect(onSave).toHaveBeenCalled())
     const draft = onSave.mock.calls[0]?.[0] as { toolbarActions?: string[] }
     expect(draft.toolbarActions?.slice(0, 2)).toEqual(['edit', 'add'])
     expect(draft.toolbarActions).toHaveLength(7)
   })
 
-  it('resets the saved order to the default', () => {
+  it('resets the saved order to the default', async () => {
     const onSave = setup()
     const panel = openPanel()
     fireEvent.click(within(panel).getByLabelText('下移 新增'))
     fireEvent.click(within(panel).getByRole('button', { name: '恢复默认' }))
-    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await vi.waitFor(() => expect(onSave).toHaveBeenCalled())
     const draft = onSave.mock.calls[0]?.[0] as { toolbarActions?: string[] }
     expect(draft.toolbarActions).toEqual([])
   })

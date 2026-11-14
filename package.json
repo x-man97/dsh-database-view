@@ -1,6 +1,6 @@
 {
   "name": "dsh-database-view",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Database View for DeepSeek Harness: native Node.js drivers, SSH/TLS, inline table editing, no Java/JDBC.",
   "repository": {
     "type": "git",
