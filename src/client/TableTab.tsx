@@ -13,7 +13,7 @@ import { ApiError, api } from './api'
 import { DataGrid, type CellMenuTarget } from './DataGrid'
 import { MenuGroupList, type MenuGroupSpec } from './menugroups'
 import { formatCell, formatCount, formatMs } from './format'
-import { CopyIcon, DownloadIcon, EyeUpIcon, FilterIcon, MinusIcon, PlayIcon, PlusIcon, RefreshIcon, TableIcon, TerminalIcon, UploadIcon } from './icons'
+import { ArrowUpIcon, CopyIcon, DownloadIcon, EyeUpIcon, FilterIcon, MinusIcon, PlayIcon, PlusIcon, RefreshIcon, TableIcon, TerminalIcon } from './icons'
 import { downloadText, exportFilename, renderExport, toCsv, toJson, toMarkdown, toTsv, type ExportFormat } from './export'
 import { openConsoleTab, readTableTabParams, type TableTabParams } from './tab-open'
 import { columnValues, commaValues, copyText, type ColumnMenuItem } from './colmenu'
@@ -605,7 +605,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     (cell: CellMenuTarget): ColumnMenuItem[] => [
             ...(canMutate
               ? [{
-                  label: '编辑单元格',
+                  label: '编辑',
                   disabled: pendingDeletes.has(cell.rowIndex),
                   run: () => startCellEdit(cell.rowIndex, cell.column),
                 }]
@@ -1093,7 +1093,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           onClick={() => void submitDml()}
           disabled={pendingCount === 0 || rowSaving}
         >
-          <UploadIcon size={13} />
+          <ArrowUpIcon size={13} />
         </button>
         {pendingCount > 0 ? <Tag tone="business">待提交 {pendingCount}</Tag> : null}
         <span className="dshdb-qbar-spacer" />
