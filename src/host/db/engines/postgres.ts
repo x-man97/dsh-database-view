@@ -13,6 +13,7 @@ import type {
   TableDescription,
 } from '../../../shared/types.js'
 import { DbError, errorMessage } from '../../errors.js'
+import { loadTls } from '../../tls.js'
 import type { DatabaseEngine, EngineConnectContext, EngineDescriptor, EngineQueryOptions } from '../types.js'
 
 const TYPE_NAMES: Record<number, string> = {
@@ -75,6 +76,16 @@ export class PostgresEngine implements DatabaseEngine {
     for (const oid of [20, 1082, 1083, 1114, 1184, 1700]) {
       pg.types.setTypeParser(oid, (value: string) => value)
     }
+    const tls = loadTls(ctx.connection.tls)
+    const ssl = tls === undefined
+      ? undefined
+      : {
+          rejectUnauthorized: tls.rejectUnauthorized,
+          ...(tls.ca === undefined ? {} : { ca: tls.ca }),
+          ...(tls.cert === undefined ? {} : { cert: tls.cert }),
+          ...(tls.key === undefined ? {} : { key: tls.key }),
+          ...(tls.verifyIdentity ? {} : { checkServerIdentity: () => undefined }),
+        }
     const client = new pg.Client({
       host: ctx.endpoint.host,
       port: ctx.endpoint.port,
@@ -84,6 +95,7 @@ export class PostgresEngine implements DatabaseEngine {
       application_name: 'dsh-database-view',
       connectionTimeoutMillis: ctx.settings.connectTimeoutSec * 1000,
       statement_timeout: ctx.settings.queryTimeoutSec * 1000,
+      ...(ssl === undefined ? {} : { ssl }),
     })
     try {
       await client.connect()

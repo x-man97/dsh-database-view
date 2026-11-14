@@ -118,7 +118,7 @@ export function apply(ctx: ClientContext): void {
             id: TAB_KIND,
             order: 38,
             title: () => TAB_TITLE,
-            description: () => '浏览和查询 MySQL、Oracle、达梦、OceanBase 与 Redis 数据源',
+            description: () => '浏览和查询 MySQL、PostgreSQL、SQLite、SQL Server、Oracle 与 Redis 数据源',
             icon: GuideIcon,
           },
         ],

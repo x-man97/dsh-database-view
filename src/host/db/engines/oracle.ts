@@ -59,7 +59,7 @@ export class OracleEngine implements DatabaseEngine {
     dialect: 'oracle',
     defaultPort: 1521,
     driverId: 'oracledb-thin',
-    capabilities: { schemas: true, ddl: 'server', explain: true, transaction: true, cancel: true, tls: 'optional', ssh: true },
+    capabilities: { schemas: true, ddl: 'server', explain: true, transaction: true, cancel: true, tls: 'none', ssh: true },
   }
 
   private connection: OracleConnection | undefined

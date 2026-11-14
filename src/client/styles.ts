@@ -291,6 +291,12 @@ export const CSS = `
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
 }
+/* The right sidebar is narrow. The cache age is already in the row tooltip;
+   hide it on data-source rows so the name, engine tag and connect action fit. */
+.dshdb-row[data-kind="datasource"] .dshdb-row-meta { display: none; }
+@container (max-width: 430px) {
+  .dshdb-row[data-kind="datasource"] .dshdb-tag { display: none; }
+}
 .dshdb-row-icon { display: inline-flex; align-items: center; flex: none; color: var(--dsw-alias-label-tertiary); }
 
 /* Dragging a data source above or below another one reorders the saved list.

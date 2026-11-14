@@ -7,7 +7,7 @@
 > Java-free、内置 SSH 隧道、驱动随包内置的 DSH 数据库插件。
 > 目前可用：包名/插件 ID 改名、原生 MySQL/PostgreSQL/SQLite/SQL Server/Oracle Engine、SSH 传输、
 > 内置驱动 pack、连接 UI，以及通过现有右侧栏完成 Schema/表/DDL/查询。
-> MySQL、PostgreSQL、SQLite、SQL Server、Oracle 均已完成真实联调。硬化、TLS UX 和完整视觉验收仍在后面。
+> MySQL、PostgreSQL、SQLite、SQL Server、Oracle 均已完成真实联调；MySQL/PostgreSQL/SQL Server 已提供 TLS 配置，Oracle TLS 和进一步硬化仍在后面。
 
 `dsh-database-view` 是一个计划中的 DeepSeek Harness（DSH）插件：在右侧栏浏览数据库结构、预览表数据，
 风格接近 JetBrains Database 工具窗；同时提供只读的 Agent 工具，用于列出连接、描述表、执行有上限的

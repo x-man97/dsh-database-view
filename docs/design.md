@@ -69,7 +69,7 @@ Fork 现有插件
 
 > 本轮支持 5 个 Engine：MySQL（含 MariaDB）、PostgreSQL、SQLite、SQL Server、Oracle。达梦/OceanBase/JDBC/第三方只保留 Engine SPI、目录结构、文档和扩展点，不写对应 Engine 实现。
 >
-> **实现状态（2026-11-14）**：MySQL、PostgreSQL、SQLite、SQL Server、Oracle 均已在 DSH + Docker 中真实联调；M3/M4 的体验/硬化仍在进行。
+> **实现状态（2026-11-14）**：MySQL、PostgreSQL、SQLite、SQL Server、Oracle 均已在 DSH + Docker 中真实联调；MySQL/PostgreSQL/SQL Server 的 TLS 配置已接入，Oracle TLS 尚未实现；M3/M4 的体验/硬化仍在进行。
 >
 > 工作量：本轮约 **10–14 人周**（含 SPI、DriverManager、SSH、SQL Server/Oracle 元数据与测试）；若没有现成的 Driver Pack 构建流程，按 **11–15 人周** 估算。后续达梦/OceanBase/JDBC 约再加 4–6 人周。
 

@@ -13,6 +13,7 @@ import type {
   TableDescription,
 } from '../../../shared/types.js'
 import { DbError, errorMessage } from '../../errors.js'
+import { loadTls } from '../../tls.js'
 import type { DatabaseEngine, EngineConnectContext, EngineDescriptor, EngineQueryOptions } from '../types.js'
 
 function quoteIdent(name: string): string {
@@ -49,6 +50,8 @@ export class MssqlEngine implements DatabaseEngine {
 
   async connect(ctx: EngineConnectContext): Promise<ServerInfo> {
     const tedious = await ctx.drivers.load<typeof import('tedious')>('tedious')
+    const tlsConfig = ctx.connection.tls
+    const tls = loadTls(tlsConfig)
     this.tedious = tedious
     const connection = new tedious.Connection({
       server: ctx.endpoint.host,
@@ -56,9 +59,18 @@ export class MssqlEngine implements DatabaseEngine {
       options: {
         port: ctx.endpoint.port,
         ...(ctx.connection.database.trim() === '' ? {} : { database: ctx.connection.database }),
-        encrypt: true,
-        trustServerCertificate: true,
-        serverName: ctx.endpoint.host,
+        encrypt: tlsConfig !== undefined && tlsConfig.mode !== 'disable',
+        trustServerCertificate: tlsConfig?.allowInvalidHostname === true || tlsConfig?.mode === 'require',
+        serverName: tlsConfig?.servername ?? ctx.connection.host,
+        ...(tls === undefined
+          ? {}
+          : {
+              cryptoCredentialsDetails: {
+                ...(tls.ca === undefined ? {} : { ca: tls.ca }),
+                ...(tls.cert === undefined ? {} : { cert: tls.cert }),
+                ...(tls.key === undefined ? {} : { key: tls.key }),
+              },
+            }),
         connectTimeout: ctx.settings.connectTimeoutSec * 1000,
         requestTimeout: ctx.settings.queryTimeoutSec * 1000,
         rowCollectionOnRequestCompletion: true,

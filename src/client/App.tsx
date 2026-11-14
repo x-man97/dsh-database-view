@@ -785,18 +785,24 @@ export function App(props: AppProps): ReactElement {
         ) : null}
         {snapshot ? (
           <span title={snapshot.env.configPath}>
-            Java{' '}
-            {snapshot.env.java.available ? (
-              snapshot.env.java.version ?? '可用'
+            {snapshot.connections.length > 0 && snapshot.connections.every((connection) => connection.nativeEngine === true) ? (
+              <>内置引擎（无需 Java）</>
             ) : (
-              <button
-                type="button"
-                className="dshdb-link"
-                title="打开设置 → 运行环境"
-                onClick={() => setSettingsOpen(true)}
-              >
-                未找到 · 去设置
-              </button>
+              <>
+                JDBC Java{' '}
+                {snapshot.env.java.available ? (
+                  snapshot.env.java.version ?? '可用'
+                ) : (
+                  <button
+                    type="button"
+                    className="dshdb-link"
+                    title="打开设置 → 运行环境"
+                    onClick={() => setSettingsOpen(true)}
+                  >
+                    未找到 · 去设置
+                  </button>
+                )}
+              </>
             )}{' '}
             · v{snapshot.env.pluginVersion}
           </span>

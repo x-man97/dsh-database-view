@@ -68,6 +68,10 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
   const [sshPassword, setSshPassword] = useState('')
   const [sshKeyPath, setSshKeyPath] = useState('')
   const [sshPassphrase, setSshPassphrase] = useState('')
+  const [tlsEnabled, setTlsEnabled] = useState(false)
+  const [tlsMode, setTlsMode] = useState<'verify-full' | 'verify-ca' | 'require'>('verify-full')
+  const [tlsCaPath, setTlsCaPath] = useState('')
+  const [tlsAllowInvalid, setTlsAllowInvalid] = useState(false)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null)
@@ -101,6 +105,10 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
       setSshKeyPath(editing.ssh?.privateKeyPath ?? '')
       setSshPassword('')
       setSshPassphrase('')
+      setTlsEnabled(editing.tls !== undefined && editing.tls.mode !== 'disable')
+      setTlsMode(editing.tls?.mode === 'verify-ca' || editing.tls?.mode === 'require' ? editing.tls.mode : 'verify-full')
+      setTlsCaPath(editing.tls?.caPath ?? '')
+      setTlsAllowInvalid(editing.tls?.allowInvalidHostname === true)
       setPassword('')
       setClearPassword(false)
       return
@@ -123,6 +131,10 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     setSshKeyPath('')
     setSshPassword('')
     setSshPassphrase('')
+    setTlsEnabled(false)
+    setTlsMode('verify-full')
+    setTlsCaPath('')
+    setTlsAllowInvalid(false)
     setPassword('')
     setClearPassword(false)
   }, [props.open, editing])
@@ -139,6 +151,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
   const isRedis = dialect === 'redis'
   const supportsNative = !isCustom && NATIVE_DRIVERS.has(choice)
   const useNative = supportsNative && nativeEngine
+  const supportsTls = useNative && !fileBased && ['mysql', 'mariadb', 'postgres', 'mssql'].includes(choice)
 
   const driverOptions = [
     ...PRESET_ORDER.map((id) => ({
@@ -195,6 +208,15 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
       : {}),
     ...(useNative && sshEnabled && !fileBased && sshPassword !== '' ? { sshPassword } : {}),
     ...(useNative && sshEnabled && !fileBased && sshPassphrase !== '' ? { sshPassphrase } : {}),
+    ...(supportsTls && tlsEnabled
+      ? {
+          tls: {
+            mode: tlsMode,
+            ...(tlsCaPath.trim() === '' ? {} : { caPath: tlsCaPath.trim() }),
+            ...(tlsAllowInvalid ? { allowInvalidHostname: true } : {}),
+          },
+        }
+      : {}),
   })
 
   const validate = (draft: ConnectionDraft): string => {
@@ -423,6 +445,32 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
                   </Field>
                 </>
               ) : null}
+            </>
+          ) : null}
+          {supportsTls ? (
+            <div className="dshdb-span-2 dshdb-list">
+              <Switch checked={tlsEnabled} onChange={setTlsEnabled} label="启用 TLS / SSL" />
+            </div>
+          ) : null}
+          {supportsTls && tlsEnabled ? (
+            <>
+              <Field label="TLS 校验模式">
+                <Select
+                  value={tlsMode}
+                  options={[
+                    { value: 'verify-full', label: 'verify-full（校验证书与主机名）' },
+                    { value: 'verify-ca', label: 'verify-ca（校验证书，不校验主机名）' },
+                    { value: 'require', label: 'require（只加密，不校验证书）' },
+                  ]}
+                  onValueChange={(value) => setTlsMode(value as 'verify-full' | 'verify-ca' | 'require')}
+                />
+              </Field>
+              <Field label="CA 证书路径" hint="留空使用系统 CA">
+                <TextInput value={tlsCaPath} onChange={(event) => setTlsCaPath(event.target.value)} placeholder="~/.dsh/certs/ca.pem" />
+              </Field>
+              <div className="dshdb-span-2 dshdb-list">
+                <Switch checked={tlsAllowInvalid} onChange={setTlsAllowInvalid} label="允许无效主机名（仅测试环境，不安全）" />
+              </div>
             </>
           ) : null}
           {!isRedis && !useNative ? (

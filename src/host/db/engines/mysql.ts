@@ -13,6 +13,7 @@ import type {
   TableDescription,
 } from '../../../shared/types.js'
 import { DbError, errorMessage } from '../../errors.js'
+import { loadTls } from '../../tls.js'
 import type {
   DatabaseEngine,
   EngineConnectContext,
@@ -98,6 +99,7 @@ export class MysqlEngine implements DatabaseEngine {
 
   async connect(ctx: EngineConnectContext): Promise<ServerInfo> {
     const mysql = await ctx.drivers.load<typeof import('mysql2/promise')>('mysql2')
+    const tls = loadTls(ctx.connection.tls)
     this.context = ctx
     try {
       this.connection = await mysql.createConnection({
@@ -112,6 +114,17 @@ export class MysqlEngine implements DatabaseEngine {
         bigNumberStrings: true,
         multipleStatements: false,
         connectTimeout: ctx.settings.connectTimeoutSec * 1000,
+        ...(tls === undefined
+          ? {}
+          : {
+              ssl: {
+                rejectUnauthorized: tls.rejectUnauthorized,
+                verifyIdentity: tls.verifyIdentity,
+                ...(tls.ca === undefined ? {} : { ca: tls.ca }),
+                ...(tls.cert === undefined ? {} : { cert: tls.cert }),
+                ...(tls.key === undefined ? {} : { key: tls.key }),
+              },
+            }),
       })
       if (ctx.connection.readOnly) {
         await this.connection.query('SET SESSION TRANSACTION READ ONLY').catch(() => undefined)

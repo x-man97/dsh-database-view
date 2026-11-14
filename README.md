@@ -8,7 +8,7 @@
 > Working now: package rename, native MySQL/PostgreSQL/SQLite/SQL Server/Oracle engines, SSH transport,
 > bundled driver packs, connection UI, and schema/table/DDL/query over the existing right sidebar.
 > MySQL, PostgreSQL, SQLite, SQL Server, and Oracle have all been live-tested over the native path.
-> Hardening, TLS UX, and full visual QA remain.
+> TLS configuration is available for MySQL/PostgreSQL/SQL Server; Oracle TLS and deeper hardening remain.
 
 `dsh-database-view` is a planned DeepSeek Harness (DSH) plugin for browsing database schemas and previewing
 table data in the right sidebar, in the spirit of the JetBrains Database tool window. It will also expose

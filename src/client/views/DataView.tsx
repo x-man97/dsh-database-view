@@ -834,7 +834,7 @@ export function DataView(props: DataViewProps): ReactElement {
         <EmptyState
           icon={<DatabaseIcon size={28} />}
           title="还没有数据源"
-          description="用工具栏的「新增」按钮添加 MySQL、Oracle、达梦、OceanBase 或 Redis 连接。连接一次之后，即使离线也能浏览缓存的库表结构。"
+          description="用工具栏的「新增」按钮添加 MySQL、PostgreSQL、SQLite、SQL Server、Oracle 或 Redis 连接。其他 JDBC 数据源仍可添加。连接一次之后，即使离线也能浏览缓存的库表结构。"
           actions={
             <Button variant="primary" icon={<PlusIcon size={13} />} onClick={props.onAddConnection}>
               新建连接
