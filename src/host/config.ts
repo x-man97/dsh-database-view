@@ -356,14 +356,23 @@ export class ConfigStore {
 
     const id = existing?.id ?? randId('conn')
     const secretName = existing?.secretName ?? Store.nameForConnection(id)
+    const copyFrom = existing === undefined && draft.copyFromId !== undefined ? this.connection(draft.copyFromId) : undefined
     if (typeof draft.password === 'string' && draft.password !== '') this.secrets.set(secretName, draft.password)
-    else if (draft.clearPassword === true) this.secrets.delete(secretName)
+    else if (copyFrom?.secretName !== undefined) {
+      const copied = this.secrets.resolve(copyFrom.secretName)?.value
+      if (copied !== undefined) this.secrets.set(secretName, copied)
+    }
+    if (draft.clearPassword === true) this.secrets.delete(secretName)
 
     if (ssh !== undefined) {
       const sshPasswordName = Store.nameForSshPassword(id)
       const sshPassphraseName = Store.nameForSshPassphrase(id)
+      const copiedSshPassword = this.secrets.resolve(Store.nameForSshPassword(copyFrom?.id ?? ' '))?.value
+      const copiedSshPassphrase = this.secrets.resolve(Store.nameForSshPassphrase(copyFrom?.id ?? ' '))?.value
       if (typeof draft.sshPassword === 'string' && draft.sshPassword !== '') this.secrets.set(sshPasswordName, draft.sshPassword)
+      else if (copiedSshPassword !== undefined) this.secrets.set(sshPasswordName, copiedSshPassword)
       if (typeof draft.sshPassphrase === 'string' && draft.sshPassphrase !== '') this.secrets.set(sshPassphraseName, draft.sshPassphrase)
+      else if (copiedSshPassphrase !== undefined) this.secrets.set(sshPassphraseName, copiedSshPassphrase)
     }
 
     const connection: ConnectionConfig = {

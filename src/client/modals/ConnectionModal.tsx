@@ -11,6 +11,8 @@ import { Banner, Button, Field, Loading, Modal, Select, Switch, TextInput } from
 export interface ConnectionModalProps {
   open: boolean
   editing: ClientConnection | null
+  /** Prefills a new-connection form from this saved connection. */
+  seed?: ClientConnection | null
   onClose: () => void
   onSaved: () => void
   onDelete: (connection: ClientConnection) => void
@@ -55,6 +57,8 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
   const [error, setError] = useState('')
 
   const editing = props.editing
+  const seed = editing === null ? props.seed ?? null : null
+  const source = editing ?? seed
 
   useEffect(() => {
     setError('')
@@ -62,27 +66,27 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     setSaving(false)
     setTesting(false)
     if (!props.open) return
-    if (editing) {
-      setChoice(editing.driver)
-      setName(editing.name)
-      setHost(editing.host)
-      setPort(String(editing.port))
-      setUser(editing.user)
-      setDatabase(editing.database)
-      setRedisDb(String(editing.redisDb))
-      setReadOnly(editing.readOnly)
-      setSshEnabled(editing.ssh !== undefined)
-      setSshHost(editing.ssh?.host ?? '')
-      setSshPort(String(editing.ssh?.port ?? 22))
-      setSshUser(editing.ssh?.user ?? '')
-      setSshAuth(editing.ssh?.auth ?? 'password')
-      setSshKeyPath(editing.ssh?.privateKeyPath ?? '')
+    if (source) {
+      setChoice(source.driver)
+      setName(editing ? source.name : t('app.copyName', { name: source.name }))
+      setHost(source.host)
+      setPort(String(source.port))
+      setUser(source.user)
+      setDatabase(source.database)
+      setRedisDb(String(source.redisDb))
+      setReadOnly(source.readOnly)
+      setSshEnabled(source.ssh !== undefined)
+      setSshHost(source.ssh?.host ?? '')
+      setSshPort(String(source.ssh?.port ?? 22))
+      setSshUser(source.ssh?.user ?? '')
+      setSshAuth(source.ssh?.auth ?? 'password')
+      setSshKeyPath(source.ssh?.privateKeyPath ?? '')
       setSshPassword('')
       setSshPassphrase('')
-      setTlsEnabled(editing.tls !== undefined && editing.tls.mode !== 'disable')
-      setTlsMode(editing.tls?.mode === 'verify-ca' || editing.tls?.mode === 'require' ? editing.tls.mode : 'verify-full')
-      setTlsCaPath(editing.tls?.caPath ?? '')
-      setTlsAllowInvalid(editing.tls?.allowInvalidHostname === true)
+      setTlsEnabled(source.tls !== undefined && source.tls.mode !== 'disable')
+      setTlsMode(source.tls?.mode === 'verify-ca' || source.tls?.mode === 'require' ? source.tls.mode : 'verify-full')
+      setTlsCaPath(source.tls?.caPath ?? '')
+      setTlsAllowInvalid(source.tls?.allowInvalidHostname === true)
       setPassword('')
       setClearPassword(false)
       return
@@ -109,7 +113,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     setTlsAllowInvalid(false)
     setPassword('')
     setClearPassword(false)
-  }, [props.open, editing])
+  }, [props.open, editing, seed, t])
 
   if (!props.open) return null
 
@@ -141,6 +145,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
 
   const buildDraft = (): ConnectionDraft => ({
     id: editing?.id,
+    ...(editing === null && seed !== null ? { copyFromId: seed.id } : {}),
     name: name.trim(),
     driver: choice,
     // File based engines keep no host; do not persist whatever the previous preset left behind.
@@ -188,7 +193,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
       if (!Number.isInteger(draft.ssh.port) || draft.ssh.port < 1 || draft.ssh.port > 65535) return 'SSH 端口需在 1-65535 之间'
       if (draft.ssh.user === '') return '请填写 SSH 用户名'
       if (draft.ssh.auth === 'key' && (draft.ssh.privateKeyPath === undefined || draft.ssh.privateKeyPath === '')) return '请填写 SSH 私钥路径'
-      if (draft.ssh.auth === 'password' && sshPassword === '' && !editing?.hasSshPassword) return '请填写 SSH 密码'
+      if (draft.ssh.auth === 'password' && sshPassword === '' && !editing?.hasSshPassword && !seed?.hasSshPassword) return '请填写 SSH 密码'
     }
     return ''
   }
@@ -243,7 +248,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
       title={
         <span className="dshdb-inline">
           <DatabaseIcon size={14} />
-          {editing ? `${t('conn.editTitle')} · ${editing.name}` : t('conn.newTitle')}
+          {editing ? `${t('conn.editTitle')} · ${editing.name}` : seed ? `${t('conn.copyTitle')} · ${seed.name}` : t('conn.newTitle')}
         </span>
       }
       onClose={props.onClose}

@@ -134,6 +134,8 @@ export interface ClientTrashedConnection extends ClientConnection {
 
 export interface ConnectionDraft {
   id?: string
+  /** New connections may copy the saved credentials of this connection. */
+  copyFromId?: string
   name: string
   driver: PresetId
   host: string

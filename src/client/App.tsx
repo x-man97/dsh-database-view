@@ -90,16 +90,16 @@ export function App(props: AppProps): ReactElement {
 
   const [toast, setToast] = useState<ToastState | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [duplicating, setDuplicating] = useState(false)
   const [trashOpen, setTrashOpen] = useState(false)
   const [trashBusy, setTrashBusy] = useState<TrashBusy | null>(null)
   const [emptyingTrash, setEmptyingTrash] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [confirm, setConfirm] = useState<{ request: ConfirmRequest; resolve: (ok: boolean) => void } | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [connModal, setConnModal] = useState<{ open: boolean; editing: ClientConnection | null }>({
+  const [connModal, setConnModal] = useState<{ open: boolean; editing: ClientConnection | null; seed: ClientConnection | null }>({
     open: false,
     editing: null,
+    seed: null,
   })
   const [ddlModal, setDdlModal] = useState<{
     open: boolean
@@ -272,26 +272,13 @@ export function App(props: AppProps): ReactElement {
     setDeleting(true)
     try {
       await api.deleteConnection(connection.id)
-      setConnModal({ open: false, editing: null })
+      setConnModal({ open: false, editing: null, seed: null })
       notify('连接已移入回收站', 'success')
       await refresh()
     } catch (error) {
       notify(`删除失败：${errorText(error)}`, 'error')
     } finally {
       setDeleting(false)
-    }
-  }
-
-  async function duplicateConnection(connection: ClientConnection): Promise<void> {
-    setDuplicating(true)
-    try {
-      await api.duplicateConnection(connection.id, t('app.copyName', { name: connection.name }))
-      notify(t('notify.duplicated'), 'success')
-      await refresh()
-    } catch (error) {
-      notify(t('notify.duplicateFailed', { error: errorText(error) }), 'error')
-    } finally {
-      setDuplicating(false)
     }
   }
 
@@ -349,7 +336,7 @@ export function App(props: AppProps): ReactElement {
       id: 'add',
       label: t('app.add'),
       title: t('app.addTitle'),
-      onClick: () => setConnModal({ open: true, editing: null }),
+      onClick: () => setConnModal({ open: true, editing: null, seed: null }),
     },
     {
       id: 'edit',
@@ -357,16 +344,16 @@ export function App(props: AppProps): ReactElement {
       title: t('app.editTitle'),
       disabled: !selected || deleting,
       onClick: () => {
-        if (selected) setConnModal({ open: true, editing: selected })
+        if (selected) setConnModal({ open: true, editing: selected, seed: null })
       },
     },
     {
       id: 'duplicate',
       label: t('app.copy'),
       title: t('app.copyTitle'),
-      disabled: !selected || duplicating,
+      disabled: !selected,
       onClick: () => {
-        if (selected) void duplicateConnection(selected)
+        if (selected) setConnModal({ open: true, editing: null, seed: selected })
       },
     },
     {
@@ -425,7 +412,7 @@ export function App(props: AppProps): ReactElement {
   // The tree hands these callbacks to memoized object rows, so they must keep
   // one identity across renders. `useDataSources` already stabilizes the hook
   // side; these wrappers only adapt its promise-returning API for the view.
-  const openAddConnection = useCallback((): void => setConnModal({ open: true, editing: null }), [])
+  const openAddConnection = useCallback((): void => setConnModal({ open: true, editing: null, seed: null }), [])
   const connectTree = useCallback((id: string): void => void connect(id), [connect])
   const refreshTree = useCallback((): void => void refreshSelected(), [refreshSelected])
   const toggleTreeSchema = useCallback(
@@ -719,7 +706,8 @@ export function App(props: AppProps): ReactElement {
       <ConnectionModal
         open={connModal.open}
         editing={connModal.editing}
-        onClose={() => setConnModal({ open: false, editing: null })}
+        seed={connModal.seed}
+        onClose={() => setConnModal({ open: false, editing: null, seed: null })}
         onSaved={() => void refresh()}
         onDelete={(connection) => void deleteConnection(connection)}
         notify={notify}

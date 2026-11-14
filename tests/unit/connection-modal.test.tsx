@@ -28,11 +28,12 @@ const existing = {
   createdAt: '2026-01-01T00:00:00.000Z',
 }
 
-function renderModal(editing: typeof existing | null = existing): void {
+function renderModal(editing: typeof existing | null = existing, seed: typeof existing | null = null): void {
   render(
     <ConnectionModal
       open
       editing={editing}
+      seed={seed}
       drivers={[]}
       onClose={() => undefined}
       onSaved={() => undefined}
@@ -87,6 +88,20 @@ describe('connection modal editing', () => {
     const draft = mocks.testConnection.mock.calls[0][0]
     expect(draft.id).toBe(existing.id)
     expect(draft.password).toBeUndefined()
+  })
+
+  it('opens a prefilled new-connection form when duplicating', async () => {
+    renderModal(null, existing)
+    const name = screen.getByLabelText(/^名称/) as HTMLInputElement
+    expect(name.value).toBe('演示 MySQL 副本')
+    expect((screen.getByLabelText(/^主机/) as HTMLInputElement).value).toBe(existing.host)
+
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(mocks.saveConnection).toHaveBeenCalledTimes(1))
+    const draft = mocks.saveConnection.mock.calls[0][0]
+    expect(draft.id).toBeUndefined()
+    expect(draft.copyFromId).toBe(existing.id)
+    expect(draft.name).toBe('演示 MySQL 副本')
   })
 
   it('sends a newly typed password', async () => {

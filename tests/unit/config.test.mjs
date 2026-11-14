@@ -82,6 +82,18 @@ describe('ConfigStore', () => {
     expect(config.snapshot().connections[0].hasPassword).toBe(true)
   })
 
+  it('copies a saved password when saving a new connection from copyFromId', () => {
+    const { config, secrets } = store()
+    const source = config.saveConnection({
+      name: 'Source', driver: 'mysql', host: '127.0.0.1', port: 3306, user: 'root', password: 'secret', database: 'app',
+    })
+    const copy = config.saveConnection({
+      name: 'Copy', driver: 'mysql', host: '127.0.0.1', port: 3306, user: 'root', database: 'app', copyFromId: source.id,
+    })
+    expect(copy.id).not.toBe(source.id)
+    expect(secrets.resolve(copy.secretName)?.value).toBe('secret')
+  })
+
   it('stores native engine and SSH settings without leaking SSH secrets', () => {
     const { config, secrets, dir } = store()
     const saved = config.saveConnection({
