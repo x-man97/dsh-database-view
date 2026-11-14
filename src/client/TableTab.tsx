@@ -1182,10 +1182,10 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
             writeNumber(AUTO_REFRESH_KEY, next)
           }}
         >
-          <option value={0}>不自动刷新</option>
-          <option value={5000}>每 5 秒刷新</option>
-          <option value={10000}>每 10 秒刷新</option>
-          <option value={30000}>每 30 秒刷新</option>
+          <option value={0}>{t('table.autoRefreshOff')}</option>
+          <option value={5000}>{t('table.autoRefreshEvery', { n: 5 })}</option>
+          <option value={10000}>{t('table.autoRefreshEvery', { n: 10 })}</option>
+          <option value={30000}>{t('table.autoRefreshEvery', { n: 30 })}</option>
         </select>
         <button
           type="button"
@@ -1450,6 +1450,10 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           })}
           deletedRows={pendingDeletes}
           editedCells={(rowIndex, column) => pendingUpdates[rowIndex]?.[column] !== undefined}
+          pendingCellValue={(rowIndex, column, original) => {
+            const changed = pendingUpdates[rowIndex]?.[column]
+            return changed === undefined ? undefined : changed === '' ? null : changed
+          }}
           {...(canMutate ? { onCellDoubleClick: (rowIndex: number, column: ColumnInfo) => startCellEdit(rowIndex, column) } : {})}
         />
       )}

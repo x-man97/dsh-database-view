@@ -72,6 +72,8 @@ function draftConfig(draft: ConnectionDraft, id: string): ConnectionConfig {
 /** Native SQL service: one bundled Node.js engine per SQL preset. */
 export class NativeSqlService {
   private readonly sessions = new Map<string, Session>()
+  /** In-flight opens so two table queries cannot start two SSH sessions. */
+  private readonly opening = new Map<string, Promise<Session>>()
   private readonly engines = new EngineRegistry()
 
   constructor(
@@ -103,7 +105,20 @@ export class NativeSqlService {
   }
 
   private async open(config: ConnectionConfig, password: string, sshPassword?: string, sshPassphrase?: string): Promise<Session> {
-    if (this.sessions.has(config.id)) return this.sessions.get(config.id) as Session
+    const existing = this.sessions.get(config.id)
+    if (existing !== undefined) return existing
+    const pending = this.opening.get(config.id)
+    if (pending !== undefined) return pending
+    const task = this.openSession(config, password, sshPassword, sshPassphrase)
+    this.opening.set(config.id, task)
+    try {
+      return await task
+    } finally {
+      this.opening.delete(config.id)
+    }
+  }
+
+  private async openSession(config: ConnectionConfig, password: string, sshPassword?: string, sshPassphrase?: string): Promise<Session> {
     let transport: SshTransport | undefined
     let endpoint = { host: config.host, port: config.port }
     try {

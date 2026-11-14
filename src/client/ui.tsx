@@ -603,14 +603,14 @@ export function ConfirmDialog({
         <>
           <div className="dshdb-modal-foot-spacer" />
           <Button onClick={onCancel} disabled={busy}>
-            取消
+            {t('confirm.cancel')}
           </Button>
           <Button
             variant={request?.danger ? 'danger' : 'primary'}
             onClick={onConfirm}
             loading={busy}
           >
-            {request?.confirmLabel ?? '确定'}
+            {request?.confirmLabel ?? t('confirm.ok')}
           </Button>
         </>
       }

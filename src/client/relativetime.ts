@@ -4,15 +4,17 @@
  * Floor per unit (never rounds a 23h40m age up to "24 小时前"), so the two
  * surfaces that show an age cannot drift apart again.
  */
+import { t } from './i18n'
+
 export function agoText(seconds: number): string {
-  if (!Number.isFinite(seconds)) return '刚刚'
+  if (!Number.isFinite(seconds)) return t('relative.justNow')
   const whole = Math.max(0, Math.round(seconds))
-  if (whole < 60) return '刚刚'
+  if (whole < 60) return t('relative.justNow')
   const minutes = Math.floor(whole / 60)
-  if (minutes < 60) return `${minutes} 分钟前`
+  if (minutes < 60) return t('relative.minutesAgo', { n: minutes })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} 小时前`
-  return `${Math.floor(hours / 24)} 天前`
+  if (hours < 24) return t('relative.hoursAgo', { n: hours })
+  return t('relative.daysAgo', { n: Math.floor(hours / 24) })
 }
 
 /** Cached-structure age shown under a data source; '' when the stamp is unusable. */

@@ -97,6 +97,8 @@ export interface DataGridProps {
   deletedRows?: ReadonlySet<number>
   /** Existing cells with pending changes; rendered blue until submit. */
   editedCells?: (rowIndex: number, column: string) => boolean
+  /** Pending text for a cell; undefined keeps the loaded value, null shows NULL. */
+  pendingCellValue?: (rowIndex: number, column: string, original: CellValue) => CellValue | undefined
   /** Double-clicking a cell starts in-place editing instead of opening it. */
   onCellDoubleClick?: (rowIndex: number, column: ColumnInfo) => void
 }
@@ -194,6 +196,7 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
     cellEdit,
     deletedRows,
     editedCells,
+    pendingCellValue,
     onCellDoubleClick,
   } = props
   const selectable = onToggleRow !== undefined
@@ -488,7 +491,9 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
                       </td>
                     )
                   }
-                  const value: CellValue = row[columnIndex] ?? null
+                  const loaded: CellValue = row[columnIndex] ?? null
+                  const pending = pendingCellValue?.(rowIndex, column.name, loaded)
+                  const value: CellValue = pending === undefined ? loaded : pending
                   // One format per cell: the same text feeds the tooltip and the body.
                   const text = formatCell(value)
                   const shown = text.length > CELL_TEXT_LIMIT ? `${text.slice(0, CELL_TEXT_LIMIT)}…` : text

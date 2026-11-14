@@ -236,7 +236,7 @@ export function App(props: AppProps): ReactElement {
   const askConfirm = useCallback((message: string, detail?: string): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
       setConfirm({
-        request: { title: '确认操作', message, detail, danger: true, confirmLabel: '继续' },
+        request: { title: t('confirm.title'), message, detail, danger: true, confirmLabel: t('confirm.continue') },
         resolve,
       })
     })
@@ -266,7 +266,7 @@ export function App(props: AppProps): ReactElement {
   }
 
   async function deleteConnection(connection: ClientConnection): Promise<void> {
-    const ok = await askConfirm(`删除连接「${connection.name}」？它会先移到回收站，可随时恢复。`)
+    const ok = await askConfirm(t('confirm.deleteConnection', { name: connection.name }))
     if (!ok) return
     setDeleting(true)
     try {
@@ -295,7 +295,7 @@ export function App(props: AppProps): ReactElement {
   }
 
   async function purgeConnection(item: ClientTrashedConnection): Promise<void> {
-    const ok = await askConfirm(`彻底删除连接「${item.name}」？保存的密码与结构缓存也会删除，且无法恢复。`)
+    const ok = await askConfirm(t('confirm.purgeConnection', { name: item.name }))
     if (!ok) return
     setTrashBusy({ id: item.id, action: 'purge' })
     try {
@@ -310,7 +310,7 @@ export function App(props: AppProps): ReactElement {
   }
 
   async function emptyTrash(): Promise<void> {
-    const ok = await askConfirm(`清空回收站中的 ${String(trash.length)} 个连接？保存的密码与结构缓存也会删除，且无法恢复。`)
+    const ok = await askConfirm(t('confirm.emptyTrash', { n: trash.length }))
     if (!ok) return
     setEmptyingTrash(true)
     try {
