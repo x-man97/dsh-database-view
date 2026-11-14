@@ -1,4 +1,4 @@
-# dsh-ide-database
+# dsh-database-view
 
 > **项目状态（x-man97/dsh-database-view fork）**
 >
@@ -7,6 +7,8 @@
 > - [设计方案（B + 可选 C）](docs/design.md)
 > - [可行性研究报告](docs/feasibility.md)
 > - [POC 验证脚本](poc/README.md)
+>
+> npm 包名已定为 `dsh-database-view`（调研时 registry 返回 404，可用）；代码里的插件 ID、路由前缀、数据目录会在 M0 一并切换，避免现在半改名。
 >
 > 上游原始 README 保留在下方，供参考。
 
