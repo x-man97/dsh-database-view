@@ -1,7 +1,7 @@
 {
   "name": "dsh-database-view",
   "version": "0.1.0",
-  "description": "DeepSeek Harness database table preview plugin: native Node.js drivers, SSH tunnels, no Java/JDBC.",
+  "description": "Database View for DeepSeek Harness: native Node.js drivers, SSH/TLS, inline table editing, no Java/JDBC.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/x-man97/dsh-database-view.git"

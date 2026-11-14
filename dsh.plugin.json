@@ -3,7 +3,7 @@
   "name": "Database View",
   "version": "0.1.0",
   "main": "./lib/index.js",
-  "description": "JetBrains Database-style data source tool window and agent tools for DeepSeek Harness.",
+  "description": "Database View for DeepSeek Harness: native drivers, SSH/TLS, schema browsing, inline table editing and SQL console.",
   "engines": {
     "dsh": ">=0.1.6-alpha.2"
   },

@@ -19,6 +19,16 @@ All SQL engines in this iteration are implemented and live-tested against Docker
 SSH tunneling, TLS configuration for MySQL/PostgreSQL/SQL Server, schema browsing, table preview, DDL,
 query console, and read-only agent tools are available. Oracle TLS is not implemented yet.
 
+## Install
+
+Install from the DSH plugin manager, or run:
+
+```bash
+dsh plugin add dsh-database-view
+```
+
+Then open **Database View** from the right-sidebar guide or DSH Settings.
+
 ## Scope
 
 | Area | Support |
@@ -27,8 +37,8 @@ query console, and read-only agent tools are available. Oracle TLS is not implem
 | Key-value | Redis |
 | Connections | Direct TCP and SSH (password, private key, ssh-agent); TOFU host-key pinning |
 | Browsing | Schemas → tables/views → columns/indexes; cached structure for offline browsing |
-| Table preview | Pagination, filters, sorting, column metadata, DDL, long-text dialog, CSV/JSON export |
-| SQL console | Read-only by default, multi-statement scripts, history, cancel, bounded rows/time |
+| Table preview | Pagination, filters, sorting, inline add/edit/delete with SQL preview, undo, DDL, CSV/JSON export |
+| SQL console | Syntax highlighting, completion, read-only by default, multi-statement scripts, history, cancel |
 | Agent tools | Connections, schemas, tables, DDL, EXPLAIN, bounded SQL, Redis inspection |
 
 There is deliberately **no JDBC bridge, no Java runtime manager, and no custom-driver form**. Adding a

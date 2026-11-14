@@ -19,6 +19,16 @@
 SSH 隧道、MySQL/PostgreSQL/SQL Server 的 TLS 配置、Schema 浏览、表预览、DDL、SQL 控制台和只读
 Agent 工具均可用。Oracle TLS 尚未实现。
 
+## 安装
+
+可在 DSH 插件管理器中安装，或运行：
+
+```bash
+dsh plugin add dsh-database-view
+```
+
+安装后从右侧栏指南或 DSH 设置中打开 **数据库视图**。
+
 ## 范围
 
 | 区域 | 支持 |
@@ -27,8 +37,8 @@ Agent 工具均可用。Oracle TLS 尚未实现。
 | 键值库 | Redis |
 | 连接 | 直连 TCP 和 SSH（密码、私钥、ssh-agent）；TOFU 主机密钥固定 |
 | 浏览 | Schema → 表/视图 → 列/索引；离线可浏览结构缓存 |
-| 表预览 | 分页、过滤、排序、列信息、DDL、长文本弹窗、CSV/JSON 导出 |
-| SQL 控制台 | 默认只读、多语句脚本、历史、取消、行数/时间限制 |
+| 表预览 | 分页、过滤、排序、行内新增/修改/删除、SQL 预览、撤销、DDL、CSV/JSON 导出 |
+| SQL 控制台 | 语法高亮、补全、默认只读、多语句脚本、历史、取消 |
 | Agent 工具 | 连接、Schema、表、DDL、EXPLAIN、有界 SQL、Redis 查看 |
 
 项目**不再包含 JDBC 桥、Java 运行时管理或自定义驱动表单**。新增数据库需要新增原生 Engine 和驱动 pack。

@@ -39,12 +39,12 @@ describe('connection modal for file based engines', () => {
   it('hides the host and credentials for a file based engine', () => {
     renderNew()
 
-    fireEvent.change(screen.getByLabelText(/^驱动/), { target: { value: 'sqlite' } })
+    fireEvent.change(screen.getByLabelText(/^数据库类型/), { target: { value: 'sqlite' } })
 
     expect(screen.queryByLabelText(/^主机/)).toBeNull()
     expect(screen.queryByLabelText(/^端口/)).toBeNull()
     expect(screen.queryByLabelText(/^用户名/)).toBeNull()
-    expect(screen.getByLabelText(/数据库 \/ 服务名/)).toBeTruthy()
+    expect(screen.getByLabelText(/数据库文件|数据库 \/ 服务名/)).toBeTruthy()
   })
 
   it('shows the note from a successful SQLite probe', async () => {
@@ -56,9 +56,9 @@ describe('connection modal for file based engines', () => {
     })
     renderNew()
 
-    fireEvent.change(screen.getByLabelText(/^驱动/), { target: { value: 'sqlite' } })
+    fireEvent.change(screen.getByLabelText(/^数据库类型/), { target: { value: 'sqlite' } })
     fireEvent.change(screen.getByLabelText(/^名称/), { target: { value: '本地库' } })
-    fireEvent.change(screen.getByLabelText(/数据库 \/ 服务名/), { target: { value: './tmp/app.db' } })
+    fireEvent.change(screen.getByLabelText(/数据库文件|数据库 \/ 服务名/), { target: { value: './tmp/app.db' } })
     fireEvent.click(screen.getByRole('button', { name: '测试连接' }))
 
     await waitFor(() => expect(screen.getByText(/文件不存在，连接时会新建一个空数据库/)).toBeTruthy())
@@ -67,14 +67,14 @@ describe('connection modal for file based engines', () => {
   it('requires a database file before saving SQLite', async () => {
     renderNew()
 
-    fireEvent.change(screen.getByLabelText(/^驱动/), { target: { value: 'sqlite' } })
+    fireEvent.change(screen.getByLabelText(/^数据库类型/), { target: { value: 'sqlite' } })
     fireEvent.change(screen.getByLabelText(/^名称/), { target: { value: '本地库' } })
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
     expect(screen.getByText('请填写数据库文件路径')).toBeTruthy()
     expect(mocks.saveConnection).not.toHaveBeenCalled()
 
-    fireEvent.change(screen.getByLabelText(/数据库 \/ 服务名/), { target: { value: './tmp/app.db' } })
+    fireEvent.change(screen.getByLabelText(/数据库文件|数据库 \/ 服务名/), { target: { value: './tmp/app.db' } })
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(mocks.saveConnection).toHaveBeenCalledTimes(1))

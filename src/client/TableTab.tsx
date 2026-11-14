@@ -301,7 +301,9 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         if (cancelled) return
         setConnection(found)
         await load(found, { page: 0, size: pageSize, where: '', orderBy: '', recount: true })
-        const described = await api.describe(found.id, params.schema, params.table, objectKind).catch(() => null)
+        const described = typeof api.describe === 'function'
+          ? await api.describe(found.id, params.schema, params.table, objectKind).catch(() => null)
+          : null
         if (!cancelled) setDescription(described)
       } catch (caught) {
         if (!cancelled) setError(failureText(caught))
@@ -959,6 +961,35 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     }
   }
 
+  const pendingNewRows = useMemo(
+    () =>
+      pendingNew.map((values, index) => ({
+        values,
+        onStartEdit: (column: string) => startNewCell(index, column),
+        onRemove: () => removeNewRow(index),
+        ...(newCell?.rowIndex === index
+          ? {
+              editing: {
+                column: newCell.column,
+                value: newCell.value,
+                onChange: updateNewCell,
+                onCommit: commitNewCell,
+                onCancel: cancelNewCell,
+              },
+            }
+          : {}),
+      })),
+    [pendingNew, newCell],
+  )
+  const editedCell = useCallback((rowIndex: number, column: string) => pendingUpdates[rowIndex]?.[column] !== undefined, [pendingUpdates])
+  const pendingCell = useCallback(
+    (rowIndex: number, column: string, original: CellValue): CellValue | undefined => {
+      const changed = pendingUpdates[rowIndex]?.[column]
+      return changed === undefined ? undefined : changed === '' ? null : changed
+    },
+    [pendingUpdates],
+  )
+
   if (error !== null && rows.length === 0) {
     return (
       <div className="dshdb-qtab">
@@ -979,7 +1010,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                 {t('table.retry')}
               </Button>
               <Button size="sm" variant="ghost" title={t('table.copyError')} onClick={() => void copyText(failureMessage(error))}>
-                {t('table.copyError')}
+                {t('table.copy')}
               </Button>
             </>
           }
@@ -1013,10 +1044,10 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
       id: 'page',
       label: t('table.export.page'),
       leaves: [
-        { id: 'page-csv', label: `${t('table.export.page')} CSV (${formatCount(rows.length)} ${t('table.rows')})`, onSelect: () => void exportRows('csv', 'page') },
-        { id: 'page-json', label: `${t('table.export.page')} JSON (${formatCount(rows.length)} ${t('table.rows')})`, onSelect: () => void exportRows('json', 'page') },
-        { id: 'page-sql', label: `${t('table.export.page')} SQL (${formatCount(rows.length)} ${t('table.rows')})`, onSelect: () => void exportRows('sql', 'page') },
-        { id: 'page-md', label: `${t('table.export.page')} Markdown (${formatCount(rows.length)} ${t('table.rows')})`, onSelect: () => void exportRows('md', 'page') },
+        { id: 'page-csv', label: `${t('table.currentPage')} CSV (${formatCount(rows.length)} ${t('table.rows')})`, onSelect: () => void exportRows('csv', 'page') },
+        { id: 'page-json', label: `${t('table.currentPage')} JSON (${formatCount(rows.length)} ${t('table.rows')})`, onSelect: () => void exportRows('json', 'page') },
+        { id: 'page-sql', label: `${t('table.currentPage')} SQL (${formatCount(rows.length)} ${t('table.rows')})`, onSelect: () => void exportRows('sql', 'page') },
+        { id: 'page-md', label: `${t('table.currentPage')} Markdown (${formatCount(rows.length)} ${t('table.rows')})`, onSelect: () => void exportRows('md', 'page') },
       ],
     },
     ...(selectedRows.size > 0
@@ -1025,10 +1056,10 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
             id: 'selected',
             label: t('table.export.selected'),
             leaves: [
-              { id: 'selected-csv', label: `${t('table.export.selected')} CSV (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('csv') },
-              { id: 'selected-json', label: `${t('table.export.selected')} JSON (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('json') },
-              { id: 'selected-sql', label: `${t('table.export.selected')} SQL (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('sql') },
-              { id: 'selected-md', label: `${t('table.export.selected')} Markdown (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('md') },
+              { id: 'selected-csv', label: `${t('table.selectedRows')} CSV (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('csv') },
+              { id: 'selected-json', label: `${t('table.selectedRows')} JSON (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('json') },
+              { id: 'selected-sql', label: `${t('table.selectedRows')} SQL (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('sql') },
+              { id: 'selected-md', label: `${t('table.selectedRows')} Markdown (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('md') },
             ],
           },
         ]
@@ -1170,7 +1201,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           {exportOpen ? (
             <MenuGroupList
               groups={exportGroups}
-              extra={{ id: 'dump', label: t('table.export.all'), onSelect: () => void exportDump() }}
+              extra={{ id: 'dump', label: t('table.dump'), onSelect: () => void exportDump() }}
               onClose={() => setExportOpen(false)}
             />
           ) : null}
@@ -1350,7 +1381,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                 {t('table.retry')}
               </Button>
               <Button size="sm" variant="ghost" title={t('table.copyError')} onClick={() => void copyText(failureMessage(error))}>
-                {t('table.copyError')}
+                {t('table.copy')}
               </Button>
             </>
           }
@@ -1417,7 +1448,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                 <th className="dshdb-select-cell" />
                 <th className="dshdb-num">
                   {activeFilterCount > 0 ? (
-                    <button type="button" className="dshdb-row-action" title={t('table.clearAllFilters')} aria-label={t('table.clearAllFilters')} onClick={clearColumnFilters}>
+                    <button type="button" className="dshdb-row-action" title={t('table.clearAllFilters')} aria-label={t('table.clearColumnFilters')} onClick={clearColumnFilters}>
                       ×
                     </button>
                   ) : null}
@@ -1474,38 +1505,10 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                 }
               : undefined
           }
-          pendingNewRows={pendingNew.map((values, index) => ({
-            values,
-            onStartEdit: (column) => startNewCell(index, column),
-            onRemove: () => removeNewRow(index),
-            ...(newCell?.rowIndex === index
-              ? {
-                  editing: {
-                    column: newCell.column,
-                    value: newCell.value,
-                    onChange: updateNewCell,
-                    onCommit: commitNewCell,
-                    onCancel: cancelNewCell,
-                  },
-                }
-              : {}),
-          }))}
-          {...(cellEdit === null ? {} : {
-            cellEdit: {
-              rowIndex: cellEdit.rowIndex,
-              column: cellEdit.column,
-              value: cellEdit.value,
-              onChange: updateCell,
-              onCommit: commitCell,
-              onCancel: cancelCell,
-            },
-          })}
+          pendingNewRows={pendingNewRows}
           deletedRows={pendingDeletes}
-          editedCells={(rowIndex, column) => pendingUpdates[rowIndex]?.[column] !== undefined}
-          pendingCellValue={(rowIndex, column, original) => {
-            const changed = pendingUpdates[rowIndex]?.[column]
-            return changed === undefined ? undefined : changed === '' ? null : changed
-          }}
+          editedCells={editedCell}
+          pendingCellValue={pendingCell}
           {...(canMutate ? { onCellDoubleClick: (rowIndex: number, column: ColumnInfo) => startCellEdit(rowIndex, column) } : {})}
         />
       )}

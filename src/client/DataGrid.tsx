@@ -14,7 +14,7 @@ import { clearWidths, readWidths, writeWidths } from './columnWidths'
 import { formatCell } from './format'
 
 /** Rows are rendered with a fixed height so offsets need no measurement. */
-export const NUMERIC_TYPE = /(?:^|\b)(?:tiny|small|medium|big)?int\b|decimal|numeric|float|double|real|number|money/i
+export const NUMERIC_TYPE = /(?:^|\b)(?:tiny|small|medium|big)?int(?:eger)?\b|decimal|numeric|float|double|real|number|money/i
 
 function numericColumn(column: ColumnInfo): boolean {
   return NUMERIC_TYPE.test(column.typeName)

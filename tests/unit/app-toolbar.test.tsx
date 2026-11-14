@@ -72,13 +72,12 @@ describe('data-source toolbar', () => {
   })
 
   it('renders the saved order and appends actions it does not mention', async () => {
-    mockStatus(['trash', 'settings'])
+    mockStatus(['trash'])
     render(<App />)
-    await waitFor(() => expect(slots()).toHaveLength(7))
+    await waitFor(() => expect(slots()).toHaveLength(6))
     await waitFor(() => expect(slotIds()[0]).toBe('trash'))
     expect(slotIds()).toEqual([
       'trash',
-      'settings',
       'add',
       'edit',
       'refresh',
@@ -90,7 +89,7 @@ describe('data-source toolbar', () => {
   it('keeps the "…" button hidden while every action fits', async () => {
     mockStatus()
     render(<App />)
-    await waitFor(() => expect(slots()).toHaveLength(7))
+    await waitFor(() => expect(slots()).toHaveLength(6))
     expect(moreSlot().className).toContain('dshdb-toolbar-slot-hidden')
   })
 
@@ -114,7 +113,6 @@ describe('data-source toolbar', () => {
         items.find((entry) => entry.textContent?.includes(label))
       expect(item('编辑')?.hasAttribute('disabled')).toBe(true)
       expect(item('删除')?.hasAttribute('disabled')).toBe(true)
-      expect(item('设置')?.hasAttribute('disabled')).toBe(false)
       expect(screen.getByLabelText('更多操作').getAttribute('aria-expanded')).toBe('true')
     } finally {
       if (original === undefined) delete (Element.prototype as { clientWidth?: unknown }).clientWidth

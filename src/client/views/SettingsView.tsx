@@ -76,7 +76,7 @@ function ShortcutRow(props: {
       <TextInput
         readOnly
         style={{ width: 168, textAlign: 'center' }}
-        aria-label={t(`shortcut.${def.id}`)}
+        aria-label={t('shortcut.aria', { label: t(`shortcut.${def.id}`) })}
         title="点一下再按新的组合键（Esc 取消，Delete 恢复默认）"
         value={recording ? '按下组合键…' : formatBinding(binding, IS_MAC)}
         onFocus={() => {

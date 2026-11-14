@@ -54,24 +54,24 @@ describe('settings panel collapse', () => {
     cleanup()
   })
 
-  it('expands 运行环境 and collapses every other panel', () => {
+  it('opens query safety and keeps the other panels collapsed', () => {
     setup()
-    expect(toggle('运行环境').getAttribute('aria-expanded')).toBe('true')
-    expect(panelBody('运行环境').hidden).toBe(false)
-    for (const title of ['查询与安全', '快捷键', '预置驱动', '自定义驱动']) {
+    expect(toggle('查询与安全').getAttribute('aria-expanded')).toBe('true')
+    expect(panelBody('查询与安全').hidden).toBe(false)
+    for (const title of ['快捷键', '数据源工具栏', '控制台', '控制台工具栏']) {
       expect(toggle(title).getAttribute('aria-expanded')).toBe('false')
       expect(panelBody(title).hidden).toBe(true)
     }
   })
 
-  it('toggles a panel open and 运行环境 closed', () => {
+  it('toggles one panel open and query safety closed', () => {
     setup()
     fireEvent.click(toggle('快捷键'))
     expect(toggle('快捷键').getAttribute('aria-expanded')).toBe('true')
     expect(panelBody('快捷键').hidden).toBe(false)
 
-    fireEvent.click(toggle('运行环境'))
-    expect(toggle('运行环境').getAttribute('aria-expanded')).toBe('false')
-    expect(panelBody('运行环境').hidden).toBe(true)
+    fireEvent.click(toggle('查询与安全'))
+    expect(toggle('查询与安全').getAttribute('aria-expanded')).toBe('false')
+    expect(panelBody('查询与安全').hidden).toBe(true)
   })
 })

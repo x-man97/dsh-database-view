@@ -1760,10 +1760,10 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         id: 'page',
         label: t('table.export.page'),
         leaves: [
-          { id: 'page-csv', label: `${t('table.export.page')} CSV (${filteredRows.length} ${t('table.rows')})`, disabled: filteredRows.length === 0, onSelect: () => exportPage('csv') },
-          { id: 'page-json', label: `${t('table.export.page')} JSON (${filteredRows.length} ${t('table.rows')})`, disabled: filteredRows.length === 0, onSelect: () => exportPage('json') },
-          { id: 'page-sql', label: `${t('table.export.page')} SQL (${filteredRows.length} ${t('table.rows')})`, disabled: filteredRows.length === 0, onSelect: () => exportPage('sql') },
-          { id: 'page-md', label: `${t('table.export.page')} Markdown (${filteredRows.length} ${t('table.rows')})`, disabled: filteredRows.length === 0, onSelect: () => exportPage('md') },
+          { id: 'page-csv', label: `${t('table.currentPage')} CSV (${filteredRows.length} ${t('table.rows')})`, disabled: filteredRows.length === 0, onSelect: () => exportPage('csv') },
+          { id: 'page-json', label: `${t('table.currentPage')} JSON (${filteredRows.length} ${t('table.rows')})`, disabled: filteredRows.length === 0, onSelect: () => exportPage('json') },
+          { id: 'page-sql', label: `${t('table.currentPage')} SQL (${filteredRows.length} ${t('table.rows')})`, disabled: filteredRows.length === 0, onSelect: () => exportPage('sql') },
+          { id: 'page-md', label: `${t('table.currentPage')} Markdown (${filteredRows.length} ${t('table.rows')})`, disabled: filteredRows.length === 0, onSelect: () => exportPage('md') },
         ],
       },
       ...(selectedRows.size > 0
@@ -1772,10 +1772,10 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               id: 'selected',
               label: t('table.export.selected'),
               leaves: [
-                { id: 'selected-csv', label: `${t('table.export.selected')} CSV (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('csv') },
-                { id: 'selected-json', label: `${t('table.export.selected')} JSON (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('json') },
-                { id: 'selected-sql', label: `${t('table.export.selected')} SQL (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('sql') },
-                { id: 'selected-md', label: `${t('table.export.selected')} Markdown (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('md') },
+                { id: 'selected-csv', label: `${t('table.selectedRows')} CSV (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('csv') },
+                { id: 'selected-json', label: `${t('table.selectedRows')} JSON (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('json') },
+                { id: 'selected-sql', label: `${t('table.selectedRows')} SQL (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('sql') },
+                { id: 'selected-md', label: `${t('table.selectedRows')} Markdown (${selectedRows.size} ${t('table.rows')})`, onSelect: () => exportSelected('md') },
               ],
             },
           ]
@@ -1823,10 +1823,10 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
               id: 'all',
               label: '导出全部',
               leaves: [
-                { id: 'all-csv', label: `${t('table.export.all')} CSV (max ${EXPORT_LIMIT} ${t('table.rows')})`, disabled: exporting, onSelect: () => void exportAll('csv') },
-                { id: 'all-json', label: `${t('table.export.all')} JSON (max ${EXPORT_LIMIT} ${t('table.rows')})`, disabled: exporting, onSelect: () => void exportAll('json') },
-                { id: 'all-sql', label: `${t('table.export.all')} SQL (max ${EXPORT_LIMIT} ${t('table.rows')})`, disabled: exporting, onSelect: () => void exportAll('sql') },
-                { id: 'all-md', label: `${t('table.export.all')} Markdown (max ${EXPORT_LIMIT} ${t('table.rows')})`, disabled: exporting, onSelect: () => void exportAll('md') },
+                { id: 'all-csv', label: `${t('table.allRows')} CSV (max ${EXPORT_LIMIT} ${t('table.rows')})`, disabled: exporting, onSelect: () => void exportAll('csv') },
+                { id: 'all-json', label: `${t('table.allRows')} JSON (max ${EXPORT_LIMIT} ${t('table.rows')})`, disabled: exporting, onSelect: () => void exportAll('json') },
+                { id: 'all-sql', label: `${t('table.allRows')} SQL (max ${EXPORT_LIMIT} ${t('table.rows')})`, disabled: exporting, onSelect: () => void exportAll('sql') },
+                { id: 'all-md', label: `${t('table.allRows')} Markdown (max ${EXPORT_LIMIT} ${t('table.rows')})`, disabled: exporting, onSelect: () => void exportAll('md') },
               ],
             },
           ]

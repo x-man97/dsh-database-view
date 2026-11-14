@@ -193,7 +193,7 @@ describe('console tree-shaped execution plan', () => {
 
     await waitFor(() => expect(mocks.explain).toHaveBeenCalled())
     await waitFor(() => expect(screen.queryByLabelText('执行计划文本')).toBeNull())
-    expect(await screen.findByText('orders')).toBeTruthy()
+    expect((await screen.findAllByText('orders')).length).toBeGreaterThan(0)
   })
 
   it('copies a tabular plan as tab-separated text', async () => {
@@ -223,7 +223,7 @@ describe('console tree-shaped execution plan', () => {
     fireEvent.change(editor, { target: { value: 'EXPLAIN SELECT * FROM orders' } })
     fireEvent.click(await screen.findByRole('button', { name: '执行计划' }))
 
-    await screen.findByText('orders')
+    await screen.findAllByText('orders')
     fireEvent.click(screen.getByRole('button', { name: '复制计划' }))
 
     const copied = mocks.copies.mock.calls.at(-1)?.[0] as string
