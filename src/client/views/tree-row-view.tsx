@@ -74,9 +74,7 @@ const rowIcon = (row: TreeRow): ReactNode => {
     case 'redis-db':
       return <DatabaseIcon size={13} />
     case 'folder':
-      return folderIcon(row.folder)
-    case 'detail-folder':
-      return detailIcon(row.detailSection)
+      return <FolderIcon size={13} />
     case 'object':
       return row.object === undefined ? <FolderIcon size={13} /> : objectIcon(row.object)
     case 'column':
@@ -227,7 +225,7 @@ function drawContent(row: TreeRow, actions: TreeRowActions, t: ReturnType<typeof
         <>
           {drawToggle(row, actions)}
           <span className="dshdb-row-icon">{rowIcon(row)}</span>
-          {drawLabel(row)}
+          {row.folder === undefined ? drawLabel(row) : <span className="dshdb-row-label">{t(`tree.${row.folder}`)}</span>}
           {drawMeta(row)}
         </>
       )

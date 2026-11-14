@@ -309,7 +309,7 @@ export function SettingsView(props: SettingsViewProps): ReactElement {
           <Switch
             checked={draft.consoleAutoComplete !== false}
             onChange={(checked) => update('consoleAutoComplete', checked)}
-            label="输入字符后自动展开补全列表"
+            label={t('settings.autoComplete')}
           />
         </div>
         <div className="dshdb-muted" style={{ fontSize: 11.5, lineHeight: 1.6 }}>

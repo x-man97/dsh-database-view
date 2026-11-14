@@ -328,12 +328,12 @@ function appendConnection(context: BuildContext, connection: ClientConnection): 
     return
   }
 
-  if (loading) note(rows, `${connection.id}#loading`, '正在加载 schema…', 2, true)
+  if (loading) note(rows, `${connection.id}#loading`, t('tree.loadingSchema'), 2, true)
   if (!loading && server === undefined && hasCachedStructure) {
-    note(rows, `${connection.id}#offline`, `离线缓存 · ${relativeTime(cachedStamp ?? '')}，连接后自动更新`, 2)
+    note(rows, `${connection.id}#offline`, t('tree.offlineCache', { time: relativeTime(cachedStamp ?? '') }), 2)
   }
   if (!loading && shownSchemas !== null && schemas.length === 0) {
-    note(rows, `${connection.id}#hidden`, '全部 Schema 已隐藏，使用行尾按钮选择显示的架构', 2)
+    note(rows, `${connection.id}#hidden`, t('tree.hiddenSchemas'), 2)
   }
   if (!loading && schemas.length === 0 && (shownSchemas === null || allSchemas.length === 0)) {
     note(rows, `${connection.id}#empty`, filter !== '' ? '没有匹配的 schema' : '没有 schema', 2)

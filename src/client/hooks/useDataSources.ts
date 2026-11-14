@@ -27,6 +27,7 @@ import type {
   TableDescription,
 } from '../../shared/types'
 import { api, ApiError } from '../api'
+import { useI18n } from '../i18n'
 import { objectKindLabel } from '../format'
 
 export interface Snapshot {
@@ -168,6 +169,7 @@ function defaultVisibleSchemas(
 }
 
 export function useDataSources(notify: Notify): DataSources {
+  const t = useI18n()
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [loadError, setLoadError] = useState('')
   const [selectedId, setSelectedId] = useState('')
@@ -588,7 +590,7 @@ export function useDataSources(notify: Notify): DataSources {
       try {
         const connected = await api.connect(connectionId)
         setServers((previous) => ({ ...previous, [connectionId]: connected }))
-        notify('连接成功', 'success')
+        notify(t('notify.connectSuccess'), 'success')
         if (connection.dialect === 'redis') {
           await loadRedisDatabases(connectionId)
           const shown = redisDbs[connectionId]
@@ -934,7 +936,7 @@ export function useDataSources(notify: Notify): DataSources {
         const shown = redisDbs[selected.id] ?? [selected.redisDb]
         // Each database is an independent SCAN; refreshing them sequentially just adds round trips.
         await Promise.all(shown.map((db) => loadRedisKeys(selected.id, db)))
-        notify('已刷新数据源', 'success')
+        notify(t('notify.refreshed'), 'success')
       } else {
         await connect(selected.id)
       }
@@ -950,7 +952,7 @@ export function useDataSources(notify: Notify): DataSources {
     // Refresh means "re-read every cached description", not just fill the gaps.
     schedulePrefetch(selected.id, true)
     await refresh()
-    notify('已刷新数据源', 'success')
+    notify(t('notify.refreshed'), 'success')
   }, [selected, servers, redisDbs, refresh, connect, loadSchemas, loadRedisDatabases, loadRedisKeys, notify, schedulePrefetch])
 
 

@@ -3,6 +3,7 @@ import type { ClientTrashedConnection } from '../../shared/types'
 import { dialectLabel, formatDateTime } from '../format'
 import { ClearIcon, RecycleIcon, TrashIcon } from '../icons'
 import { Button, EmptyState, Modal, Tag } from '../ui'
+import { useI18n } from '../i18n'
 
 /** Which row action is in flight; one request at a time. */
 export interface TrashBusy {
@@ -29,12 +30,13 @@ function addressOf(item: ClientTrashedConnection): string {
 }
 
 export function TrashModal(props: TrashModalProps): ReactElement | null {
+  const t = useI18n()
   if (!props.open) return null
   const busy = props.busy !== null || props.emptying
   return (
     <Modal
       open
-      title="回收站"
+      title={t('trash.title')}
       width={640}
       onClose={props.onClose}
       footer={
@@ -47,11 +49,11 @@ export function TrashModal(props: TrashModalProps): ReactElement | null {
             loading={props.emptying}
             onClick={props.onEmpty}
           >
-            清空回收站
+            {t('trash.clear')}
           </Button>
           <span className="dshdb-modal-foot-spacer" />
           <Button size="sm" variant="primary" onClick={props.onClose}>
-            关闭
+            {t('trash.close')}
           </Button>
         </>
       }
@@ -59,12 +61,12 @@ export function TrashModal(props: TrashModalProps): ReactElement | null {
       {props.items.length === 0 ? (
         <EmptyState
           icon={<RecycleIcon size={20} />}
-          title="回收站是空的"
-          description="删除的数据源会先放到这里，可随时恢复。"
+          title={t('trash.empty')}
+          description={t('trash.emptyDescription')}
         />
       ) : (
         <>
-          <p className="dshdb-modal-message">彻底删除会同时移除保存的密码与结构缓存，且无法撤销。</p>
+          <p className="dshdb-modal-message">{t('trash.purgeNote')}</p>
           <div className="dshdb-list">
             {props.items.map((item) => {
               const rowBusy = props.busy?.id === item.id
@@ -76,7 +78,7 @@ export function TrashModal(props: TrashModalProps): ReactElement | null {
                       <Tag>{dialectLabel(item.dialect)}</Tag>
                     </div>
                     <div className="dshdb-driver-sub">
-                      {addressOf(item)} · 删除于 {formatDateTime(item.deletedAt)}
+                      {addressOf(item)} · {t('trash.deletedAt', { time: formatDateTime(item.deletedAt) })}
                     </div>
                   </div>
                   <Button
@@ -85,7 +87,7 @@ export function TrashModal(props: TrashModalProps): ReactElement | null {
                     disabled={busy && !(rowBusy && props.busy?.action === 'restore')}
                     onClick={() => props.onRestore(item)}
                   >
-                    恢复
+                    {t('trash.restore')}
                   </Button>
                   <Button
                     size="sm"
@@ -95,7 +97,7 @@ export function TrashModal(props: TrashModalProps): ReactElement | null {
                     disabled={busy && !(rowBusy && props.busy?.action === 'purge')}
                     onClick={() => props.onPurge(item)}
                   >
-                    彻底删除
+                    {t('trash.purge')}
                   </Button>
                 </div>
               )
