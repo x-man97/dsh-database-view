@@ -4,6 +4,7 @@
 > 日期：2026-11-13  
 > 范围：DeepSeek Harness（DSH）Web / Desktop 双半插件；数据库表预览、结构浏览、只读查询与 Agent 工具  
 > 后续设计：[设计方案（B + 可选 C）](design.md)  
+> 注：设计方案 v1.2 已将 SQL Server/Oracle 纳入本轮；本报告的 MVP 范围/估算以 MySQL/PostgreSQL/SQLite 为基线，实际排期见设计方案。  
 > 结论：**可行**。两项限制（必须依赖 Java/JDBC、无 SSH 隧道）都有成熟替代方案；推荐用「复用现有 MIT 插件 UI + 新的 Java-free 数据访问层 + 内置 SSH 隧道」的路线，先交付 MySQL/PostgreSQL/SQLite，再补齐 SQL Server/Oracle/达梦。
 
 ## 目录

@@ -1,6 +1,6 @@
 # DSH 数据库表预览插件设计方案（B + 可选 C）
 
-> 版本：v1.1（设计稿，补充统一驱动下载/Driver Pack）  
+> 版本：v1.2（设计稿，本轮纳入 SQL Server / Oracle）  
 > 日期：2026-11-14  
 > 前置文档：[可行性研究报告](feasibility.md)  
 > 范围：Fork `dsh-ide-database`，保留右侧栏 UI，替换为 Java-free 数据访问层；内置 SSH 隧道；JDBC 作为独立可选扩展包（C）。  
@@ -53,7 +53,7 @@ Fork 现有插件
 | D4 | UI 由 `/engines` 描述符驱动，不硬编码数据库列表 | 外部 Engine 包无需改核心 UI |
 | D5 | SSH 放在 TransportService，不放在 Engine 内 | 所有 Engine（含 JDBC）共享认证、主机密钥、转发逻辑 |
 | D6 | JDBC 做成独立包 `dsh-database-view-jdbc`，通过 `dbEngines` 服务注册 | 满足长尾；核心保持 Java-free；可单独安装/卸载 |
-| D7 | 主流分 Tier：T1 MySQL/MariaDB/PostgreSQL/SQLite；T2 SQL Server/Oracle/达梦/Redis；T3 OceanBase/JDBC/第三方 | 先覆盖 80% 用户，再扩展 |
+| D7 | 本轮支持 MySQL/MariaDB/PostgreSQL/SQLite/SQL Server/Oracle；达梦/Redis SSH/OceanBase/JDBC 留后续 | SQL Server/Oracle 是企业主流，纳入本轮；其余长尾靠扩展点 |
 | D8 | 保留 `db_*` 工具名，增加 `toolPrefix` 配置与冲突检测 | 降低迁移成本；与旧插件共存时不静默覆盖 |
 | D9 | 数据目录用新名字 `dsh-database-view`，提供从旧插件导入 | 避免两个插件互相写坏配置 |
 | D10 | 默认只读，写操作显式开启 + 二次确认 + 数据库只读账号建议 | 数据库工具的风险主要在误写/误删 |
@@ -64,13 +64,12 @@ Fork 现有插件
 
 | 范围 | 内容 |
 |---|---|
-| **本轮（T1）** | MySQL、MariaDB、PostgreSQL、SQLite；SSH（密码/私钥/agent，主机密钥确认）；**统一驱动下载/缓存**；连接管理、树、表预览、DDL、只读 SQL 控制台、结构缓存、只读 Agent 工具 |
-| **后续（T2，本轮不做）** | SQL Server、Oracle（Thin）、达梦（许可允许时）、Redis 走 SSH；写操作/事务；TLS 完整适配 |
-| **后续（T3，本轮不做）** | OceanBase MySQL、JDBC 扩展包、第三方 Engine 包、多跳 SSH、数据编辑 |
+| **本轮（主流）** | MySQL、MariaDB、PostgreSQL、SQLite、SQL Server、Oracle（Thin）；SSH（密码/私钥/agent，主机密钥确认）；**统一驱动下载/缓存**；连接管理、树、表预览、DDL、只读 SQL 控制台、结构缓存、只读 Agent 工具 |
+| **后续（本轮不做）** | 达梦（许可允许时）、Redis 走 SSH、OceanBase、JDBC 扩展包、第三方 Engine 包、多跳 SSH、数据编辑 |
 
-> 本轮只实现 T1；T2/T3 只保留 Engine SPI、目录结构、文档和扩展点，不写对应 Engine 实现。
+> 本轮支持 5 个 Engine：MySQL（含 MariaDB）、PostgreSQL、SQLite、SQL Server、Oracle。达梦/OceanBase/JDBC/第三方只保留 Engine SPI、目录结构、文档和扩展点，不写对应 Engine 实现。
 >
-> 工作量：本轮 T1 约 **7–10 人周**（含 SPI、DriverManager、SSH、测试与文档）；后续 T2 约再加 4–6 人周。
+> 工作量：本轮约 **10–14 人周**（含 SPI、DriverManager、SSH、SQL Server/Oracle 元数据与测试）；若没有现成的 Driver Pack 发布流水线，按 **11–15 人周** 估算。后续达梦/OceanBase/JDBC 约再加 4–6 人周。
 
 ---
 
@@ -80,11 +79,12 @@ Fork 现有插件
 
 先把「主流 + 高频」做扎实：
 
-1. **MySQL 家族**：MySQL 5.7/8.0/8.4、MariaDB 10.x/11.x；OceanBase MySQL 模式复用协议。
+1. **MySQL 家族**：MySQL 5.7/8.0/8.4、MariaDB 10.x/11.x。
 2. **PostgreSQL**：12–17。
 3. **SQLite**：文件库，桌面/本地分析场景。
-4. **SQL Server / Oracle / 达梦**：企业场景，P2。
-5. **Redis**：现有插件已有，保留并接入 SSH。
+4. **SQL Server 2019/2022、Oracle 12.1+（Thin）**：企业场景，本轮纳入。
+5. **Redis**：现有插件已有，保留；SSH 改造后续。
+6. **达梦 / OceanBase / JDBC 长尾**：本轮不改造，保留扩展点。
 
 ### 1.2 Tier 划分
 
@@ -93,18 +93,18 @@ Fork 现有插件
 | **T1** | MySQL、MariaDB | `download` mysql2（可选 bundled） | MVP | 使用量最大；`mysql2` 成熟；协议/元数据清晰 | 真实实例 + SSH + 中文 + 事务 + 取消 |
 | **T1** | PostgreSQL | `download` pg（可选 bundled） | MVP | 使用量第二；`pg` 成熟 | 真实实例 + SSH + `information_schema`/`pg_catalog` |
 | **T1** | SQLite | `builtin` node:sqlite | MVP | 无需服务端；`node:sqlite` 内置 | 文件/内存 + 大文本 + `EXPLAIN QUERY PLAN` |
-| **T2** | SQL Server | `download` tedious | P2 | 企业常见；`tedious` 纯 JS | 真实实例 + TLS + `SHOWPLAN` |
-| **T2** | Oracle | `download` oracledb Thin | P2 | 企业常见；`oracledb` Thin | 真实实例 + `DBMS_METADATA` + `EXPLAIN PLAN` |
-| **T2** | 达梦 DM | `user-provided` dmdb / JDBC | P2 | 国内政企常见；`dmdb` 可用但许可受限 | 许可确认 + 真实实例 |
-| **T2** | Redis | `dependency` ioredis | P2 | 现有功能；ioredis 纯 JS | SSH + SCAN/取值/命令 |
-| **T3** | OceanBase MySQL | `download` mysql2 | P3 | 协议兼容 MySQL；先复用 | 真实租户 |
-| **T3** | OceanBase Oracle | `download` JDBC jar | P3 | 协议特殊；JDBC 或实验驱动 | 明确标注实验性 |
-| **T3** | 任意 JDBC 库 | `download` JDBC jar | P3 | 长尾 | 安装 `dsh-database-view-jdbc` 后可用 |
-| **T3** | 第三方 Engine | 由 Engine 包声明 | P3 | 社区 PR | 通过契约测试 + 安全审查 |
+| **T2** | SQL Server | `download` tedious | **本轮** | 企业常见；`tedious` 纯 JS | 真实实例 + TLS + `SHOWPLAN` |
+| **T2** | Oracle | `download` oracledb Thin | **本轮** | 企业常见；`oracledb` Thin | 真实实例 + `DBMS_METADATA` + `EXPLAIN PLAN` |
+| **T2** | 达梦 DM | `user-provided` dmdb / JDBC | 后续 | 国内政企常见；`dmdb` 可用但许可受限 | 许可确认 + 真实实例 |
+| **T2** | Redis | `dependency` ioredis | 现有保留 | 现有功能；ioredis 纯 JS | 现有功能；SSH 后续 |
+| **T3** | OceanBase MySQL | `download` mysql2 | 后续 | 协议兼容 MySQL；先复用 | 真实租户 |
+| **T3** | OceanBase Oracle | `download` JDBC jar | 后续 | 协议特殊；JDBC 或实验驱动 | 明确标注实验性 |
+| **T3** | 任意 JDBC 库 | `download` JDBC jar | 后续 | 长尾 | 安装 `dsh-database-view-jdbc` 后可用 |
+| **T3** | 第三方 Engine | 由 Engine 包声明 | 后续 | 社区 PR | 通过契约测试 + 安全审查 |
 
 > `bundled` = 随可选 offline 包/手动导入携带的自包含 driver pack，离线可用；`download` = 首次连接时从发布源下载并校验；`builtin` = Node 内置；`user-provided` = 因许可证/体积原因由用户提供文件；`jdbc` 见第 8 章。
 >
-> **本轮范围**：只实现 T1（MySQL、MariaDB、PostgreSQL、SQLite）。T2/T3 的 Engine、驱动 manifest、测试和 UI 文案可以留占位，但不进入本轮验收。
+> **本轮范围**：MySQL、MariaDB、PostgreSQL、SQLite、SQL Server、Oracle。达梦/OceanBase/JDBC/第三方只留占位，不进入本轮验收。
 
 ### 1.3 非目标
 
@@ -112,6 +112,7 @@ Fork 现有插件
 - 核心包不承诺「任意 JDBC 库开箱即用」；这是可选 C 的职责。
 - 不做多租户/团队共享连接/云端凭据托管。
 - 不在 MVP 做 SSH 多跳、SOCKS、`~/.ssh/config` 全量解析。
+- 本轮不做达梦、OceanBase、Redis SSH、JDBC 扩展包、第三方 Engine 实现；只保留扩展点。
 
 ### 1.4 设计原则（也是 PR 审核标准）
 
@@ -1361,7 +1362,7 @@ Engine 负责把驱动类型转成上表；核心 `normalizeResult` 再做：
 
 | Engine | driver id | 交付 | 版本策略 | 说明 |
 |---|---|---|---|---|
-| MySQL/MariaDB/OceanBase MySQL | `mysql2` | download（可选 bundled） | 固定 + 可更新 | 默认按需下载；offline 包可内置 |
+| MySQL/MariaDB | `mysql2` | download（可选 bundled） | 固定 + 可更新 | 默认按需下载；offline 包可内置；OceanBase 后续复用 |
 | PostgreSQL | `pg` | download（可选 bundled） | 固定 + 可更新 | 默认按需下载；offline 包可内置 |
 | SQLite | `node:sqlite` | builtin | Node/Electron 内置 | 无 driver pack |
 | SQL Server | `tedious` | download | 固定 + 可更新 | 首次使用下载 |
@@ -1370,7 +1371,7 @@ Engine 负责把驱动类型转成上表；核心 `normalizeResult` 再做：
 | Redis | `ioredis` | dependency | 固定 | 随核心 dependency，开箱即用 |
 | JDBC | `jdbc-*` | download | Maven 坐标 | 可选包提供 |
 
-### 6.1 MySQL / MariaDB / OceanBase MySQL
+### 6.1 MySQL / MariaDB（OceanBase MySQL 后续）
 
 **文件**：`engines/mysql/{index,descriptor,engine,metadata,codec}.ts`
 
@@ -1482,7 +1483,7 @@ if (readOnly) db.exec('PRAGMA query_only = ON')
 - `:memory:` 每个连接独立；不支持跨连接共享。
 - Web 形态 Node <22.13：检测 `node:sqlite`，不可用时回退 `sql.js`（WASM），并在能力里标注。
 
-### 6.4 SQL Server（后续，本轮不实现）
+### 6.4 SQL Server（本轮实现）
 
 **文件**：`engines/mssql/*`
 
@@ -1515,7 +1516,7 @@ new tedious.Connection({
 - 默认加密协商；自签证书需显式信任，不能默认 `trustServerCertificate:true`。
 - 取消 `request.cancel()`；连接失败要区分登录失败/网络/TLS。
 
-### 6.5 Oracle（后续，本轮不实现）
+### 6.5 Oracle（本轮实现）
 
 **文件**：`engines/oracle/*`
 
@@ -2310,16 +2311,16 @@ npm test
 | MariaDB 11 | `mariadb:11` | 同 MySQL |
 | PostgreSQL 16 | `postgres:16-alpine` | SSH、查询、中文、`pg_catalog`、EXPLAIN、取消 |
 | SQLite | 文件/内存 | 建表、查询、PRAGMA、大文本、只读 |
-| SQL Server 2022 | `mcr.microsoft.com/mssql/server:2022-latest` | TLS、元数据、SHOWPLAN |
-| Oracle 23ai Free | `container-registry.oracle.com/database/free` | Thin、DBMS_METADATA、EXPLAIN |
-| 达梦 DM8 | 授权环境 | 连接、元数据、DDL、许可 |
-| Redis 7 | `redis:7-alpine` | SSH、SCAN、命令 |
+| SQL Server 2022 | `mcr.microsoft.com/mssql/server:2022-latest` | **本轮必测**：TLS、元数据、SHOWPLAN、取消 |
+| Oracle 23ai Free | `container-registry.oracle.com/database/free` | **本轮必测**：Thin、DBMS_METADATA、EXPLAIN、LOB/日期类型 |
+| 达梦 DM8 | 授权环境 | 后续；连接、元数据、DDL、许可 |
+| Redis 7 | `redis:7-alpine` | 现有功能；SSH 后续 |
 | SSH | linuxserver/openssh-server | 密码/私钥/agent、主机密钥变化、转发禁用 |
 | Driver Pack | 本地 release assets / 手工导入 | bundled/download/user-provided、SHA-256、删除后重装 |
 
 ### 12.4 UI/E2E
 
-- 独立 dev profile，**机器无 Java**，创建 MySQL/PG SSH 连接，打开树/表预览/控制台。
+- 独立 dev profile，**机器无 Java**，创建 MySQL/PG/SQL Server/Oracle SSH 连接，打开树/表预览/控制台。
 - 主机密钥未知 → 确认 → 连接成功；变更 → 拒绝。
 - 只读连接写 SQL → 拒绝；Agent 写开关关闭 → 拒绝。
 - 卸载 JDBC 包 → 连接显示不可用，配置不丢。
@@ -2354,19 +2355,20 @@ PR 必须通过：
 | 里程碑 | 周期 | 内容 | 退出条件 |
 |---|---|---|---|
 | **M0** 骨架 | 1–2 周 | Fork、改名、Engine SPI、Catalog、DriverManager、MySQL driver pack、SSH、连接弹窗（MySQL） | 不装 Java 连 MySQL；删驱动后能提示下载并恢复 |
-| **M1** T1 | 2–3 周 | PostgreSQL、SQLite、元数据/DDL/EXPLAIN、v1 迁移、表预览/缓存 | T1 三库契约测试通过；驱动下载/离线导入可用 |
-| **M2** 体验 | 2 周 | 控制台、导出、Agent 工具、只读限制、错误/主机密钥/驱动下载 UX | 日常只读预览可用 |
-| **M3** 硬化/发布 | 1–2 周 | 性能/安全、打包、文档、外部 Engine 贡献指南、发布 | 验收清单通过；T1 发布 |
-| **后续 T2** | 4–6 周 | SQL Server、Oracle、达梦、Redis 隧道；JDBC 扩展包 | 不在本轮范围 |
+| **M1** 基础库 | 2–3 周 | PostgreSQL、SQLite、元数据/DDL/EXPLAIN、v1 迁移、表预览/缓存 | 基础库契约测试通过；驱动下载/离线导入可用 |
+| **M2** 企业库 | 3–4 周 | SQL Server、Oracle Thin：连接、元数据、DDL、EXPLAIN、TLS、driver pack | SQL Server/Oracle 真实实例通过；TLS/驱动下载通过 |
+| **M3** 体验 | 2 周 | 控制台、导出、Agent 工具、只读限制、错误/主机密钥/驱动下载 UX | 日常只读预览可用 |
+| **M4** 硬化/发布 | 1–2 周 | 性能/安全、打包、文档、外部 Engine 贡献指南、发布 | 验收清单通过；本轮 6 Engine 发布 |
+| **后续** | 4–6 周 | 达梦、Redis SSH、OceanBase、JDBC 扩展包 | 不在本轮范围 |
 
-本轮 T1 约 **7–10 人周**（含 SPI、DriverManager、SSH、测试与文档）；如果团队没有现成的 Driver Pack 发布流水线，按 **8–11 人周** 估算。T2/T3 不在本轮范围，后续约再加 4–6 人周。
+本轮约 **10–14 人周**（含 SPI、DriverManager、SSH、SQL Server/Oracle 元数据与测试）；如果团队没有现成的 Driver Pack 发布流水线，按 **11–15 人周** 估算。达梦/OceanBase/JDBC 不在本轮范围，后续约再加 4–6 人周。
 
 **并行建议**：
 
 - 1 人负责 MySQL/PG/SQLite + Engine SPI；
+- 1 人负责 SQL Server/Oracle + Driver Pack/TLS；
 - 1 人负责 SSH/Transport + 安全/主机密钥；
-- 1 人负责 UI（连接弹窗/设置/表预览适配）；
-- T2 Engine 可以并行给贡献者，按契约测试验收。
+- 1 人负责 UI（连接弹窗/设置/表预览适配）。
 
 ---
 
@@ -2387,6 +2389,9 @@ PR 必须通过：
 | 下载源不可用/被墙 | 首次使用失败 | 多 URL/镜像、手动导入、可选 offline 包兜底 |
 | 驱动校验/供应链 | 代码执行风险 | HTTPS + SHA-256 + 固定版本 + 发布审计；导入需明确警告 |
 | 驱动版本漂移 | 兼容性 | descriptor 固定版本；更新提示；旧版本保留回滚 |
+| SQL Server/Oracle 测试环境重 | 验证慢 | 提前准备镜像/内存；CI 分层；契约测试先跑 |
+| Oracle Thin bundle 失败 | Oracle 不可用 | M0 spike；失败退回核心 dependency 或 user-provided |
+| SQL Server/Oracle TLS 差异 | 连接失败 | 按驱动映射 servername/serverName/DN；准备自签/CA 测试 |
 
 ### 14.2 开放问题
 
@@ -2395,7 +2400,7 @@ PR 必须通过：
 | Q1 | 插件/包最终命名？ | 暂用 `dsh-database-view`；发布前确认 npm 可用 |
 | Q2 | 工具名保留 `db_*` 还是改 `dbv_*`？ | 默认 `db_*`，加 `toolPrefix`；冲突时禁用并提示 |
 | Q3 | 达梦支持策略？ | 首选「用户自行安装 dmdb / 走 JDBC 扩展」；核心不打包；需法务确认 |
-| Q4 | MVP 是否包含 SQL Server/Oracle？ | 建议不包含；T1 先发布，T2 紧跟 |
+| Q4 | MVP 是否包含 SQL Server/Oracle？ | **已确认包含**：本轮交付 MySQL/MariaDB/PG/SQLite + SQL Server/Oracle；达梦/OceanBase/JDBC 后续 |
 | Q5 | OS keychain 在 Desktop/Web 的可用性？ | M0 验证 `safeStorage`；不可用回退 0600 并 UI 说明 |
 | Q6 | 默认 TLS 模式？ | `prefer` 还是 `verify-full`？建议默认 `verify-full`，自签库显式配置 |
 | Q7 | 是否保留 `db_*` 工具在旧插件共存时的行为？ | 冲突检测 + 提示；不静默覆盖 |
