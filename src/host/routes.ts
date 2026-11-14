@@ -315,6 +315,13 @@ async function handle(deps: RouteDeps, request: IncomingMessage, response: Serve
       sendJson(response, 200, { ok: true, data: result })
       return
     }
+    case '/connections/duplicate': {
+      const id = typeof data.id === 'string' ? data.id : ''
+      const name = typeof data.name === 'string' ? data.name : undefined
+      deps.config.duplicateConnection(id, name)
+      sendJson(response, 200, { ok: true, data: { config: deps.config.snapshot() } })
+      return
+    }
     case '/connections/connect': {
       const id = typeof data.id === 'string' ? data.id : ''
       const connection = sqlConnection(deps, id)

@@ -49,6 +49,39 @@ describe('ConfigStore', () => {
     expect(secrets.resolve(saved.secretName)?.value).toBe('s3cret')
   })
 
+  it('duplicates a connection with its password and SSH credentials', () => {
+    const { config, secrets } = store()
+    const saved = config.saveConnection({
+      name: 'SSH MySQL',
+      driver: 'mysql',
+      host: '10.0.0.12',
+      port: 3306,
+      user: 'root',
+      password: 'dbpass',
+      database: 'app',
+      readOnly: true,
+      ssh: {
+        enabled: true,
+        host: 'bastion.example.com',
+        port: 22,
+        user: 'ops',
+        auth: 'password',
+        hostKeyPolicy: 'accept-new',
+      },
+      sshPassword: 'sshpass',
+    })
+
+    const copy = config.duplicateConnection(saved.id, 'SSH MySQL copy')
+    expect(copy.id).not.toBe(saved.id)
+    expect(copy.name).toBe('SSH MySQL copy')
+    expect(copy.readOnly).toBe(true)
+    expect(copy.secretName).not.toBe(saved.secretName)
+    expect(secrets.resolve(copy.secretName)?.value).toBe('dbpass')
+    expect(secrets.resolve(`DSH_DB_SSH_PASSWORD_${copy.id.replace(/[^A-Za-z0-9]/g, '_').toUpperCase()}`)?.value).toBe('sshpass')
+    expect(config.snapshot().connections).toHaveLength(2)
+    expect(config.snapshot().connections[0].hasPassword).toBe(true)
+  })
+
   it('stores native engine and SSH settings without leaking SSH secrets', () => {
     const { config, secrets, dir } = store()
     const saved = config.saveConnection({
@@ -337,11 +370,11 @@ describe('ConfigStore', () => {
     expect(config.snapshot().settings.toolbarActions).toEqual([])
     expect(() => config.updateSettings({ toolbarActions: 'settings' })).toThrow(/toolbarActions/)
 
-    config.updateSettings({ toolbarActions: ['settings', 'add', 'ghost', 'settings'] })
+    config.updateSettings({ toolbarActions: ['duplicate', 'add', 'ghost', 'duplicate'] })
 
-    expect(config.snapshot().settings.toolbarActions).toEqual(['settings', 'add'])
+    expect(config.snapshot().settings.toolbarActions).toEqual(['duplicate', 'add'])
     const reloaded = new ConfigStore(join(dir, 'connections.json'), new SecretStore(join(dir, 'secrets.json')))
     reloaded.load()
-    expect(reloaded.snapshot().settings.toolbarActions).toEqual(['settings', 'add'])
+    expect(reloaded.snapshot().settings.toolbarActions).toEqual(['duplicate', 'add'])
   })
 })

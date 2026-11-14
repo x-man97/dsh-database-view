@@ -8,27 +8,27 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import { orderToolbarActions, type ToolbarActionId } from '../shared/toolbaractions'
 import { t } from './i18n'
-import { EditIcon, PlusIcon, RecycleIcon, RefreshIcon, SettingsIcon, TerminalIcon, TrashIcon } from './icons'
+import { CopyIcon, EditIcon, PlusIcon, RecycleIcon, RefreshIcon, TerminalIcon, TrashIcon } from './icons'
 
 export const TOOLBAR_ACTION_LABEL = {
   get add() { return t('app.add') },
   get edit() { return t('app.edit') },
+  get duplicate() { return t('app.copy') },
   get refresh() { return t('app.refresh') },
   get delete() { return t('app.delete') },
   get console() { return t('app.console') },
   get trash() { return t('app.trash') },
-  get settings() { return t('app.settings') },
 } as Record<ToolbarActionId, string>
 
 /** Tooltip / accessible name of each toolbar button. */
 export const TOOLBAR_ACTION_TITLE = {
   get add() { return t('app.addTitle') },
   get edit() { return t('app.editTitle') },
+  get duplicate() { return t('app.copyTitle') },
   get refresh() { return t('app.refreshTitle') },
   get delete() { return t('app.deleteTitle') },
   get console() { return t('app.consoleTitle') },
   get trash() { return t('app.trashTitle') },
-  get settings() { return t('app.settingsTitle') },
 } as Record<ToolbarActionId, string>
 
 export function toolbarActionIcon(id: ToolbarActionId, size = 14): ReactElement {
@@ -37,6 +37,8 @@ export function toolbarActionIcon(id: ToolbarActionId, size = 14): ReactElement 
       return <PlusIcon size={size} />
     case 'edit':
       return <EditIcon size={size} />
+    case 'duplicate':
+      return <CopyIcon size={size} />
     case 'refresh':
       return <RefreshIcon size={size} />
     case 'delete':
@@ -45,8 +47,6 @@ export function toolbarActionIcon(id: ToolbarActionId, size = 14): ReactElement 
       return <TerminalIcon size={size} />
     case 'trash':
       return <RecycleIcon size={size} />
-    case 'settings':
-      return <SettingsIcon size={size} />
   }
 }
 

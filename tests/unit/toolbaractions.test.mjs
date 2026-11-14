@@ -8,7 +8,7 @@ import {
 
 describe('toolbar action order', () => {
   it('keeps known ids in order and drops unknown or repeated ones', () => {
-    expect(readToolbarActionOrder(['settings', 'ghost', 'add', 'settings', 7])).toEqual(['settings', 'add'])
+    expect(readToolbarActionOrder(['duplicate', 'ghost', 'add', 'duplicate', 7])).toEqual(['duplicate', 'add'])
     expect(readToolbarActionOrder(undefined)).toEqual([])
     expect(readToolbarActionOrder({ add: true })).toEqual([])
   })
@@ -18,10 +18,10 @@ describe('toolbar action order', () => {
       'console',
       'add',
       'edit',
+      'duplicate',
       'refresh',
       'delete',
       'trash',
-      'settings',
     ])
     expect(TOOLBAR_ACTION_IDS).toHaveLength(7)
     expect(orderToolbarActions(undefined)).toEqual([...TOOLBAR_ACTION_IDS])

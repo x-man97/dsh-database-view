@@ -82,6 +82,8 @@ export const api = {
 
   saveConnection: (draft: ConnectionDraft) =>
     post<{ connection: ClientConnection; config: ClientConfig }>('/connections/save', { ...draft }),
+  duplicateConnection: (id: string, name: string) =>
+    post<{ config: ClientConfig }>('/connections/duplicate', { id, name }),
   deleteConnection: (id: string) => post<{ config: ClientConfig }>('/connections/delete', { id }),
   restoreConnection: (id: string) =>
     post<{ connection: ClientConnection; config: ClientConfig }>('/connections/restore', { id }),

@@ -90,6 +90,7 @@ export function App(props: AppProps): ReactElement {
 
   const [toast, setToast] = useState<ToastState | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
   const [trashOpen, setTrashOpen] = useState(false)
   const [trashBusy, setTrashBusy] = useState<TrashBusy | null>(null)
   const [emptyingTrash, setEmptyingTrash] = useState(false)
@@ -281,6 +282,19 @@ export function App(props: AppProps): ReactElement {
     }
   }
 
+  async function duplicateConnection(connection: ClientConnection): Promise<void> {
+    setDuplicating(true)
+    try {
+      await api.duplicateConnection(connection.id, t('app.copyName', { name: connection.name }))
+      notify(t('notify.duplicated'), 'success')
+      await refresh()
+    } catch (error) {
+      notify(t('notify.duplicateFailed', { error: errorText(error) }), 'error')
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
   async function restoreConnection(item: ClientTrashedConnection): Promise<void> {
     setTrashBusy({ id: item.id, action: 'restore' })
     try {
@@ -344,6 +358,15 @@ export function App(props: AppProps): ReactElement {
       disabled: !selected || deleting,
       onClick: () => {
         if (selected) setConnModal({ open: true, editing: selected })
+      },
+    },
+    {
+      id: 'duplicate',
+      label: t('app.copy'),
+      title: t('app.copyTitle'),
+      disabled: !selected || duplicating,
+      onClick: () => {
+        if (selected) void duplicateConnection(selected)
       },
     },
     {

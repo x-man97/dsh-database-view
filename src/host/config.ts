@@ -391,6 +391,36 @@ export class ConfigStore {
     return connection
   }
 
+  /** Create an independent copy; credentials and SSH/TLS settings are copied too. */
+  duplicateConnection(id: string, name?: string): ConnectionConfig {
+    const source = this.connection(id)
+    if (source === undefined) throw new DbError('not-found', `连接不存在：${id}`)
+    const newId = randId('conn')
+    const secretName = Store.nameForConnection(newId)
+    const password = source.secretName === undefined ? undefined : this.secrets.resolve(source.secretName)?.value
+    if (password !== undefined) this.secrets.set(secretName, password)
+
+    const sshPassword = this.secrets.resolve(Store.nameForSshPassword(source.id))?.value
+    const sshPassphrase = this.secrets.resolve(Store.nameForSshPassphrase(source.id))?.value
+    if (sshPassword !== undefined) this.secrets.set(Store.nameForSshPassword(newId), sshPassword)
+    if (sshPassphrase !== undefined) this.secrets.set(Store.nameForSshPassphrase(newId), sshPassphrase)
+
+    const connection: ConnectionConfig = {
+      ...source,
+      id: newId,
+      name: asString(name === undefined ? `${source.name} copy` : name, '名称', NAME_MAX, true),
+      secretName,
+      hasPassword: password !== undefined,
+      createdAt: nowIso(),
+      ...(source.ssh === undefined ? {} : { ssh: { ...source.ssh } }),
+      ...(source.tls === undefined ? {} : { tls: { ...source.tls } }),
+    }
+    delete connection.lastUsedAt
+    this.data.connections.push(connection)
+    this.persist()
+    return connection
+  }
+
   /** Connections currently in the recycle bin, newest first. */
   trashed(id: string): TrashedConnection | undefined {
     return this.data.trash.find((connection) => connection.id === id)
