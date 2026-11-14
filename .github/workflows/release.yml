@@ -45,7 +45,7 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: 升级 npm（Trusted Publishing 需要 npm >= 11.5.1）
-        run: npm install -g npm@11.15.1
+        run: npm install -g npm@11.21.2
 
       - name: 校验 tag 与清单版本一致
         run: |
