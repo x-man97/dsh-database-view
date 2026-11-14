@@ -2358,7 +2358,7 @@ PR 必须通过：
 | **M1** 基础库 | 2–3 周 | PostgreSQL、SQLite、元数据/DDL/EXPLAIN、v1 迁移、表预览/缓存 | 基础库契约测试通过；驱动下载/离线导入可用 |
 | **M2** 企业库 | 3–4 周 | SQL Server、Oracle Thin：连接、元数据、DDL、EXPLAIN、TLS、driver pack | SQL Server/Oracle 真实实例通过；TLS/驱动下载通过 |
 | **M3** 体验 | 2 周 | 控制台、导出、Agent 工具、只读限制、错误/主机密钥/驱动下载 UX | 日常只读预览可用 |
-| **M4** 硬化/发布 | 1–2 周 | 性能/安全、打包、文档、外部 Engine 贡献指南、发布 | 验收清单通过；本轮 6 Engine 发布 |
+| **M4** 硬化/发布 | 1–2 周 | 性能/安全、打包、文档、外部 Engine 贡献指南、发布 | 验收清单通过；本轮 5 Engine（MySQL/MariaDB、PostgreSQL、SQLite、SQL Server、Oracle）发布 |
 | **后续** | 4–6 周 | 达梦、Redis SSH、OceanBase、JDBC 扩展包 | 不在本轮范围 |
 
 本轮约 **10–14 人周**（含 SPI、DriverManager、SSH、SQL Server/Oracle 元数据与测试）；如果团队没有现成的 Driver Pack 发布流水线，按 **11–15 人周** 估算。达梦/OceanBase/JDBC 不在本轮范围，后续约再加 4–6 人周。
