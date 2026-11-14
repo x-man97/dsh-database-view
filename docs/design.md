@@ -1,6 +1,6 @@
 # DSH 数据库表预览插件设计方案（B + 可选 C）
 
-> 版本：v1.4（设计稿；MySQL/PostgreSQL/SQLite 已联调，SQL Server/Oracle 待真实实例验证）  
+> 版本：v1.5（设计稿；5 个 SQL Engine 均已真实联调）  
 > 日期：2026-11-14  
 > 前置文档：[可行性研究报告](feasibility.md)  
 > 范围：Fork `dsh-ide-database`，保留右侧栏 UI，替换为 Java-free 数据访问层；内置 SSH 隧道；JDBC 作为独立可选扩展包（C）。  
@@ -69,7 +69,7 @@ Fork 现有插件
 
 > 本轮支持 5 个 Engine：MySQL（含 MariaDB）、PostgreSQL、SQLite、SQL Server、Oracle。达梦/OceanBase/JDBC/第三方只保留 Engine SPI、目录结构、文档和扩展点，不写对应 Engine 实现。
 >
-> **实现状态（2026-11-14）**：MySQL、PostgreSQL、SQLite 已在 DSH + Docker 中真实联调；SQL Server/Oracle 代码已实现、driver pack 已构建，但尚未连接真实实例验证；M3/M4 的体验/硬化仍在进行。
+> **实现状态（2026-11-14）**：MySQL、PostgreSQL、SQLite、SQL Server、Oracle 均已在 DSH + Docker 中真实联调；M3/M4 的体验/硬化仍在进行。
 >
 > 工作量：本轮约 **10–14 人周**（含 SPI、DriverManager、SSH、SQL Server/Oracle 元数据与测试）；若没有现成的 Driver Pack 构建流程，按 **11–15 人周** 估算。后续达梦/OceanBase/JDBC 约再加 4–6 人周。
 

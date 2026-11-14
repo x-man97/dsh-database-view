@@ -90,9 +90,9 @@ export class MssqlEngine implements DatabaseEngine {
     return this.connection
   }
 
-  private run(sql: string): Promise<{ columns: string[]; rows: unknown[][]; rowCount: number; updateCount?: number }> {
+  private run(sql: string): Promise<{ columns: Array<{ name: string; typeName: string }>; rows: unknown[][]; rowCount: number; updateCount?: number }> {
     return new Promise((resolve, reject) => {
-      const columns: string[] = []
+      const columns: Array<{ name: string; typeName: string }> = []
       const rows: unknown[][] = []
       const tedious = this.tedious
       if (tedious === undefined) throw new Error('tedious not loaded')
@@ -103,8 +103,8 @@ export class MssqlEngine implements DatabaseEngine {
       })
       this.request = request
       const evented = request as unknown as { on(event: string, listener: (...args: never[]) => void): void }
-      evented.on('columnMetadata', (metadata: Array<{ colName: string }>) => {
-        columns.splice(0, columns.length, ...metadata.map((column) => column.colName))
+      evented.on('columnMetadata', (metadata: Array<{ colName: string; type?: { name?: string } }>) => {
+        columns.splice(0, columns.length, ...metadata.map((column) => ({ name: column.colName, typeName: column.type?.name ?? '' })))
       })
       evented.on('row', (cells: Array<{ value: unknown }>) => {
         rows.push(cells.map((value) => cell(value.value)))
@@ -126,7 +126,7 @@ export class MssqlEngine implements DatabaseEngine {
   }
 
   async listSchemas(filter = ''): Promise<SchemaInfo[]> {
-    const result = await this.run("SELECT name FROM sys.schemas WHERE name NOT IN ('sys','INFORMATION_SCHEMA') ORDER BY name")
+    const result = await this.run("SELECT name FROM sys.schemas WHERE name NOT IN ('sys','INFORMATION_SCHEMA','guest') AND name NOT LIKE 'db[_]%' ORDER BY name")
     const needle = filter.trim().toLowerCase()
     return result.rows
       .map((row) => String(row[0]))
@@ -198,7 +198,7 @@ export class MssqlEngine implements DatabaseEngine {
     const maxRows = Math.max(1, Math.min(options.maxRows ?? 200, 5000))
     const shown = result.rows.slice(0, maxRows)
     return {
-      columns: result.columns.map((name) => ({ name, typeName: '' })),
+      columns: result.columns,
       rows: shown as Array<Array<string | number | boolean | null>>,
       rowCount: shown.length,
       truncated: result.rows.length > maxRows,

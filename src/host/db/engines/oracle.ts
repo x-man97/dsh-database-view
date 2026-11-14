@@ -15,6 +15,10 @@ import type {
 import { DbError, errorMessage } from '../../errors.js'
 import type { DatabaseEngine, EngineConnectContext, EngineDescriptor, EngineQueryOptions } from '../types.js'
 
+function pick(row: Record<string, unknown>, name: string): unknown {
+  return row[name] ?? row[name.toUpperCase()] ?? row[name.toLowerCase()]
+}
+
 function quoteIdent(name: string): string {
   return `"${name.replaceAll('"', '""')}"`
 }
@@ -62,7 +66,7 @@ export class OracleEngine implements DatabaseEngine {
   private oracledb: typeof import('oracledb') | undefined
 
   async connect(ctx: EngineConnectContext): Promise<ServerInfo> {
-    const loaded = await ctx.drivers.load<typeof import('oracledb')>('oracledb')
+    const loaded = await ctx.drivers.load<typeof import('oracledb')>('oracledb-thin')
     const oracledb = ((loaded as unknown as { default?: typeof import('oracledb') }).default ?? loaded)
     oracledb.fetchAsString = [oracledb.DATE, oracledb.NUMBER, oracledb.CLOB]
     this.oracledb = oracledb
@@ -119,25 +123,34 @@ export class OracleEngine implements DatabaseEngine {
   }
 
   async listSchemas(filter = ''): Promise<SchemaInfo[]> {
-    const result = await this.requireConnection().execute('SELECT username AS name FROM all_users ORDER BY username')
+    const result = await this.requireConnection().execute('SELECT username AS name FROM all_users ORDER BY username', [], { outFormat: this.oracledb?.OUT_FORMAT_OBJECT ?? 4002 })
     const needle = filter.trim().toLowerCase()
-    return (result.rows as Array<{ NAME: string }>)
-      .map((row) => row.NAME)
+    return (result.rows as Array<Record<string, unknown>>)
+      .map((row) => String(pick(row, 'NAME')))
       .filter((name) => needle === '' || name.toLowerCase().includes(needle))
-      .map((name) => ({ name }))
+      .map((name) => ({
+        name,
+        system: /^(SYS|SYSTEM|AUDSYS|DBSNMP|OUTLN|APPQOSSYS|GSMADMIN_INTERNAL|DBSFWUSER|DVF|DVSYS|GGSYS|GSMCATUSER|GSMUSER|LBACSYS|MDSYS|OJVMSYS|OLAPSYS|ORDDATA|ORDSYS|REMOTE_SCHEDULER_AGENT|SI_INFORMTN_SCHEMA|SYS$UMF|SYSBACKUP|SYSDG|SYSKM|SYSRAC|WMSYS|XDB)$/i.test(name),
+      }))
   }
 
   async listObjects(schema: string): Promise<SchemaObject[]> {
     const result = await this.requireConnection().execute(
       `SELECT object_name AS name, object_type AS type FROM all_objects
-       WHERE owner = :owner AND object_type IN ('TABLE','VIEW','PROCEDURE','FUNCTION','SEQUENCE','TRIGGER')
+       WHERE owner = :owner_name AND object_type IN ('TABLE','VIEW','PROCEDURE','FUNCTION','SEQUENCE','TRIGGER')
        ORDER BY object_name`,
-      { owner: schema },
+      { owner_name: schema },
+      { outFormat: this.oracledb?.OUT_FORMAT_OBJECT ?? 4002 },
     )
-    return (result.rows as Array<{ NAME: string; TYPE: string }>).map((row) => ({
-      name: row.NAME,
-      kind: row.TYPE === 'TABLE' ? 'table' : row.TYPE === 'VIEW' ? 'view' : row.TYPE.toLowerCase() as ObjectKind,
-    }))
+    return (result.rows as Array<Record<string, unknown>>)
+      .filter((row) => !String(pick(row, 'NAME') ?? '').startsWith('ISEQ$$_'))
+      .map((row) => {
+      const type = String(pick(row, 'TYPE') ?? '')
+      return {
+        name: String(pick(row, 'NAME')),
+        kind: type === 'TABLE' ? 'table' : type === 'VIEW' ? 'view' : type.toLowerCase() as ObjectKind,
+      }
+    })
   }
 
   async setSchema(schema: string): Promise<void> {
@@ -149,27 +162,30 @@ export class OracleEngine implements DatabaseEngine {
     const connection = this.requireConnection()
     const columns = await connection.execute(
       `SELECT column_name, data_type, data_length, data_precision, data_scale, nullable, data_default, column_id
-       FROM all_tab_columns WHERE owner = :owner AND table_name = :table ORDER BY column_id`,
-      { owner: schema, table },
+       FROM all_tab_columns WHERE owner = :owner_name AND table_name = :table_name ORDER BY column_id`,
+      { owner_name: schema, table_name: table },
+      { outFormat: this.oracledb?.OUT_FORMAT_OBJECT ?? 4002 },
     )
     const indexes = await connection.execute(
       `SELECT i.index_name, i.uniqueness, i.index_type, c.column_name, c.column_position
        FROM all_indexes i JOIN all_ind_columns c ON c.index_owner = i.owner AND c.index_name = i.index_name
-       WHERE i.table_owner = :owner AND i.table_name = :table ORDER BY i.index_name, c.column_position`,
-      { owner: schema, table },
+       WHERE i.table_owner = :owner_name AND i.table_name = :table_name ORDER BY i.index_name, c.column_position`,
+      { owner_name: schema, table_name: table },
+      { outFormat: this.oracledb?.OUT_FORMAT_OBJECT ?? 4002 },
     )
     const primary = await connection.execute(
       `SELECT cc.column_name FROM all_constraints c JOIN all_cons_columns cc
        ON cc.owner = c.owner AND cc.constraint_name = c.constraint_name
-       WHERE c.owner = :owner AND c.table_name = :table AND c.constraint_type = 'P'`,
-      { owner: schema, table },
+       WHERE c.owner = :owner_name AND c.table_name = :table_name AND c.constraint_type = 'P'`,
+      { owner_name: schema, table_name: table },
+      { outFormat: this.oracledb?.OUT_FORMAT_OBJECT ?? 4002 },
     )
-    const primaryColumns = new Set((primary.rows as Array<{ COLUMN_NAME: string }>).map((row) => row.COLUMN_NAME))
+    const primaryColumns = new Set((primary.rows as Array<Record<string, unknown>>).map((row) => String(pick(row, 'COLUMN_NAME'))))
     const byName = new Map<string, IndexInfo>()
     for (const row of indexes.rows as Array<Record<string, unknown>>) {
-      const name = String(row.INDEX_NAME)
-      const entry = byName.get(name) ?? { name, columns: [], unique: row.UNIQUENESS === 'UNIQUE', primary: primaryColumns.size > 0 && name === name }
-      entry.columns.push(String(row.COLUMN_NAME))
+      const name = String(pick(row, 'INDEX_NAME'))
+      const entry = byName.get(name) ?? { name, columns: [], unique: pick(row, 'UNIQUENESS') === 'UNIQUE', primary: false }
+      entry.columns.push(String(pick(row, 'COLUMN_NAME')))
       byName.set(name, entry)
     }
     const primaryIndex = [...byName.values()].find((index) => index.columns.every((column) => primaryColumns.has(column)) && primaryColumns.size > 0)
@@ -178,14 +194,18 @@ export class OracleEngine implements DatabaseEngine {
       schema,
       table,
       kind,
-      columns: (columns.rows as Array<Record<string, unknown>>).map((row): ColumnDetail => ({
-        name: String(row.COLUMN_NAME),
-        typeName: String(row.DATA_TYPE) + (row.DATA_PRECISION === null ? '' : `(${String(row.DATA_PRECISION)}${row.DATA_SCALE === null ? '' : `,${String(row.DATA_SCALE)}`})`),
-        nullable: row.NULLABLE === 'Y',
-        ...(row.DATA_DEFAULT === null ? {} : { defaultValue: String(row.DATA_DEFAULT) }),
-        ...(typeof row.COLUMN_ID === 'number' ? { ordinal: row.COLUMN_ID } : {}),
-        ...(primaryColumns.has(String(row.COLUMN_NAME)) ? { primaryKey: true } : {}),
-      })),
+      columns: (columns.rows as Array<Record<string, unknown>>).map((row): ColumnDetail => {
+        const precision = pick(row, 'DATA_PRECISION')
+        const scale = pick(row, 'DATA_SCALE')
+        return {
+          name: String(pick(row, 'COLUMN_NAME')),
+          typeName: String(pick(row, 'DATA_TYPE') ?? '') + (precision === null || precision === undefined ? '' : `(${String(precision)}${scale === null || scale === undefined ? '' : `,${String(scale)}`})`),
+          nullable: pick(row, 'NULLABLE') === 'Y',
+          ...(pick(row, 'DATA_DEFAULT') === null || pick(row, 'DATA_DEFAULT') === undefined ? {} : { defaultValue: String(pick(row, 'DATA_DEFAULT')) }),
+          ...(typeof pick(row, 'COLUMN_ID') === 'number' ? { ordinal: Number(pick(row, 'COLUMN_ID')) } : {}),
+          ...(primaryColumns.has(String(pick(row, 'COLUMN_NAME'))) ? { primaryKey: true } : {}),
+        }
+      }),
       indexes: [...byName.values()],
     }
   }
@@ -195,6 +215,8 @@ export class OracleEngine implements DatabaseEngine {
     try {
       const result = await this.requireConnection().execute(
         `SELECT DBMS_METADATA.GET_DDL(${quoteLiteral(objectType)}, ${quoteLiteral(table)}, ${quoteLiteral(schema)}) AS ddl FROM DUAL`,
+        [],
+        { outFormat: this.oracledb?.OUT_FORMAT_OBJECT ?? 4002 },
       )
       const first = (result.rows as unknown[] | undefined)?.[0]
       const ddl = Array.isArray(first) ? String(first[0] ?? '') : String((first as Record<string, unknown> | undefined)?.DDL ?? '')
@@ -218,7 +240,7 @@ export class OracleEngine implements DatabaseEngine {
       const rows = result.rows as Array<Record<string, unknown>>
       return {
         columns: meta.map((column) => ({ name: column.name, typeName: column.dbTypeName ?? '' })),
-        rows: rows.map((row) => meta.map((column) => cell(row[column.name]))),
+        rows: rows.map((row) => meta.map((column) => cell(pick(row, column.name)))),
         rowCount: rows.length,
         truncated: rows.length >= maxRows,
         elapsedMs: Date.now() - started,
