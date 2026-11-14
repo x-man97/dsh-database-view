@@ -209,7 +209,7 @@ export function ConnectionModal(props: ConnectionModalProps): ReactElement | nul
     setTesting(true)
     setError('')
     try {
-      setTestResult(await api.testConnection({ ...draft, id: undefined }))
+      setTestResult(await api.testConnection(draft))
     } catch (cause) {
       setTestResult(null)
       setError(errorText(cause))

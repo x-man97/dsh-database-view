@@ -72,6 +72,23 @@ describe('connection modal editing', () => {
     expect(draft.clearPassword).toBeUndefined()
   })
 
+  it('tests an edited connection with its id so the saved password is reused', async () => {
+    mocks.testConnection.mockResolvedValue({
+      ok: true,
+      latencyMs: 3,
+      server: { product: 'MySQL', version: '8.0.46' },
+    })
+    renderModal()
+
+    expect(passwordInput().value).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: '测试连接' }))
+
+    await waitFor(() => expect(mocks.testConnection).toHaveBeenCalledTimes(1))
+    const draft = mocks.testConnection.mock.calls[0][0]
+    expect(draft.id).toBe(existing.id)
+    expect(draft.password).toBeUndefined()
+  })
+
   it('sends a newly typed password', async () => {
     renderModal()
 
