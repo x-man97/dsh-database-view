@@ -1560,6 +1560,81 @@ export const CSS = `
 }
 .dshdb-redis-detail .dshdb-panel-body { overflow: auto; }
 .dshdb-redis-detail .dshdb-redis-value { min-width: 0; }
+/* SQL console: a transparent textarea over a highlighted, scroll-synced <pre>. */
+.dshdb-sql-editor {
+  position: relative;
+  display: grid;
+  width: 100%;
+  flex: none;
+}
+.dshdb-sql-editor > * { grid-area: 1 / 1; }
+.dshdb-sql-highlight {
+  margin: 0;
+  padding: 8px 10px;
+  border: 0.5px solid transparent;
+  box-sizing: border-box;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-family: var(--ds-font-family-code, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-primary);
+  pointer-events: none;
+  scrollbar-width: none;
+}
+.dshdb-sql-highlight::-webkit-scrollbar { display: none; }
+.dshdb-sql-input {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--dsw-alias-label-primary);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.dshdb-sql-input::placeholder {
+  color: var(--dsw-alias-label-dimmed);
+  -webkit-text-fill-color: var(--dsw-alias-label-dimmed);
+}
+.dshdb-tok-keyword { color: var(--dsw-alias-state-business-primary); font-weight: 500; }
+.dshdb-tok-string { color: var(--dsw-alias-state-success-primary); }
+.dshdb-tok-number { color: var(--dsw-alias-state-warn-primary); }
+.dshdb-tok-comment { color: var(--dsw-alias-label-tertiary); font-style: italic; }
+.dshdb-tok-function { color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 70%, var(--dsw-alias-label-primary)); }
+.dshdb-tok-operator { color: var(--dsw-alias-label-secondary); }
+
+/* Inline DML preview: the exact SQL is visible before it runs. */
+.dshdb-sql-preview {
+  margin: 6px 0 4px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  overflow: hidden;
+}
+.dshdb-sql-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
+  font-size: 11px;
+  color: var(--dsw-alias-label-secondary);
+}
+.dshdb-sql-preview-text {
+  margin: 0;
+  padding: 7px 9px;
+  max-height: 120px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-family: var(--ds-font-family-code, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-primary);
+}
+
 
 `;
 

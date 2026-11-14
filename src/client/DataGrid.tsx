@@ -33,6 +33,17 @@ export interface CellMenuTarget {
   rowIndex: number
 }
 
+export interface InlineEdit {
+  mode: 'insert' | 'edit'
+  /** Row being replaced in edit mode. */
+  rowIndex?: number
+  values: Record<string, string>
+  readOnlyColumns?: ReadonlySet<string>
+  onChange: (column: string, value: string) => void
+  onCommit: () => void
+  onCancel: () => void
+}
+
 interface VirtualRange {
   start: number
   end: number
@@ -74,6 +85,8 @@ export interface DataGridProps {
   onToggleRow?: (rowIndex: number, extend: boolean) => void
   /** Check or clear every visible row from the header checkbox. */
   onToggleAllRows?: () => void
+  /** Inline row editor rendered inside the grid, not in a dialog. */
+  inlineEdit?: InlineEdit
 }
 
 const MIN_COLUMN_WIDTH = 48
@@ -165,10 +178,30 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
     selectedRows,
     onToggleRow,
     onToggleAllRows,
+    inlineEdit,
   } = props
   const selectable = onToggleRow !== undefined
   const selectedCount = selectedRows?.size ?? 0
   const colSpan = columns.length + (selectable ? 2 : 1)
+  const inlineInput = (column: ColumnInfo, rowNo: string, autoFocus: boolean): ReactElement => (
+    <input
+      className="dshdb-cell-input"
+      aria-label={`${rowNo} ${column.name}`}
+      value={inlineEdit?.values[column.name] ?? ''}
+      readOnly={inlineEdit?.readOnlyColumns?.has(column.name) === true}
+      autoFocus={autoFocus}
+      onChange={(event) => inlineEdit?.onChange(column.name, event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          inlineEdit?.onCommit()
+        } else if (event.key === 'Escape') {
+          event.preventDefault()
+          inlineEdit?.onCancel()
+        }
+      }}
+    />
+  )
   const [menu, setMenu] = useState<{ items: ColumnMenuItem[]; x: number; y: number } | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const dragIndex = useRef<number | null>(null)
@@ -419,8 +452,9 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
             const rowIndex = range.start + index
             const rowNo = rowNumbers?.[rowIndex] ?? offset + rowIndex + 1
             const checked = selectedRows?.has(rowIndex) === true
+            const editing = inlineEdit?.mode === 'edit' && inlineEdit.rowIndex === rowIndex
             return (
-              <tr key={rowIndex} data-selected={selectable && checked ? 'true' : undefined}>
+              <tr key={rowIndex} data-selected={selectable && checked ? 'true' : undefined} data-editing={editing ? 'true' : undefined}>
                 {selectable ? (
                   <td className="dshdb-select-cell">
                     <input
@@ -433,6 +467,13 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
                 ) : null}
                 <td className="dshdb-num">{rowNo}</td>
                 {columns.map((column, columnIndex) => {
+                  if (editing) {
+                    return (
+                      <td key={`${column.name}-${columnIndex}`} className="dshdb-cell-editing">
+                        {inlineInput(column, String(rowNo), columnIndex === 0)}
+                      </td>
+                    )
+                  }
                   const value: CellValue = row[columnIndex] ?? null
                   // One format per cell: the same text feeds the tooltip and the body.
                   const text = formatCell(value)
@@ -464,6 +505,17 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
               </tr>
             )
           })}
+          {inlineEdit?.mode === 'insert' ? (
+            <tr className="dshdb-inline-row">
+              {selectable ? <td className="dshdb-select-cell" /> : null}
+              <td className="dshdb-num">新</td>
+              {columns.map((column, columnIndex) => (
+                <td key={`insert-${column.name}-${columnIndex}`} className="dshdb-cell-editing">
+                  {inlineInput(column, '新行', columnIndex === 0)}
+                </td>
+              ))}
+            </tr>
+          ) : null}
           {range.paddingBottom > 0 ? (
             <tr className="dshdb-vpad" aria-hidden="true">
               <td colSpan={colSpan} style={{ height: range.paddingBottom }} />

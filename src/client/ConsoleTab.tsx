@@ -39,6 +39,7 @@ import { nextRowSort, sortRowsWithOrder, type RowSort } from './rowsort'
 import { filterRowIndexesByHaystacks, rowHaystacks } from './rowfilter'
 import { pageable, wrapPage } from './pagesql'
 import { applyCommandCompletion, commandCompletion, keyCompletion } from './rediscommands'
+import { SqlHighlight } from './sqlhighlight'
 import { pickStatement, statementAtCaret } from './sqlselection'
 import { splitStatements } from './multistatement'
 import { readAllowedNumber, readFlag, readText, writeFlag, writeNumber, writeText } from './prefs'
@@ -463,7 +464,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
   const loadSchemaList = useCallback(async (id: string): Promise<void> => {
     if (id === '') return
     try {
-      const list = await api.schemas(id)
+      const list = await withConnection(id, () => api.schemas(id))
       setSchemas(list.schemas)
     } catch {
       // Keep the login default; the list retries after the first successful query.
@@ -2136,6 +2137,13 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                   aria-label="Redis 命令"
               value={command}
               spellCheck={false}
+              onScroll={(event) => {
+                const pre = event.currentTarget.parentElement?.querySelector('.dshdb-sql-highlight')
+                if (pre instanceof HTMLElement) {
+                  pre.scrollTop = event.currentTarget.scrollTop
+                  pre.scrollLeft = event.currentTarget.scrollLeft
+                }
+              }}
               onChange={(event) => {
                 recallRef.current = -1
                 setCommand(event.target.value)
@@ -2234,8 +2242,10 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
       ) : (
         <>
           <span className="dshdb-complete-anchor" ref={completionAnchor}>
-            <textarea
-              className="dshdb-input dshdb-console-input"
+            <div className="dshdb-sql-editor">
+              <SqlHighlight sql={statement} />
+              <textarea
+              className="dshdb-input dshdb-console-input dshdb-sql-input"
               placeholder={`输入 SQL，${shortcutLabel('console.run')} 执行（有选中内容时只执行选中部分），${shortcutLabel('console.complete')} 补全表名和列名（\`表.\` 后补全列名），${shortcutLabel('console.save')} 存成 .sql，${shortcutLabel('console.explain')} 查看执行计划，${shortcutLabel('console.clear')} 清空编辑器，${shortcutLabel('console.comment')} 注释，${shortcutLabel('console.runCaret')} 执行光标所在的语句，${shortcutLabel('console.format')} 格式化，${shortcutLabel('console.historyOlder')} / ${shortcutLabel('console.historyNewer')} 切换历史（可在设置里改）`}
                   aria-label="SQL 编辑器"
               ref={inputRef}
@@ -2344,7 +2354,8 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                   recallHistory(-1)
                 }
               }}
-            />
+              />
+            </div>
             {suggestions !== null ? (
               <div className="dshdb-complete" id={`${completeId}-list`} role="listbox" aria-label="补全候选">
                 {suggestionItems.length === 0 ? (

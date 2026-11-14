@@ -8,12 +8,12 @@
  * table has to be opened again instead of guessing.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
-import type { CellValue, ClientConnection, ColumnInfo, QueryResult, Row } from '../shared/types'
+import type { CellValue, ClientConnection, ColumnDetail, ColumnInfo, QueryResult, Row, SqlDialect, TableDescription } from '../shared/types'
 import { ApiError, api } from './api'
 import { DataGrid, type CellMenuTarget } from './DataGrid'
 import { MenuGroupList, type MenuGroupSpec } from './menugroups'
 import { formatCell, formatCount, formatMs } from './format'
-import { CopyIcon, DownloadIcon, FilterIcon, PlayIcon, RefreshIcon, TableIcon, TerminalIcon } from './icons'
+import { CopyIcon, DownloadIcon, EditIcon, FilterIcon, PlayIcon, PlusIcon, RefreshIcon, TableIcon, TerminalIcon, TrashIcon } from './icons'
 import { downloadText, exportFilename, renderExport, toCsv, toJson, toMarkdown, toTsv, type ExportFormat } from './export'
 import { openConsoleTab, readTableTabParams, type TableTabParams } from './tab-open'
 import { columnValues, commaValues, copyText, type ColumnMenuItem } from './colmenu'
@@ -30,6 +30,7 @@ import { CellValueModal } from './CellValueModal'
 import { DdlModal } from './DdlModal'
 import { cellValueView, type CellValueView } from './cellvalue'
 import { tableDumpText } from './tabledump'
+import { deleteRowSql, insertRowSql, updateRowSql } from './rowedit'
 
 /** What the tab body receives: the framework's tab reader. */
 export interface TableTabProps {
@@ -97,6 +98,13 @@ function PagerButton({
   )
 }
 
+interface InlineEditState {
+  mode: 'insert' | 'edit'
+  rowIndex?: number
+  values: Record<string, string>
+  readOnly: Set<string>
+}
+
 function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const [connection, setConnection] = useState<ClientConnection | null>(null)
   const [columns, setColumns] = useState<ColumnInfo[]>([])
@@ -110,6 +118,11 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   /** Auto-refresh period in ms; 0 means off. */
   const [autoMs, setAutoMs] = useState(() => readAllowedNumber(AUTO_REFRESH_KEY, AUTO_REFRESH_OPTIONS, 0))
   const [error, setError] = useState<Failure | null>(null)
+  const [description, setDescription] = useState<TableDescription | null>(null)
+  const [inlineEdit, setInlineEdit] = useState<InlineEditState | null>(null)
+  const [rowSaving, setRowSaving] = useState(false)
+  const [deletePreview, setDeletePreview] = useState<{ sqls: string[]; count: number } | null>(null)
+  const [rowError, setRowError] = useState('')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(() => readPageSize(TABLE_PAGE_KEY, PAGE_SIZES, 500))
   const [pageDraft, setPageDraft] = useState('1')
@@ -210,6 +223,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   // A reload, page change or filter shows different rows; old checkboxes would point nowhere.
   useEffect(() => {
     setSelectedRows(new Set())
+    setDeletePreview(null)
     selectionAnchor.current = null
   }, [rows, page])
 
@@ -283,6 +297,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         if (cancelled) return
         setConnection(found)
         await load(found, { page: 0, size: pageSize, where: '', orderBy: '', recount: true })
+        const described = await api.describe(found.id, params.schema, params.table, objectKind).catch(() => null)
+        if (!cancelled) setDescription(described)
       } catch (caught) {
         if (!cancelled) setError(failureText(caught))
       }
@@ -315,6 +331,129 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     [columns, connection, filters, load, orderStorageKey, orderText, page, pageSize, whereText],
   )
   applyRef.current = apply
+
+  const editableColumns = description?.columns ?? []
+  const keyColumns = editableColumns.filter((column) => column.primaryKey === true)
+  const effectiveKey = keyColumns.length > 0 ? keyColumns : editableColumns
+  const canMutate =
+    connection !== null &&
+    connection.readOnly !== true &&
+    objectKind === 'table' &&
+    description !== null &&
+    hiddenCount === 0
+  const selectedIndex = selectedRows.size === 1 ? [...selectedRows][0] : undefined
+  const selectedRow = selectedIndex === undefined ? undefined : displayRows[selectedIndex]
+
+  const rowValue = (column: string, row: Row): CellValue | null => {
+    const index = displayColumns.findIndex((entry) => entry.name === column)
+    return index < 0 ? null : row[index] ?? null
+  }
+
+  const startInsert = (): void => {
+    if (!canMutate) return
+    setRowError('')
+    setInlineEdit({ mode: 'insert', values: {}, readOnly: new Set() })
+  }
+  const startEdit = (): void => {
+    if (!canMutate || selectedRow === undefined) return
+    const values: Record<string, string> = {}
+    for (const column of editableColumns) {
+      const value = rowValue(column.name, selectedRow)
+      values[column.name] = value === null ? '' : String(value)
+    }
+    setRowError('')
+    setInlineEdit({
+      mode: 'edit',
+      rowIndex: selectedIndex,
+      values,
+      readOnly: new Set(editableColumns.filter((column) => column.primaryKey === true).map((column) => column.name)),
+    })
+  }
+  const updateInline = (column: string, value: string): void => {
+    setInlineEdit((previous) => (previous === null ? previous : { ...previous, values: { ...previous.values, [column]: value } }))
+  }
+  const cancelInline = (): void => {
+    if (rowSaving) return
+    setInlineEdit(null)
+    setRowError('')
+  }
+  const buildInlineSql = (state: InlineEditState): string => {
+    if (connection === null || description === null) throw new Error('连接尚未就绪')
+    const dialect = connection.dialect as SqlDialect
+    const values = editableColumns
+      .filter((column) => state.mode === 'insert'
+        ? state.values[column.name] !== undefined && state.values[column.name] !== ''
+        : column.primaryKey !== true)
+      .map((column) => {
+        const text = state.values[column.name] ?? ''
+        return { column, value: text === '' ? null : text }
+      })
+    if (state.mode === 'insert' && values.length === 0) throw new Error('至少填写一个字段')
+    if (state.mode === 'edit' && values.length === 0) throw new Error('这张表只有主键列，没有可修改的字段')
+    if (state.mode === 'insert') return insertRowSql(dialect, params.schema, params.table, values)
+    const row = selectedRow
+    if (row === undefined) throw new Error('选中的行已经不存在，请刷新后重试')
+    const original = new Map(effectiveKey.map((column) => [column.name, rowValue(column.name, row)]))
+    return updateRowSql(dialect, params.schema, params.table, values, effectiveKey, original)
+  }
+  const inlineSqlPreview = (() => {
+    if (inlineEdit === null) return ''
+    try {
+      return buildInlineSql(inlineEdit)
+    } catch (caught) {
+      return `-- ${failureText(caught).message}`
+    }
+  })()
+  const commitInline = async (): Promise<void> => {
+    if (inlineEdit === null) return
+    setRowSaving(true)
+    setRowError('')
+    try {
+      const sql = buildInlineSql(inlineEdit)
+      await api.query({ id: params.connectionId, sql, maxRows: 1, allowWrite: true })
+      setInlineEdit(null)
+      applyRef.current({ recount: true })
+    } catch (caught) {
+      setRowError(failureMessage(failureText(caught)))
+    } finally {
+      setRowSaving(false)
+    }
+  }
+  const requestDelete = (): void => {
+    if (connection === null || !canMutate || selectedRows.size === 0 || rowSaving) return
+    const targets = [...selectedRows].map((index) => displayRows[index]).filter((row): row is Row => row !== undefined)
+    if (targets.length === 0) return
+    const dialect = connection.dialect as SqlDialect
+    const sqls = targets.map((row) => {
+      const original = new Map(effectiveKey.map((column) => [column.name, rowValue(column.name, row)]))
+      return deleteRowSql(dialect, params.schema, params.table, effectiveKey, original)
+    })
+    setRowError('')
+    setDeletePreview({ sqls, count: sqls.length })
+  }
+  const executeDelete = async (): Promise<void> => {
+    if (deletePreview === null) return
+    setRowSaving(true)
+    setRowError('')
+    try {
+      for (const sql of deletePreview.sqls) {
+        await api.query({ id: params.connectionId, sql, maxRows: 1, allowWrite: true })
+      }
+      setDeletePreview(null)
+      setSelectedRows(new Set())
+      applyRef.current({ recount: true })
+    } catch (caught) {
+      setRowError(failureMessage(failureText(caught)))
+    } finally {
+      setRowSaving(false)
+    }
+  }
+  const cancelDelete = (): void => {
+    if (rowSaving) return
+    setDeletePreview(null)
+    setRowError('')
+  }
+
   const orderTextRef = useRef(orderText)
   orderTextRef.current = orderText
   const loadingRef = useRef(loading)
@@ -665,7 +804,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     setExportOpen(false)
     exportCancelled.current = false
     try {
-      const dialect = connection.dialect
+      const dialect = connection.dialect as SqlDialect
       let exportColumns = displayColumns
       let exportData = displayRows
       if (scope === 'all') {
@@ -905,6 +1044,58 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
             只读
           </Tag>
         ) : null}
+        {inlineEdit === null && deletePreview === null ? (
+          <>
+            <button
+              type="button"
+              className="dshdb-pager-btn"
+              title={canMutate ? '新增行' : objectKind === 'view' ? '视图不能新增行' : '显示全部列并连接可写数据源后才能新增行'}
+              aria-label="新增行"
+              onClick={startInsert}
+              disabled={!canMutate || rowSaving}
+            >
+              <PlusIcon size={13} />
+            </button>
+            <button
+              type="button"
+              className="dshdb-pager-btn"
+              title={canMutate ? (selectedIndex === undefined ? '先勾选一行再修改' : '修改选中的行') : '当前不可修改'}
+              aria-label="修改行"
+              onClick={startEdit}
+              disabled={!canMutate || selectedIndex === undefined || rowSaving}
+            >
+              <EditIcon size={13} />
+            </button>
+            <button
+              type="button"
+              className="dshdb-pager-btn"
+              title={canMutate ? '预览并删除选中的行' : '当前不可删除'}
+              aria-label="删除选中行"
+              onClick={requestDelete}
+              disabled={!canMutate || selectedRows.size === 0 || rowSaving}
+            >
+              <TrashIcon size={13} />
+            </button>
+          </>
+        ) : inlineEdit !== null ? (
+          <>
+            <Button size="sm" variant="primary" loading={rowSaving} onClick={() => void commitInline()}>
+              执行
+            </Button>
+            <Button size="sm" onClick={cancelInline} disabled={rowSaving}>
+              取消
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button size="sm" variant="primary" loading={rowSaving} onClick={() => void executeDelete()}>
+              执行删除{deletePreview === null ? '' : ` (${deletePreview.count})`}
+            </Button>
+            <Button size="sm" onClick={cancelDelete} disabled={rowSaving}>
+              取消
+            </Button>
+          </>
+        )}
         <span className="dshdb-qbar-spacer" />
         {loading ? <Loading bare /> : null}
         {elapsed !== undefined && !loading ? <span className="dshdb-qmeta">{formatMs(elapsed)}</span> : null}
@@ -1126,6 +1317,29 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         </Banner>
       ) : null}
 
+
+      {rowError !== '' ? (
+        <Banner tone="error" onClose={() => setRowError('')}>{rowError}</Banner>
+      ) : null}
+
+      {inlineEdit !== null || deletePreview !== null ? (
+        <div className="dshdb-sql-preview">
+          <div className="dshdb-sql-preview-head">
+            <span>SQL 预览</span>
+            <span className="dshdb-muted">
+              {inlineEdit !== null
+                ? inlineEdit.mode === 'insert' ? 'INSERT' : 'UPDATE'
+                : `DELETE ${deletePreview?.count ?? 0} 行`}
+            </span>
+            <span className="dshdb-qbar-spacer" />
+            <Button size="sm" variant="ghost" onClick={() => void copyText(inlineEdit !== null ? inlineSqlPreview : (deletePreview?.sqls.join(';\n') ?? ''))}>
+              复制 SQL
+            </Button>
+          </div>
+          <pre className="dshdb-sql-preview-text">{inlineEdit !== null ? inlineSqlPreview : deletePreview?.sqls.join(';\n')}</pre>
+        </div>
+      ) : null}
+
       {rows.length === 0 && !loading ? (
         <div className="dshdb-grid-wrap">
           <EmptyState
@@ -1235,6 +1449,15 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                 }
               : undefined
           }
+          inlineEdit={inlineEdit === null ? undefined : {
+            mode: inlineEdit.mode,
+            ...(inlineEdit.rowIndex === undefined ? {} : { rowIndex: inlineEdit.rowIndex }),
+            values: inlineEdit.values,
+            readOnlyColumns: inlineEdit.readOnly,
+            onChange: updateInline,
+            onCommit: () => void commitInline(),
+            onCancel: cancelInline,
+          }}
         />
       )}
 
