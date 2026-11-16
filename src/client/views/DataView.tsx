@@ -103,6 +103,8 @@ export interface DataViewProps {
   onDropObject?: (connectionId: string, schema: string, object: SchemaObject) => void
   /** Open the server DDL in a console tab. */
   onDdlConsole?: (connectionId: string, schema: string, table: string, kind: string) => void
+  /** Compare this table's structure with another table in the same schema. */
+  onCompareTable?: (connectionId: string, schema: string, table: string) => void
 }
 
 const rowDomId = (index: number): string => `dshdb-tree-row-${index}`
@@ -266,6 +268,9 @@ export function DataView(props: DataViewProps): ReactElement {
           ? [{ label: t('menu.dropObject'), run: () => props.onDropObject?.(connectionId, schema, object) }]
           : []),
         { label: t('menu.showDdl'), run: () => props.onShowDdl(connectionId, schema, object.name, object.kind) },
+        ...(props.onCompareTable !== undefined && isTable
+          ? [{ label: t('menu.compareStructure'), run: () => props.onCompareTable?.(connectionId, schema, object.name) }]
+          : []),
         ...(read !== undefined && isRelation
           ? [
               {
@@ -301,6 +306,7 @@ export function DataView(props: DataViewProps): ReactElement {
     [
       focusTreeFilter,
       props.connections,
+      props.onCompareTable,
       props.onDdlConsole,
       props.onDropObject,
       props.onModifyTable,

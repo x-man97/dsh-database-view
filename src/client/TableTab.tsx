@@ -13,7 +13,7 @@ import { ApiError, api } from './api'
 import { DataGrid, type CellMenuTarget } from './DataGrid'
 import { MenuGroupList, type MenuGroupSpec } from './menugroups'
 import { formatCell, formatCount, formatMs } from './format'
-import { ArrowUpIcon, CopyIcon, DownloadIcon, UndoIcon, EyeUpIcon, FilterIcon, MinusIcon, PlayIcon, PlusIcon, RefreshIcon, TableIcon, TerminalIcon } from './icons'
+import { ArrowUpIcon, CopyIcon, DownloadIcon, UndoIcon, EyeUpIcon, FilterIcon, MinusIcon, PlayIcon, PlusIcon, RefreshIcon, TableIcon, TerminalIcon, UploadIcon } from './icons'
 import { downloadText, exportFilename, renderExport, toCsv, toJson, toMarkdown, toTsv, type ExportFormat } from './export'
 import { openConsoleTab, readTableTabParams, type TableTabParams } from './tab-open'
 import { columnValues, commaValues, copyText, type ColumnMenuItem } from './colmenu'
@@ -33,6 +33,7 @@ import { tableDumpText } from './tabledump'
 import { SqlHighlight } from './sqlhighlight'
 import { useI18n } from './i18n'
 import { deleteRowSql, insertRowSql, updateRowSql, DEFAULT_VALUE, type RowValue } from './rowedit'
+import { DataImportModal } from './DataImportModal'
 import { summarizeRange, type GridRange } from './gridrange'
 
 /** What the tab body receives: the framework's tab reader. */
@@ -159,6 +160,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const [ddl, setDdl] = useState<{ title: string; text: string; warnings: string[] } | null>(null)
   const [ddlBusy, setDdlBusy] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const exportingRef = useRef(false)
   const [exportNote, setExportNote] = useState('')
@@ -1322,6 +1324,22 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
             取消
           </button>
         ) : null}
+        <button
+          type="button"
+          className="dshdb-pager-btn"
+          title={
+            canMutate
+              ? pendingCount > 0
+                ? t('import.blockedPending')
+                : t('table.import')
+              : t('import.readonly')
+          }
+          aria-label={t('table.import')}
+          onClick={() => setImportOpen(true)}
+          disabled={!canMutate || description === null || pendingCount > 0 || loading}
+        >
+          <UploadIcon size={13} />
+        </button>
         <span className="dshdb-menu-wrap" ref={exportAnchor}>
           <button
             type="button"
@@ -1807,6 +1825,23 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         {rowError !== '' ? <Banner tone="error">{rowError}</Banner> : null}
       </Modal>
       <CellValueModal view={cellView} onClose={() => setCellView(null)} />
+      <DataImportModal
+        target={
+          !importOpen || connection === null || description === null
+            ? null
+            : {
+                connection,
+                schema: params.schema,
+                table: params.table,
+                columns: description.columns,
+              }
+        }
+        onClose={() => setImportOpen(false)}
+        onImported={(count) => {
+          setExportNote(t('import.done', { n: formatCount(count) }))
+          applyRef.current({ recount: true, page: 0 })
+        }}
+      />
     </div>
   )
 }

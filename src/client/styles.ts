@@ -1572,6 +1572,12 @@ export const CSS = `
   min-height: 54px;
   max-height: 220px;
 }
+.dshdb-import-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
 .dshdb-redis-value {
   display: flex;
   flex: 1 1 auto;

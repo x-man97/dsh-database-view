@@ -33,6 +33,7 @@ import { openConsoleTab, openTableTab } from './tab-open'
 import { dropObjectSql, renameTableSql } from './tableddl'
 import { TableDesigner, type TableDesignerTarget } from './TableDesigner'
 import { TableRenameModal, type TableRenameTarget } from './TableRenameModal'
+import { CompareStructureModal, type CompareStructureTarget } from './CompareStructureModal'
 import { tableSelectSql } from './tablesql'
 import {
   Banner,
@@ -121,6 +122,7 @@ export function App(props: AppProps): ReactElement {
   })
   const [designer, setDesigner] = useState<TableDesignerTarget | null>(null)
   const [renameTarget, setRenameTarget] = useState<TableRenameTarget | null>(null)
+  const [compareTarget, setCompareTarget] = useState<CompareStructureTarget | null>(null)
 
   const notify = useCallback((text: string, tone: 'info' | 'success' | 'error' = 'info') => {
     setToast((previous) => nextToast(previous, text, tone))
@@ -605,6 +607,15 @@ export function App(props: AppProps): ReactElement {
     [notify, selectConnection],
   )
 
+  const openCompareTable = useCallback(
+    (connectionId: string, schema: string, table: string): void => {
+      const connection = connections.find((item) => item.id === connectionId)
+      if (connection === undefined || connection.dialect === 'redis') return
+      setCompareTarget({ connection, schema, table })
+    },
+    [connections],
+  )
+
   return (
     <div className="dshdb-root" style={rootStyle} data-plugin-route={ROUTE_PREFIX}>
       {/* IDEA 风格工具窗口：工具栏左对齐，下面是数据源列表 */}
@@ -753,6 +764,7 @@ export function App(props: AppProps): ReactElement {
               onRenameTable={openRenameTable}
               onDropObject={dropObject}
               onDdlConsole={openDdlConsole}
+              onCompareTable={openCompareTable}
             />
           </div>
         ) : null}
@@ -877,6 +889,7 @@ export function App(props: AppProps): ReactElement {
       </Modal>
       <TableDesigner target={designer} onClose={() => setDesigner(null)} onExecute={applyTableDdl} />
       <TableRenameModal target={renameTarget} onClose={() => setRenameTarget(null)} onRename={renameTable} />
+      <CompareStructureModal target={compareTarget} onClose={() => setCompareTarget(null)} />
       <ConfirmDialog request={confirm?.request ?? null} onConfirm={() => resolveConfirm(true)} onCancel={() => resolveConfirm(false)} />
       <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
