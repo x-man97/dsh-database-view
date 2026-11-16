@@ -981,6 +981,7 @@ export function useDataSources(notify: Notify): DataSources {
     setRedisDetail(null)
     setRedisDetailDb(-1)
     setSelectedKey('')
+    setSelectedSchema('')
   }, [])
 
   const refreshSelected = useCallback(async (): Promise<void> => {

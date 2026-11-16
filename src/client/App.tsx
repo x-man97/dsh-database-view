@@ -38,7 +38,7 @@ import { CompareStructureModal, type CompareStructureTarget } from './CompareStr
 import { CompareDataModal, type CompareDataTarget } from './CompareDataModal'
 import { ViewDesigner, type ViewDesignerTarget } from './ViewDesigner'
 import { SchemaCreateModal, type SchemaCreateTarget } from './SchemaCreateModal'
-import { createSchemaSql, supportsCreateSchema } from './schemaddl'
+import { createSchemaSql, dropSchemaSql, supportsSchemaDdl } from './schemaddl'
 import { SqlGeneratorModal, type SqlGeneratorTarget } from './SqlGeneratorModal'
 import { extractViewSelect } from './viewddl'
 import { SqlHighlight } from './sqlhighlight'
@@ -106,6 +106,7 @@ export function App(props: AppProps): ReactElement {
   const [trashBusy, setTrashBusy] = useState<TrashBusy | null>(null)
   const [emptyingTrash, setEmptyingTrash] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [schemaDropping, setSchemaDropping] = useState(false)
   const [confirm, setConfirm] = useState<{ request: ConfirmRequest; resolve: (ok: boolean) => void } | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [connModal, setConnModal] = useState<{ open: boolean; editing: ClientConnection | null; seed: ClientConnection | null }>({
@@ -175,6 +176,7 @@ export function App(props: AppProps): ReactElement {
     refresh,
     connect,
     disconnect,
+    resetDetail,
     reorderConnections,
     refreshSelected,
     toggleConnection,
@@ -347,6 +349,73 @@ export function App(props: AppProps): ReactElement {
     }
   }
 
+  /** A structure change on a cold tab opens the connection once, like table reads do. */
+  const executeDdl = useCallback(async (connectionId: string, schema: string, sql: string): Promise<void> => {
+    const run = (): Promise<unknown> => api.query({ id: connectionId, sql, allowWrite: true, schema, maxRows: 1 })
+    try {
+      await run()
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'not-connected') {
+        await api.connect(connectionId)
+        await run()
+        return
+      }
+      throw error
+    }
+  }, [])
+
+  // `selectedKey` names the selected tree row; a schema row reads
+  // `<connectionId>|schema:<name>`. Only an exact schema row may be dropped:
+  // selecting a table inside it must keep the toolbar on the data source.
+  const schemaMarker = selectedKey.indexOf('|schema:')
+  const selectedSchemaRow = schemaMarker === -1 ? '' : selectedKey.slice(schemaMarker + '|schema:'.length)
+  const selectedSchemaEntry =
+    selected !== undefined && selectedSchemaRow !== ''
+      ? (schemas[selected.id] ?? []).find((item) => item.name === selectedSchemaRow)
+      : undefined
+  const schemaDeleteBlocked =
+    selectedSchemaRow === ''
+      ? ''
+      : selected === undefined || selected.readOnly === true
+        ? t('app.deleteSchemaReadonly')
+        : !supportsSchemaDdl(selected.dialect)
+          ? t('app.deleteSchemaUnsupported')
+          : selectedSchemaEntry?.system === true
+            ? t('app.deleteSchemaSystem')
+            : ''
+
+  const dropSchema = useCallback(
+    async (connection: ClientConnection, schema: string): Promise<void> => {
+      const sql = dropSchemaSql(connection.dialect, schema)
+      if (sql === null) return
+      const note = connection.dialect === 'mysql' ? t('confirm.dropSchemaMysql') : t('confirm.dropSchemaEmpty')
+      const ok = await askConfirm(t('confirm.dropSchema', { name: schema }), `${sql}\n\n${note}`)
+      if (!ok) return
+      setSchemaDropping(true)
+      try {
+        await executeDdl(connection.id, connection.database, sql)
+        // Every cached page of that schema is stale now; the next open reads again.
+        clearTableSnapshots()
+        await reloadSchemas(connection.id)
+        resetDetail()
+        notify(t('notify.schemaDropped', { name: schema }), 'success')
+      } catch (error) {
+        notify(t('schemaDrop.failed', { name: schema, error: errorText(error) }), 'error')
+      } finally {
+        setSchemaDropping(false)
+      }
+    },
+    [askConfirm, executeDdl, notify, reloadSchemas, resetDetail, t],
+  )
+
+  const dropSchemaFromTree = useCallback(
+    (connectionId: string, schema: string): void => {
+      const connection = connections.find((item) => item.id === connectionId)
+      if (connection !== undefined) void dropSchema(connection, schema)
+    },
+    [connections, dropSchema],
+  )
+
   const toolbarActions: {
     id: ToolbarActionId
     label: string
@@ -414,10 +483,22 @@ export function App(props: AppProps): ReactElement {
     },
     {
       id: 'delete',
-      label: t('app.delete'),
-      title: t('app.deleteTitle'),
-      disabled: !selected || deleting,
+      label: selectedSchemaRow === '' ? t('app.delete') : t('app.deleteSchema'),
+      title:
+        selectedSchemaRow === ''
+          ? t('app.deleteTitle')
+          : schemaDeleteBlocked === ''
+            ? t('app.deleteSchemaTitle', { name: selectedSchemaRow })
+            : schemaDeleteBlocked,
+      disabled:
+        selectedSchemaRow === ''
+          ? !selected || deleting
+          : schemaDeleteBlocked !== '' || schemaDropping,
       onClick: () => {
+        if (selectedSchemaRow !== '') {
+          if (selected !== undefined && schemaDeleteBlocked === '') void dropSchema(selected, selectedSchemaRow)
+          return
+        }
         if (selected) void deleteConnection(selected)
       },
     },
@@ -530,21 +611,6 @@ export function App(props: AppProps): ReactElement {
     [connections, selectConnection],
   )
 
-  /** A structure change on a cold tab opens the connection once, like table reads do. */
-  const executeDdl = useCallback(async (connectionId: string, schema: string, sql: string): Promise<void> => {
-    const run = (): Promise<unknown> => api.query({ id: connectionId, sql, allowWrite: true, schema, maxRows: 1 })
-    try {
-      await run()
-    } catch (error) {
-      if (error instanceof ApiError && error.code === 'not-connected') {
-        await api.connect(connectionId)
-        await run()
-        return
-      }
-      throw error
-    }
-  }, [])
-
   /** A successful structure change invalidates both the tree and the cached description. */
   const refreshAfterDdl = useCallback(
     async (connectionId: string, schema: string): Promise<void> => {
@@ -572,7 +638,7 @@ export function App(props: AppProps): ReactElement {
   const openCreateSchema = useCallback(
     (connectionId: string): void => {
       const connection = connections.find((item) => item.id === connectionId)
-      if (connection === undefined || connection.readOnly === true || !supportsCreateSchema(connection.dialect)) return
+      if (connection === undefined || connection.readOnly === true || !supportsSchemaDdl(connection.dialect)) return
       setSchemaCreate({ connection })
     },
     [connections],
@@ -908,6 +974,7 @@ export function App(props: AppProps): ReactElement {
               onOpenConsole={openConsoleFromTree}
               onNewTable={openNewTable}
               onCreateSchema={openCreateSchema}
+              onDropSchema={dropSchemaFromTree}
               onModifyTable={openModifyTable}
               onRenameTable={openRenameTable}
               onDropObject={dropObject}

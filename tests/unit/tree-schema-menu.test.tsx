@@ -110,6 +110,20 @@ describe('schema context menu', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: '新建 Schema…' }))
     expect(onCreateSchema).toHaveBeenCalledWith('c1')
   })
+
+  it('drops a schema from the schema menu', async () => {
+    const onDropSchema = vi.fn()
+    render(<DataView {...props({ onDropSchema })} />)
+    fireEvent.contextMenu(schemaRow())
+    fireEvent.click(await screen.findByRole('menuitem', { name: '删除 Schema…' }))
+    expect(onDropSchema).toHaveBeenCalledWith('c1', 'shop')
+  })
+
+  it('does not offer dropping a system schema', async () => {
+    render(<DataView {...props({ onDropSchema: vi.fn(), schemas: { c1: [{ name: 'shop', system: true }] } })} />)
+    fireEvent.contextMenu(schemaRow())
+    expect(screen.queryByRole('menuitem', { name: '删除 Schema…' })).toBeNull()
+  })
   it('exports every table of the schema as one script', async () => {
     const readDdl = vi.fn(
       async (_connectionId: string, _schema: string, table: string): Promise<string | null> =>

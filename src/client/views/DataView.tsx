@@ -28,7 +28,7 @@ import { SqlHighlight } from '../sqlhighlight'
 import { selectColumnsSql } from '../tablesql'
 import { tableSelectSql } from '../tablesql'
 import { supportsSqlDesign } from '../tableddl'
-import { supportsCreateSchema } from '../schemaddl'
+import { supportsSchemaDdl } from '../schemaddl'
 import { TreeMenu, placeMenu, type TreeMenuState } from './tree-menu'
 import { objectIcon } from './tree-parts'
 import { buildTreeRows, folderOf, type TreeRow } from './tree-rows'
@@ -103,6 +103,8 @@ export interface DataViewProps {
   onNewTable?: (connectionId: string, schema: string) => void
   /** Create a new schema (database on MySQL) on this connection. */
   onCreateSchema?: (connectionId: string) => void
+  /** Drop one schema (database on MySQL) and everything it contains. */
+  onDropSchema?: (connectionId: string, schema: string) => void
   onModifyTable?: (connectionId: string, schema: string, table: string) => void
   onRenameTable?: (connectionId: string, schema: string, table: string) => void
   onDropObject?: (connectionId: string, schema: string, object: SchemaObject) => void
@@ -371,12 +373,19 @@ export function DataView(props: DataViewProps): ReactElement {
       event.preventDefault()
       const connection = props.connections.find((item) => item.id === connectionId)
       const canManage = connection !== undefined && supportsSqlDesign(connection.dialect) && connection.readOnly !== true
+      const schemaEntry = (props.schemas[connectionId] ?? []).find((item) => item.name === schemaName)
+      const canDrop =
+        canManage &&
+        props.onDropSchema !== undefined &&
+        connection !== undefined &&
+        supportsSchemaDdl(connection.dialect) &&
+        schemaEntry?.system !== true
       const items = [
         ...(canManage
           ? [
               { label: t('menu.newTable'), run: () => props.onNewTable?.(connectionId, schemaName) },
               { label: t('menu.newView'), run: () => props.onNewView?.(connectionId, schemaName) },
-              ...(props.onCreateSchema !== undefined && supportsCreateSchema(connection.dialect)
+              ...(props.onCreateSchema !== undefined && connection !== undefined && supportsSchemaDdl(connection.dialect)
                 ? [{ label: t('menu.newSchema'), run: () => props.onCreateSchema?.(connectionId) }]
                 : []),
             ]
@@ -394,17 +403,30 @@ export function DataView(props: DataViewProps): ReactElement {
             setTimeout(focusTreeFilter, 0)
           },
         },
+        ...(canDrop
+          ? [{ label: t('menu.dropSchema'), run: () => props.onDropSchema?.(connectionId, schemaName) }]
+          : []),
       ]
       setSchemaMenu({ ...placeMenu(event.clientX, event.clientY, items), items })
     },
-    [exportSchemaScript, focusTreeFilter, props.connections, props.onCreateSchema, props.onNewTable, props.onNewView, props.onSqlGenerator],
+    [
+      exportSchemaScript,
+      focusTreeFilter,
+      props.connections,
+      props.onCreateSchema,
+      props.onDropSchema,
+      props.onNewTable,
+      props.onNewView,
+      props.onSqlGenerator,
+      props.schemas,
+    ],
   )
 
   const openConnectionMenu = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>, connection: ClientConnection): void => {
       event.preventDefault()
       const items = [
-        ...(props.onCreateSchema !== undefined && supportsCreateSchema(connection.dialect) && connection.readOnly !== true
+        ...(props.onCreateSchema !== undefined && supportsSchemaDdl(connection.dialect) && connection.readOnly !== true
           ? [{ label: t('menu.newSchema'), run: () => props.onCreateSchema?.(connection.id) }]
           : []),
         { label: t('menu.copyConnectionName'), run: () => void copyText(connection.name) },
