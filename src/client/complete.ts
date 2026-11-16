@@ -18,6 +18,43 @@ export type { Completion, CompletionKind }
 export { matchScore }
 export { applyCompletion, qualifierBefore, wordAtCaret } from './completion/edit'
 
+/** True while an IME is composing; Enter there confirms the candidate, not the statement. */
+export function composing(event: { nativeEvent: Event }): boolean {
+  return (event.nativeEvent as unknown as { isComposing?: boolean }).isComposing === true
+}
+
+/** A single typed identifier character may open the completion popup. */
+export function opensCompletion(previous: string, next: string): boolean {
+  if (next.length !== previous.length + 1) return false
+  let index = 0
+  while (index < previous.length && previous[index] === next[index]) index += 1
+  const typed = next.charAt(index)
+  return typed !== '' && /[\w$.\u4e00-\u9fa5`"]/.test(typed)
+}
+
+/** Localized label for the right-hand hint of a completion row. */
+export function completionKindLabel(
+  t: (key: string, params?: Record<string, unknown>) => string,
+  kind: CompletionKind,
+): string {
+  switch (kind) {
+    case 'column':
+      return t('console.kindColumn')
+    case 'table':
+      return t('console.kindTable')
+    case 'schema':
+      return t('console.kindDatabase')
+    case 'function':
+      return t('console.kindFunction')
+    case 'alias':
+      return t('console.kindAlias')
+    case 'snippet':
+      return t('console.kindSnippet')
+    case 'keyword':
+      return t('console.kindKeyword')
+  }
+}
+
 /** All SQL keywords, ordered as the editor has always listed them. */
 const ALL_KEYWORDS: readonly Completion[] = keywordCandidates('any', 'mysql')
 

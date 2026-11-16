@@ -31,6 +31,7 @@ import { DdlModal } from './DdlModal'
 import { cellValueView, type CellValueView } from './cellvalue'
 import { tableDumpText } from './tabledump'
 import { SqlHighlight } from './sqlhighlight'
+import { SqlFilterInput } from './SqlFilterInput'
 import { useI18n } from './i18n'
 import { deleteRowSql, insertRowSql, updateRowSql, whereForRow, DEFAULT_VALUE, type RowValue } from './rowedit'
 import { DataImportModal } from './DataImportModal'
@@ -131,8 +132,6 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const [pageSize, setPageSize] = useState(() => readPageSize(TABLE_PAGE_KEY, PAGE_SIZES, 500))
   const [pageDraft, setPageDraft] = useState('1')
   const [whereText, setWhereText] = useState(() => params.where ?? '')
-  /** Two table tabs open at once must not share one datalist id. */
-  const columnsListId = `dshdb-columns-${params.table.replace(/[^\w-]/gu, '-')}`
   /** Sort order survives closing the tab, the same way column widths do. */
   const orderStorageKey = `${ORDER_KEY}:${params.schema}.${params.table}`
   const [orderText, setOrderText] = useState(() => readText(orderStorageKey))
@@ -1506,23 +1505,23 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
 
       <div className="dshdb-qfilter">
         <span className="dshdb-qfilter-label">WHERE</span>
-        <input
+        <SqlFilterInput
           ref={whereRef}
-          className="dshdb-input dshdb-qfilter-input"
-          placeholder={t('table.wherePlaceholder')}
-          aria-label={t('table.whereAria')}
-          list={columnsListId}
-          title={t('table.whereFocus', { binding: shortcutLabel('table.where') })}
           value={whereText}
-          spellCheck={false}
-          onChange={(event) => setWhereText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') apply({ where: whereText, page: 0 })
-            if (event.key === 'Escape') {
-              setWhereText('')
-              apply({ where: '', page: 0 })
-            }
+          onChange={setWhereText}
+          onEnter={() => apply({ where: whereText, page: 0 })}
+          onEscape={() => {
+            setWhereText('')
+            apply({ where: '', page: 0 })
           }}
+          placeholder={t('table.wherePlaceholder')}
+          ariaLabel={t('table.whereAria')}
+          title={t('table.whereFocus', { binding: shortcutLabel('table.where') })}
+          connectionId={params.connectionId}
+          schema={params.schema}
+          table={params.table}
+          dialect={connection?.dialect ?? 'mysql'}
+          clause="where"
         />
         {whereText === '' ? null : (
           <button
@@ -1539,21 +1538,22 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           </button>
         )}
         <span className="dshdb-qfilter-label">ORDER BY</span>
-        <input
-          className="dshdb-input dshdb-qfilter-input dshdb-qfilter-order"
-          placeholder={t('table.orderPlaceholder')}
-          aria-label={t('table.orderAria')}
-          list={columnsListId}
+        <SqlFilterInput
           value={orderText}
-          spellCheck={false}
-          onChange={(event) => setOrderText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') apply({ orderBy: orderText, page: 0 })
-            if (event.key === 'Escape') {
-              setOrderText('')
-              apply({ orderBy: '', page: 0 })
-            }
+          onChange={setOrderText}
+          onEnter={() => apply({ orderBy: orderText, page: 0 })}
+          onEscape={() => {
+            setOrderText('')
+            apply({ orderBy: '', page: 0 })
           }}
+          placeholder={t('table.orderPlaceholder')}
+          ariaLabel={t('table.orderAria')}
+          connectionId={params.connectionId}
+          schema={params.schema}
+          table={params.table}
+          dialect={connection?.dialect ?? 'mysql'}
+          clause="order"
+          className="dshdb-qfilter-order"
         />
         {orderText === '' ? null : (
           <button
@@ -1569,11 +1569,6 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
             ×
           </button>
         )}
-        <datalist id={columnsListId}>
-          {columns.map((column) => (
-            <option key={column.name} value={column.name} />
-          ))}
-        </datalist>
         <button
           type="button"
           className="dshdb-pager-btn"

@@ -48,7 +48,7 @@ import { shortcutHit, shortcutLabel } from './keymap'
 import type { ShortcutId } from '../shared/keymap'
 import { downloadText, exportFilename, renderExport, toCsv, toJson, toMarkdown, toTsv, type ExportFormat } from './export'
 import { cellWhere, groupCountSql, inListOf, insertStatement, insertStatements, columnNames, selectColumnsSql, tableFromStatement } from './tablesql'
-import { applyCompletion, wordAtCaret, type Completion } from './complete'
+import { applyCompletion, completionKindLabel, composing, opensCompletion, wordAtCaret, type Completion } from './complete'
 import { complete as completeRequest } from './completion/engine'
 import { matchScore } from './completion/rank'
 import { ConsoleCompletionCatalog } from './completion/catalog'
@@ -113,19 +113,6 @@ const REDIS_DB_KEY_PREFIX = 'dsh-database-view.redis-db.v1:'
 const SCHEMA_KEY_PREFIX = 'dsh-database-view.schema.v1:'
 
 const TTL_ONLY_KEY = 'dsh-database-view.redis.ttl-only.v1'
-/** 中文输入法用回车确认候选词时，KeyboardEvent 带 isComposing 标记。 */
-function composing(event: { nativeEvent: Event }): boolean {
-  return (event.nativeEvent as unknown as { isComposing?: boolean }).isComposing === true
-}
-
-/** A single typed identifier character may open the completion popup. */
-function opensCompletion(previous: string, next: string): boolean {
-  if (next.length !== previous.length + 1) return false
-  let index = 0
-  while (index < previous.length && previous[index] === next[index]) index += 1
-  const typed = next.charAt(index)
-  return typed !== '' && /[\w$.\u4e00-\u9fa5`"]/.test(typed)
-}
 
 const PAGE_SIZES = [200, 500, 1000, 2000, 5000]
 /** Pseudo page size meaning "run the statement once and show everything". */
@@ -2384,21 +2371,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
                         {item.detail !== undefined ? (
                           <span className="dshdb-complete-detail">{item.detail}</span>
                         ) : null}
-                        <span className="dshdb-complete-kind">
-                          {item.kind === 'column'
-                            ? t('console.kindColumn')
-                            : item.kind === 'table'
-                              ? t('console.kindTable')
-                              : item.kind === 'schema'
-                                ? t('console.kindDatabase')
-                                : item.kind === 'function'
-                                  ? t('console.kindFunction')
-                                  : item.kind === 'alias'
-                                    ? t('console.kindAlias')
-                                    : item.kind === 'snippet'
-                                      ? t('console.kindSnippet')
-                                      : t('console.kindKeyword')}
-                        </span>
+                        <span className="dshdb-complete-kind">{completionKindLabel(t, item.kind)}</span>
                       </span>
                     </button>
                   ))

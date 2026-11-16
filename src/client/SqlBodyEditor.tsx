@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useId, useRef, useState, type ReactElement } from 'react'
 import type { ClientConnection } from '../shared/types'
+import { completionKindLabel, composing, opensCompletion } from './complete'
 import { ConsoleCompletionCatalog } from './completion/catalog'
 import { applyCompletion } from './completion/edit'
 import { complete } from './completion/engine'
@@ -11,18 +12,6 @@ import type { Completion } from './completion/types'
 import { useI18n } from './i18n'
 import { usePopoverDismiss } from './popover'
 import { SqlHighlight } from './sqlhighlight'
-
-function composing(event: { nativeEvent: Event }): boolean {
-  return (event.nativeEvent as unknown as { isComposing?: boolean }).isComposing === true
-}
-
-function opensCompletion(previous: string, next: string): boolean {
-  if (next.length !== previous.length + 1) return false
-  let index = 0
-  while (index < previous.length && previous[index] === next[index]) index += 1
-  const typed = next.charAt(index)
-  return typed !== '' && /[\w$.\u4e00-\u9fa5`"]/.test(typed)
-}
 
 export interface SqlBodyEditorProps {
   value: string
@@ -130,20 +119,6 @@ export function SqlBodyEditor({
   }
 
   const activeIndex = suggestions === null || suggestions.length === 0 ? 0 : active % suggestions.length
-  const kindLabel = (kind: Completion['kind']): string =>
-    kind === 'column'
-      ? t('console.kindColumn')
-      : kind === 'table'
-        ? t('console.kindTable')
-        : kind === 'schema'
-          ? t('console.kindDatabase')
-          : kind === 'function'
-            ? t('console.kindFunction')
-            : kind === 'alias'
-              ? t('console.kindAlias')
-              : kind === 'snippet'
-                ? t('console.kindSnippet')
-                : t('console.kindKeyword')
 
   return (
     <span className="dshdb-complete-anchor" ref={anchorRef}>
@@ -228,7 +203,7 @@ export function SqlBodyEditor({
                 <span className="dshdb-complete-name">{item.name}</span>
                 <span className="dshdb-complete-meta">
                   {item.detail === undefined ? null : <span className="dshdb-complete-detail">{item.detail}</span>}
-                  <span className="dshdb-complete-kind">{kindLabel(item.kind)}</span>
+                  <span className="dshdb-complete-kind">{completionKindLabel(t, item.kind)}</span>
                 </span>
               </button>
             ))

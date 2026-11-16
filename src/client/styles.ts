@@ -1387,6 +1387,45 @@ export const CSS = `
 .dshdb-qfilter-input { flex: 1; min-width: 90px; height: 22px; border: 0; background: transparent; font-family: var(--ds-font-family-code, ui-monospace, Menlo, Consolas, monospace); font-size: 11.5px; }
 .dshdb-qfilter-input:focus { border: 0; outline: none; }
 .dshdb-qfilter-order { flex: 0 1 190px; border-left: 0.5px solid var(--dsw-alias-border-l1); padding-left: 8px; }
+/* WHERE/ORDER BY: a transparent input over a highlighted single-line copy. */
+.dshdb-sql-inline-anchor { position: relative; display: block; box-sizing: border-box; }
+.dshdb-sql-inline { display: grid; width: 100%; height: 100%; overflow: hidden; }
+.dshdb-sql-inline > * { grid-area: 1 / 1; }
+.dshdb-sql-inline-highlight {
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: pre;
+  font-family: var(--ds-font-family-code, ui-monospace, Menlo, Consolas, monospace);
+  font-size: 11.5px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+  pointer-events: none;
+}
+.dshdb-sql-inline-input {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--dsw-alias-label-primary);
+  font-family: var(--ds-font-family-code, ui-monospace, Menlo, Consolas, monospace);
+  font-size: 11.5px;
+  line-height: 22px;
+  outline: none;
+}
+.dshdb-sql-inline-input::placeholder {
+  color: var(--dsw-alias-label-dimmed);
+  -webkit-text-fill-color: var(--dsw-alias-label-dimmed);
+}
 .dshdb-pager {
   display: flex;
   align-items: center;
