@@ -63,4 +63,18 @@ describe('readTableTabParams', () => {
       table: 'orders',
     })
   })
+
+  it('carries an initial filter when opened from a related row', () => {
+    expect(
+      readTableTabParams({ connectionId: 'mysql-1', schema: 'shop', table: 'users', where: '`id` = 5' }),
+    ).toEqual({
+      connectionId: 'mysql-1',
+      schema: 'shop',
+      table: 'users',
+      where: '`id` = 5',
+    })
+    expect(
+      readTableTabParams({ connectionId: 'mysql-1', schema: 'shop', table: 'users', where: '   ' }),
+    ).toEqual({ connectionId: 'mysql-1', schema: 'shop', table: 'users' })
+  })
 })

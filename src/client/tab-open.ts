@@ -14,6 +14,8 @@ export interface TableTabParams {
   table: string
   /** Views need SHOW CREATE VIEW (or a view-shaped fallback), not a table's. */
   kind?: 'table' | 'view'
+  /** Initial WHERE condition, e.g. when opening a row through a foreign key. */
+  where?: string
 }
 
 type TableTabOpener = (params: TableTabParams) => void
@@ -37,7 +39,13 @@ export function readTableTabParams(params: unknown): TableTabParams | undefined 
   const { connectionId, schema, table } = value
   if (typeof connectionId !== 'string' || typeof schema !== 'string' || typeof table !== 'string') return undefined
   if (connectionId === '' || table === '') return undefined
-  return { connectionId, schema, table, ...(value.kind === 'view' ? { kind: 'view' as const } : {}) }
+  return {
+    connectionId,
+    schema,
+    table,
+    ...(value.kind === 'view' ? { kind: 'view' as const } : {}),
+    ...(typeof value.where === 'string' && value.where.trim() !== '' ? { where: value.where.trim() } : {}),
+  }
 }
 
 /** What one query console tab starts with (every part is optional). */

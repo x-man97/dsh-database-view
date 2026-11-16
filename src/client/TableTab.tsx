@@ -13,9 +13,9 @@ import { ApiError, api } from './api'
 import { DataGrid, type CellMenuTarget } from './DataGrid'
 import { MenuGroupList, type MenuGroupSpec } from './menugroups'
 import { formatCell, formatCount, formatMs } from './format'
-import { ArrowUpIcon, CopyIcon, DownloadIcon, UndoIcon, EyeUpIcon, FilterIcon, MinusIcon, PlayIcon, PlusIcon, RefreshIcon, TableIcon, TerminalIcon, UploadIcon } from './icons'
+import { ArrowUpIcon, CopyIcon, DatabaseIcon, DownloadIcon, UndoIcon, EyeUpIcon, FilterIcon, MinusIcon, PlayIcon, PlusIcon, RefreshIcon, TableIcon, TerminalIcon, UploadIcon } from './icons'
 import { downloadText, exportFilename, renderExport, toCsv, toJson, toMarkdown, toTsv, type ExportFormat } from './export'
-import { openConsoleTab, readTableTabParams, type TableTabParams } from './tab-open'
+import { openConsoleTab, openTableTab, readTableTabParams, type TableTabParams } from './tab-open'
 import { columnValues, commaValues, copyText, type ColumnMenuItem } from './colmenu'
 import { cellCopyText, rowToTsv } from './cellmenu'
 import { columnSignature, identityOrder, moveColumn, orderColumns, orderRows } from './columnOrder'
@@ -32,8 +32,9 @@ import { cellValueView, type CellValueView } from './cellvalue'
 import { tableDumpText } from './tabledump'
 import { SqlHighlight } from './sqlhighlight'
 import { useI18n } from './i18n'
-import { deleteRowSql, insertRowSql, updateRowSql, DEFAULT_VALUE, type RowValue } from './rowedit'
+import { deleteRowSql, insertRowSql, updateRowSql, whereForRow, DEFAULT_VALUE, type RowValue } from './rowedit'
 import { DataImportModal } from './DataImportModal'
+import { CopyToDatabaseModal } from './CopyToDatabaseModal'
 import { summarizeRange, type GridRange } from './gridrange'
 
 /** What the tab body receives: the framework's tab reader. */
@@ -129,7 +130,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(() => readPageSize(TABLE_PAGE_KEY, PAGE_SIZES, 500))
   const [pageDraft, setPageDraft] = useState('1')
-  const [whereText, setWhereText] = useState('')
+  const [whereText, setWhereText] = useState(() => params.where ?? '')
   /** Two table tabs open at once must not share one datalist id. */
   const columnsListId = `dshdb-columns-${params.table.replace(/[^\w-]/gu, '-')}`
   /** Sort order survives closing the tab, the same way column widths do. */
@@ -161,6 +162,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const [ddlBusy, setDdlBusy] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [copyOpen, setCopyOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const exportingRef = useRef(false)
   const [exportNote, setExportNote] = useState('')
@@ -293,7 +295,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     setColumns([])
     setTotal(undefined)
     setPage(0)
-    setWhereText('')
+    setWhereText(params.where ?? '')
     setOrderText('')
     setError(null)
     void (async () => {
@@ -304,7 +306,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         if (found.dialect === 'redis') throw new ApiError('unsupported', '数据表只能在关系型数据源中打开')
         if (cancelled) return
         setConnection(found)
-        await load(found, { page: 0, size: pageSize, where: '', orderBy: '', recount: true })
+        await load(found, { page: 0, size: pageSize, where: params.where ?? '', orderBy: '', recount: true })
         const described = typeof api.describe === 'function'
           ? await api.describe(found.id, params.schema, params.table, objectKind).catch(() => null)
           : null
@@ -716,7 +718,43 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     [filtersOpen],
   )
   const gridCellMenu = useCallback(
-    (cell: CellMenuTarget): ColumnMenuItem[] => [
+    (cell: CellMenuTarget): ColumnMenuItem[] => {
+      const related: ColumnMenuItem[] = []
+      const row = displayRows[cell.rowIndex]
+      if (connection !== null && row !== undefined) {
+        for (const foreignKey of description?.foreignKeys ?? []) {
+          if (!foreignKey.columns.includes(cell.column.name) || foreignKey.referencedTable.trim() === '') continue
+          if (foreignKey.referencedColumns.length !== foreignKey.columns.length) continue
+          const columns: ColumnInfo[] = []
+          const values = new Map<string, CellValue | null>()
+          let complete = true
+          for (const [index, localName] of foreignKey.columns.entries()) {
+            const position = displayColumns.findIndex((column) => column.name === localName)
+            const referencedName = foreignKey.referencedColumns[index]
+            if (position < 0 || referencedName === undefined) {
+              complete = false
+              break
+            }
+            const localType = editableColumns.find((column) => column.name === localName)?.typeName ?? ''
+            columns.push({ name: referencedName, typeName: localType })
+            values.set(referencedName, row[position] ?? null)
+          }
+          if (!complete) continue
+          const targetSchema = foreignKey.referencedSchema.trim() === '' ? params.schema : foreignKey.referencedSchema
+          const where = whereForRow(connection.dialect as SqlDialect, columns, values)
+          related.push({
+            label: t('menu.relatedRows', { name: `${targetSchema}.${foreignKey.referencedTable}` }),
+            run: () =>
+              openTableTab({
+                connectionId: params.connectionId,
+                schema: targetSchema,
+                table: foreignKey.referencedTable,
+                where,
+              }),
+          })
+        }
+      }
+      return [
             ...(canMutate
               ? [{
                   label: t('menu.edit'),
@@ -743,6 +781,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                   },
                 ]
               : []),
+            ...related,
             {
               label: t('menu.viewFull'),
               run: () => setCellView(cellValueView(cell.column.name, cell.value)),
@@ -807,16 +846,20 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                 setColumnFilter(cell.column, undefined)
                 applyRef.current({ page: 0 })
               },
-            },],
+            },
+      ]
+    },
     [
       canMutate,
       connection,
+      description,
       displayColumns,
       displayRows,
       duplicateRow,
       editableColumns,
       filters,
       pageSize,
+      params.connectionId,
       params.schema,
       params.table,
       pendingDeletes,
@@ -1115,6 +1158,10 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
       return pending === DEFAULT_VALUE ? null : pending === '' ? null : pending
     })
   }, [cellRange, pendingUpdates, shownColumns, shownRows])
+  const copyRows = useMemo(
+    () => (selectedRows.size > 0 ? displayRows.filter((_, index) => selectedRows.has(index)) : displayRows),
+    [displayRows, selectedRows],
+  )
 
   if (error !== null && rows.length === 0) {
     return (
@@ -1339,6 +1386,28 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           disabled={!canMutate || description === null || pendingCount > 0 || loading}
         >
           <UploadIcon size={13} />
+        </button>
+        <button
+          type="button"
+          className="dshdb-pager-btn"
+          title={
+            connection?.readOnly === true
+              ? t('copyTo.readonly')
+              : pendingCount > 0
+                ? t('import.blockedPending')
+                : t('table.copyToDatabase')
+          }
+          aria-label={t('table.copyToDatabase')}
+          onClick={() => setCopyOpen(true)}
+          disabled={
+            connection?.readOnly === true ||
+            displayColumns.length === 0 ||
+            rows.length === 0 ||
+            loading ||
+            pendingCount > 0
+          }
+        >
+          <DatabaseIcon size={13} />
         </button>
         <span className="dshdb-menu-wrap" ref={exportAnchor}>
           <button
@@ -1840,6 +1909,23 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         onImported={(count) => {
           setExportNote(t('import.done', { n: formatCount(count) }))
           applyRef.current({ recount: true, page: 0 })
+        }}
+      />
+      <CopyToDatabaseModal
+        target={
+          !copyOpen || connection === null || copyRows.length === 0
+            ? null
+            : {
+                connection,
+                schema: params.schema,
+                table: params.table,
+                columns: displayColumns,
+                rows: copyRows,
+              }
+        }
+        onClose={() => setCopyOpen(false)}
+        onCopied={(count, name) => {
+          setExportNote(t('copyTo.done', { n: formatCount(count), name }))
         }}
       />
     </div>
