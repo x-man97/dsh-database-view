@@ -28,7 +28,9 @@ import { shortcutHit, shortcutLabel } from './keymap'
 import { Banner, Button, EmptyState, Loading, Modal, Spinner, Tag } from './ui'
 import { CellValueModal } from './CellValueModal'
 import { DdlModal } from './DdlModal'
-import { cellValueView, type CellValueView } from './cellvalue'
+import { cellValueView, isJsonColumn, type CellValueView } from './cellvalue'
+import { looksLikeJson } from './jsonhighlight'
+import { readTableSnapshot, tableSnapshotKey, writeTableSnapshot } from './tablecache'
 import { tableDumpText } from './tabledump'
 import { SqlHighlight } from './sqlhighlight'
 import { SqlFilterInput } from './SqlFilterInput'
@@ -49,13 +51,11 @@ interface Failure {
 }
 
 import { TABLE_PAGE_KEY, readPageSize, writePageSize } from './pagesize'
-import { readAllowedNumber, readFlag, readText, writeFlag, writeNumber, writeText } from './prefs'
+import { readFlag, readText, writeFlag, writeText } from './prefs'
 
 const PAGE_SIZES = [100, 200, 500, 1000, 2000, 5000]
-const AUTO_REFRESH_KEY = 'dsh-database-view.auto-refresh.v1'
 const FILTERS_OPEN_KEY = 'dsh-database-view.table.filters-open.v1'
 const ORDER_KEY = 'dsh-database-view.table-order.v1'
-const AUTO_REFRESH_OPTIONS = [0, 5000, 10000, 30000] as const
 
 const noTabInfo = (): undefined => undefined
 
@@ -106,19 +106,23 @@ function PagerButton({
 
 function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const t = useI18n()
-  const [connection, setConnection] = useState<ClientConnection | null>(null)
-  const [columns, setColumns] = useState<ColumnInfo[]>([])
-  const [rows, setRows] = useState<Row[]>([])
-  const [total, setTotal] = useState<number | undefined>(undefined)
+  const objectKind = params.kind === 'view' ? 'view' : 'table'
+  // Reopening a table read earlier in this session restores its snapshot
+  // instead of querying the server again; DML, imports, explicit refreshes and
+  // structure changes replace or drop it.
+  const cacheKey = tableSnapshotKey(params.connectionId, params.schema, params.table, objectKind, params.where ?? '')
+  const cached = useMemo(() => readTableSnapshot(cacheKey), [cacheKey])
+  const [connection, setConnection] = useState<ClientConnection | null>(cached?.connection ?? null)
+  const [columns, setColumns] = useState<ColumnInfo[]>(cached?.columns ?? [])
+  const [rows, setRows] = useState<Row[]>(cached?.rows ?? [])
+  const [total, setTotal] = useState<number | undefined>(cached?.total)
   /** Counting is optional (permissions, timeouts); say so instead of a bare empty total. */
-  const [countUnknown, setCountUnknown] = useState(false)
-  const [elapsed, setElapsed] = useState<number | undefined>(undefined)
-  const [sqlText, setSqlText] = useState('')
+  const [countUnknown, setCountUnknown] = useState(cached?.countUnknown ?? false)
+  const [elapsed, setElapsed] = useState<number | undefined>(cached?.elapsed)
+  const [sqlText, setSqlText] = useState(cached?.sqlText ?? '')
   const [loading, setLoading] = useState(false)
-  /** Auto-refresh period in ms; 0 means off. */
-  const [autoMs, setAutoMs] = useState(() => readAllowedNumber(AUTO_REFRESH_KEY, AUTO_REFRESH_OPTIONS, 0))
   const [error, setError] = useState<Failure | null>(null)
-  const [description, setDescription] = useState<TableDescription | null>(null)
+  const [description, setDescription] = useState<TableDescription | null>(cached?.description ?? null)
   const [pendingNew, setPendingNew] = useState<Array<Record<string, string>>>([])
   const [pendingUpdates, setPendingUpdates] = useState<Record<number, Record<string, string | typeof DEFAULT_VALUE>>>({})
   const [pendingDeletes, setPendingDeletes] = useState<Set<number>>(new Set())
@@ -128,18 +132,19 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const [dmlOpen, setDmlOpen] = useState(false)
   const [rowSaving, setRowSaving] = useState(false)
   const [rowError, setRowError] = useState('')
-  const [page, setPage] = useState(0)
-  const [pageSize, setPageSize] = useState(() => readPageSize(TABLE_PAGE_KEY, PAGE_SIZES, 500))
-  const [pageDraft, setPageDraft] = useState('1')
-  const [whereText, setWhereText] = useState(() => params.where ?? '')
+  const [page, setPage] = useState(cached?.page ?? 0)
+  const [pageSize, setPageSize] = useState(() => cached?.pageSize ?? readPageSize(TABLE_PAGE_KEY, PAGE_SIZES, 500))
+  const [pageDraft, setPageDraft] = useState(String((cached?.page ?? 0) + 1))
+  const [whereText, setWhereText] = useState(() => cached?.whereText ?? params.where ?? '')
   /** Sort order survives closing the tab, the same way column widths do. */
   const orderStorageKey = `${ORDER_KEY}:${params.schema}.${params.table}`
-  const [orderText, setOrderText] = useState(() => readText(orderStorageKey))
-  const [filters, setFilters] = useState<ColumnFilters>({})
+  const [orderText, setOrderText] = useState(() => cached?.orderText ?? readText(orderStorageKey))
+  const [filters, setFilters] = useState<ColumnFilters>(cached?.filters ?? {})
   const [filtersOpen, setFiltersOpen] = useState(() => readFlag(FILTERS_OPEN_KEY, false))
   const [order, setOrder] = useState<number[] | null>(null)
   // The ordering saved with the tab is only applied after the first page tells us
   // which columns exist; a column that was dropped or renamed is simply dropped.
+  // A restored snapshot already carries the ordering it was loaded with.
   useEffect(() => {
     if (columns.length === 0 || storedOrderApplied.current) return
     storedOrderApplied.current = true
@@ -156,7 +161,10 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   }, [columns, orderStorageKey])
   const [hiddenColumns, setHiddenColumns] = useState<string[] | null>(() => readHidden(`table:${params.schema}.${params.table}`))
   const [cellView, setCellView] = useState<CellValueView | null>(null)
-  const objectKind = params.kind === 'view' ? 'view' : 'table'
+  const [cellValueTarget, setCellValueTarget] = useState<{ rowIndex: number; column: ColumnInfo } | null>(null)
+  const [cellValueEditing, setCellValueEditing] = useState(false)
+  /** Snapshots are only kept once a load succeeded; a failure keeps the tab retryable. */
+  const [snapshotReady, setSnapshotReady] = useState(cached !== undefined)
   const [ddl, setDdl] = useState<{ title: string; text: string; warnings: string[] } | null>(null)
   const [ddlBusy, setDdlBusy] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
@@ -205,7 +213,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     found: ClientConnection
     target: { page: number; size: number; where: string; orderBy: string; recount: boolean }
   } | null>(null)
-  const storedOrderApplied = useRef(false)
+  const storedOrderApplied = useRef(cached !== undefined)
   const filterRowRef = useRef<HTMLTableRowElement | null>(null)
 
   // Column drag order is display-only; reset it when the result set changes shape.
@@ -269,6 +277,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         setElapsed(result.elapsedMs)
         setSqlText(result.sql === '' ? pageSql : result.sql)
         setPage(target.page)
+        setSnapshotReady(true)
         if (countPromise !== undefined) {
           // Already running alongside the page query; a failed count just hides the total.
           const counted = await countPromise
@@ -288,6 +297,9 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   )
 
   useEffect(() => {
+    // A restored snapshot already shows the rows; reopening the tab must not
+    // query the server again.
+    if (cached !== undefined) return undefined
     let cancelled = false
     setConnection(null)
     setRows([])
@@ -317,7 +329,45 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     return () => {
       cancelled = true
     }
-  }, [load, params.connectionId])
+  }, [cached, load, objectKind, pageSize, params.connectionId, params.schema, params.table, params.where])
+
+  // A restored snapshot normally carries the structure it was read with; only
+  // the description that failed the first time is fetched again.
+  useEffect(() => {
+    const describe = api.describe
+    if (cached === undefined || cached.description !== null || typeof describe !== 'function') return undefined
+    let cancelled = false
+    void describe(params.connectionId, params.schema, params.table, objectKind)
+      .then((described) => {
+        if (!cancelled) setDescription(described)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [cached, objectKind, params.connectionId, params.schema, params.table])
+
+  // Keep the snapshot in step with what the tab shows: page changes, filters,
+  // DML reloads and imports all land here. It is only written after a
+  // successful load, so a first-open failure still retries on the next open.
+  useEffect(() => {
+    if (!snapshotReady || connection === null) return
+    writeTableSnapshot(cacheKey, {
+      connection,
+      columns,
+      rows,
+      total,
+      countUnknown,
+      elapsed,
+      sqlText,
+      page,
+      pageSize,
+      whereText,
+      orderText,
+      filters,
+      description,
+    })
+  }, [snapshotReady, cacheKey, connection, columns, rows, total, countUnknown, elapsed, sqlText, page, pageSize, whereText, orderText, filters, description])
 
   const offset = page * pageSize
   const activeSort = useMemo(() => parseOrderBy(stripOrderBy(orderText)), [orderText])
@@ -378,24 +428,31 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     setRowError('')
     setCellEdit({ rowIndex, column: column.name, value: current === null ? '' : String(current) })
   }, [canMutate, displayColumns, displayRows, pendingDeletes, pendingUpdates])
+  const stageCellValue = useCallback(
+    (rowIndex: number, column: string, value: string): void => {
+      const row = displayRows[rowIndex]
+      const original = row === undefined ? null : rowValue(column, row)
+      const originalText = original === null ? '' : String(original)
+      setPendingUpdates((previous) => {
+        const next = { ...previous }
+        const rowChanges = { ...(next[rowIndex] ?? {}) }
+        if (value === originalText) delete rowChanges[column]
+        else rowChanges[column] = value
+        if (Object.keys(rowChanges).length === 0) delete next[rowIndex]
+        else next[rowIndex] = rowChanges
+        return next
+      })
+    },
+    // rowValue reads the current display columns.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayColumns, displayRows],
+  )
   const updateCell = (value: string): void => {
     setCellEdit((previous) => (previous === null ? previous : { ...previous, value }))
   }
   const commitCell = (): void => {
     if (cellEdit === null) return
-    const { rowIndex, column, value } = cellEdit
-    const row = displayRows[rowIndex]
-    const original = row === undefined ? null : rowValue(column, row)
-    const originalText = original === null ? '' : String(original)
-    setPendingUpdates((previous) => {
-      const next = { ...previous }
-      const rowChanges = { ...(next[rowIndex] ?? {}) }
-      if (value === originalText) delete rowChanges[column]
-      else rowChanges[column] = value
-      if (Object.keys(rowChanges).length === 0) delete next[rowIndex]
-      else next[rowIndex] = rowChanges
-      return next
-    })
+    stageCellValue(cellEdit.rowIndex, cellEdit.column, cellEdit.value)
     setCellEdit(null)
   }
   const cancelCell = (): void => setCellEdit(null)
@@ -575,8 +632,6 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
 
   const orderTextRef = useRef(orderText)
   orderTextRef.current = orderText
-  const loadingRef = useRef(loading)
-  loadingRef.current = loading
 
   // Stable grid callbacks: typing into the WHERE / ORDER BY boxes must not
   // repaint the whole result grid on every keystroke.
@@ -664,33 +719,6 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     },
     [displayColumns.length, hiddenView.positions],
   )
-  // Auto refresh reuses the current page/filter/sort; a tick is skipped while
-  // the previous load is still running so slow queries do not pile up.
-  useEffect(() => {
-    if (autoMs === 0 || connection === null) return undefined
-    const tick = (): void => {
-      // An export is already walking the table page by page; refreshing the
-      // grid underneath it would only churn the view.
-      if (exportingRef.current) return
-      if (!loadingRef.current) applyRef.current({ recount: false })
-    }
-    const timer = setInterval(() => {
-      // A hidden tab is not being read: skip the tick so the database is not
-      // re-queried while the user is looking at something else.
-      if (document.visibilityState !== 'visible') return
-      tick()
-    }, autoMs)
-    // Coming back to the tab should not wait up to a full interval for the
-    // first refresh, otherwise the page can look stale for half a minute.
-    const onVisible = (): void => {
-      if (document.visibilityState === 'visible') tick()
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => {
-      clearInterval(timer)
-      document.removeEventListener('visibilitychange', onVisible)
-    }
-  }, [autoMs, connection])
 
   const openDdl = useCallback(async (): Promise<void> => {
     if (connection === null) return
@@ -710,8 +738,52 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   }, [connection, objectKind, params.connectionId, params.schema, params.table])
 
   const gridCellOpen = useCallback((column: ColumnInfo, value: CellValue): void => {
-    setCellView(cellValueView(column.name, value))
+    setCellView(cellValueView(column.name, value, isJsonColumn(column)))
+    setCellValueTarget(null)
+    setCellValueEditing(false)
   }, [])
+  const closeCellValue = useCallback((): void => {
+    setCellView(null)
+    setCellValueTarget(null)
+    setCellValueEditing(false)
+  }, [])
+  /** The value the grid currently shows for one cell, pending edits included. */
+  const cellValueOf = useCallback(
+    (rowIndex: number, column: ColumnInfo): CellValue => {
+      const row = displayRows[rowIndex]
+      const index = displayColumns.findIndex((entry) => entry.name === column.name)
+      const loaded: CellValue = index < 0 || row === undefined ? null : row[index] ?? null
+      const pending = pendingUpdates[rowIndex]?.[column.name]
+      if (pending === undefined) return loaded
+      if (pending === DEFAULT_VALUE) return ''
+      return pending === '' ? null : pending
+    },
+    [displayColumns, displayRows, pendingUpdates],
+  )
+  const openCellValue = useCallback(
+    (rowIndex: number, column: ColumnInfo, value: CellValue, editing: boolean): void => {
+      const editable = canMutate && !pendingDeletes.has(rowIndex)
+      setRowError('')
+      setCellView(cellValueView(column.name, value, isJsonColumn(column)))
+      setCellValueTarget(editable ? { rowIndex, column } : null)
+      setCellValueEditing(editable && editing)
+    },
+    [canMutate, pendingDeletes],
+  )
+  // JSON documents are unreadable in a one-line input: double-clicking one
+  // opens the full-value editor, where they keep their highlighting.
+  const openCellByDoubleClick = useCallback(
+    (rowIndex: number, column: ColumnInfo): void => {
+      if (!canMutate || pendingDeletes.has(rowIndex)) return
+      const value = cellValueOf(rowIndex, column)
+      if (isJsonColumn(column) || (typeof value === 'string' && looksLikeJson(value))) {
+        openCellValue(rowIndex, column, value, true)
+        return
+      }
+      startCellEdit(rowIndex, column)
+    },
+    [canMutate, cellValueOf, openCellValue, pendingDeletes, startCellEdit],
+  )
   const gridCellClass = useCallback(
     (): string | undefined => (filtersOpen ? 'dshdb-cell-filterable' : undefined),
     [filtersOpen],
@@ -755,11 +827,18 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
       }
       return [
             ...(canMutate
-              ? [{
-                  label: t('menu.edit'),
-                  disabled: pendingDeletes.has(cell.rowIndex),
-                  run: () => startCellEdit(cell.rowIndex, cell.column),
-                }]
+              ? [
+                  {
+                    label: t('menu.edit'),
+                    disabled: pendingDeletes.has(cell.rowIndex),
+                    run: () => startCellEdit(cell.rowIndex, cell.column),
+                  },
+                  {
+                    label: t('menu.editFull'),
+                    disabled: pendingDeletes.has(cell.rowIndex),
+                    run: () => openCellValue(cell.rowIndex, cell.column, cell.value, true),
+                  },
+                ]
               : []),
             ...(canMutate && editableColumns.some((entry) => entry.name === cell.column.name)
               ? [
@@ -783,7 +862,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
             ...related,
             {
               label: t('menu.viewFull'),
-              run: () => setCellView(cellValueView(cell.column.name, cell.value)),
+              run: () => openCellValue(cell.rowIndex, cell.column, cell.value, false),
             },
             {
               label: t('menu.copyCell'),
@@ -857,6 +936,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
       duplicateRow,
       editableColumns,
       filters,
+      openCellValue,
       pageSize,
       params.connectionId,
       params.schema,
@@ -1465,22 +1545,6 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         >
           <TerminalIcon size={13} />
         </button>
-        <select
-          className="dshdb-input dshdb-qfilter-input"
-          aria-label="自动刷新"
-          title="定时重新查询当前页"
-          value={autoMs}
-          onChange={(event) => {
-            const next = Number(event.target.value)
-            setAutoMs(next)
-            writeNumber(AUTO_REFRESH_KEY, next)
-          }}
-        >
-          <option value={0}>{t('table.autoRefreshOff')}</option>
-          <option value={5000}>{t('table.autoRefreshEvery', { n: 5 })}</option>
-          <option value={10000}>{t('table.autoRefreshEvery', { n: 10 })}</option>
-          <option value={30000}>{t('table.autoRefreshEvery', { n: 30 })}</option>
-        </select>
         <button
           type="button"
           className="dshdb-pager-btn"
@@ -1739,7 +1803,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
               onCancel: cancelCell,
             },
           })}
-          {...(canMutate ? { onCellDoubleClick: startCellEdit } : {})}
+          {...(canMutate ? { onCellDoubleClick: openCellByDoubleClick } : {})}
         />
       )}
 
@@ -1877,7 +1941,19 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         {keyColumns.length === 0 ? <Banner tone="warn">{t('table.noPrimaryKey')}</Banner> : null}
         {rowError !== '' ? <Banner tone="error">{rowError}</Banner> : null}
       </Modal>
-      <CellValueModal view={cellView} onClose={() => setCellView(null)} />
+      <CellValueModal
+        view={cellView}
+        onClose={closeCellValue}
+        editing={cellValueEditing}
+        {...(cellValueTarget === null
+          ? {}
+          : {
+              onSave: (text: string) => {
+                stageCellValue(cellValueTarget.rowIndex, cellValueTarget.column.name, text)
+                setRowError('')
+              },
+            })}
+      />
       <DataImportModal
         target={
           !importOpen || connection === null || description === null
@@ -1930,7 +2006,10 @@ export function TableTab(props: TableTabProps): ReactElement {
       />
     )
   }
-  return <TableGrid params={params} />
+  // A tab is reused when the host points it at another table; a key gives the
+  // grid fresh state (and the right snapshot) for the new coordinates.
+  const key = `${params.connectionId}|${params.kind ?? 'table'}|${params.schema}.${params.table}|${params.where ?? ''}`
+  return <TableGrid key={key} params={params} />
 }
 
 /** The chip text of a table tab: the table's name, or nothing to name. */

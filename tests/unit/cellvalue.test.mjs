@@ -1,22 +1,48 @@
 import { describe, expect, it } from 'vitest'
 
-import { cellValueView } from '../../src/client/cellvalue'
+import { cellValueView, isJsonColumn } from '../../src/client/cellvalue'
 
 describe('grid cell full value', () => {
   it('shows NULL for missing values', () => {
-    expect(cellValueView('note', null)).toEqual({ column: 'note', text: 'NULL', pretty: false })
+    expect(cellValueView('note', null)).toEqual({
+      column: 'note',
+      text: 'NULL',
+      editText: '',
+      pretty: false,
+      json: false,
+    })
   })
 
   it('expands JSON containers over several lines', () => {
     const view = cellValueView('config', '{"a":1,"list":[2,3]}')
     expect(view.pretty).toBe(true)
+    expect(view.json).toBe(true)
     expect(view.text).toBe('{\n  "a": 1,\n  "list": [\n    2,\n    3\n  ]\n}')
+    expect(view.editText).toBe(view.text)
   })
 
   it('keeps plain text and unparsable text as they are', () => {
-    expect(cellValueView('note', 'hello')).toEqual({ column: 'note', text: 'hello', pretty: false })
-    expect(cellValueView('note', '{oops}')).toEqual({ column: 'note', text: '{oops}', pretty: false })
+    expect(cellValueView('note', 'hello')).toEqual({
+      column: 'note',
+      text: 'hello',
+      editText: 'hello',
+      pretty: false,
+      json: false,
+    })
+    expect(cellValueView('note', '{oops}')).toEqual({
+      column: 'note',
+      text: '{oops}',
+      editText: '{oops}',
+      pretty: false,
+      json: false,
+    })
     expect(cellValueView('note', '42').pretty).toBe(false)
+  })
+
+  it('marks JSON-typed columns so the editor highlights them', () => {
+    const view = cellValueView('payload', 'plain', isJsonColumn({ typeName: 'jsonb' }))
+    expect(view.json).toBe(true)
+    expect(cellValueView('payload', 'plain', isJsonColumn({ typeName: 'text' })).json).toBe(false)
   })
 
   it('formats scalar cells exactly like the grid', () => {

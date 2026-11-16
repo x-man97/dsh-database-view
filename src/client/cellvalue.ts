@@ -12,14 +12,30 @@ import { prettyJsonText } from './redisvalue'
 export interface CellValueView {
   /** Column the cell belongs to, used as the dialog title. */
   column: string
+  /** Read-only text: JSON containers expanded, NULL spelled out. */
   text: string
+  /** What the editor starts from; NULL becomes an empty string. */
+  editText: string
   /** True when a JSON container was expanded into several lines. */
   pretty: boolean
+  /** True for JSON-typed columns and values that parse as JSON containers. */
+  json: boolean
 }
 
-export function cellValueView(column: string, value: CellValue): CellValueView {
-  if (value === null || value === undefined) return { column, text: 'NULL', pretty: false }
-  if (typeof value !== 'string') return { column, text: formatCell(value), pretty: false }
+/** Column types that store JSON documents (`json`, `jsonb`, ...). */
+export function isJsonColumn(column: { typeName?: string } | undefined): boolean {
+  return /\bjson/iu.test(column?.typeName ?? '')
+}
+
+export function cellValueView(column: string, value: CellValue, jsonColumn = false): CellValueView {
+  if (value === null || value === undefined) {
+    return { column, text: 'NULL', editText: '', pretty: false, json: false }
+  }
+  if (typeof value !== 'string') {
+    const text = formatCell(value)
+    return { column, text, editText: text, pretty: false, json: jsonColumn }
+  }
   const text = prettyJsonText(value)
-  return { column, text, pretty: text !== value }
+  const pretty = text !== value
+  return { column, text, editText: text, pretty, json: jsonColumn || pretty }
 }

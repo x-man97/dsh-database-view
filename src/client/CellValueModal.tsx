@@ -1,29 +1,52 @@
 /**
- * Read-only dialog for one cell: the whole value in a monospace block, with a
- * copy button. The grid keeps cells to a single line, so long JSON and text
- * blobs are only readable here.
+ * One cell's whole value: the expanded text, with a copy button and — when the
+ * caller can write the cell — an editor for long text and JSON documents. The
+ * grid keeps cells to one line, so this is the only place a JSON payload can be
+ * read or replaced in full, and JSON keeps its colors while being edited.
  */
 import { useEffect, useState, type ReactElement } from 'react'
 import type { CellValueView } from './cellvalue'
 import { copyText } from './colmenu'
 import { useCopyFlash } from './copyflash'
+import { JsonHighlight, looksLikeJson } from './jsonhighlight'
 import { Button, Modal } from './ui'
 
 export interface CellValueModalProps {
   /** The cell to show; null keeps the dialog closed. */
   view: CellValueView | null
   onClose: () => void
+  /** When provided the dialog offers editing; the full text is handed back. */
+  onSave?: (text: string) => void
+  /** Open directly in edit mode, e.g. double-clicking a JSON cell. */
+  editing?: boolean
 }
 
-export function CellValueModal({ view, onClose }: CellValueModalProps): ReactElement | null {
+export function CellValueModal({ view, onClose, onSave, editing = false }: CellValueModalProps): ReactElement | null {
   const flash = useCopyFlash()
+  const initialMode = view !== null && editing && onSave !== undefined
+  const [draft, setDraft] = useState(view?.editText ?? '')
+  const [mode, setMode] = useState(initialMode)
+  const [shown, setShown] = useState(view)
+  // The view object is the identity of one open dialog: a new cell, or the same
+  // cell reopened, resets the draft and the mode before anything is painted.
+  if (view !== shown) {
+    setShown(view)
+    setDraft(view?.editText ?? '')
+    setMode(view !== null && editing && onSave !== undefined)
+  }
   useEffect(() => {
     flash.reset()
   }, [flash.reset, view])
   if (view === null) return null
 
+  const json = view.json || looksLikeJson(draft)
   const copy = async (): Promise<void> => {
-    flash.flash(await copyText(view.text))
+    flash.flash(await copyText(mode ? draft : view.text))
+  }
+  const save = (): void => {
+    // Switching mode and saving again must not mark an untouched value dirty.
+    if (draft !== view.editText) onSave?.(draft)
+    onClose()
   }
 
   return (
@@ -38,15 +61,68 @@ export function CellValueModal({ view, onClose }: CellValueModalProps): ReactEle
           <Button size="sm" onClick={() => void copy()}>
             {flash.copied ? '已复制' : '复制'}
           </Button>
-          <Button size="sm" variant="primary" onClick={onClose}>
-            关闭
-          </Button>
+          {mode ? (
+            <>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setDraft(view.editText)
+                  setMode(false)
+                }}
+              >
+                取消
+              </Button>
+              <Button size="sm" variant="primary" onClick={save}>
+                保存
+              </Button>
+            </>
+          ) : (
+            <>
+              {onSave === undefined ? null : (
+                <Button size="sm" onClick={() => setMode(true)}>
+                  编辑
+                </Button>
+              )}
+              <Button size="sm" variant="primary" onClick={onClose}>
+                关闭
+              </Button>
+            </>
+          )}
         </>
       }
     >
-      <pre className="dshdb-cellvalue" aria-label="单元格完整值">
-        {view.text}
-      </pre>
+      {mode ? (
+        <div className="dshdb-sql-editor dshdb-cellvalue-editor">
+          <pre className="dshdb-sql-highlight" aria-hidden="true">
+            {json ? <JsonHighlight text={draft} /> : draft}
+          </pre>
+          <textarea
+            className="dshdb-input dshdb-sql-input"
+            aria-label="单元格完整值编辑"
+            autoFocus
+            spellCheck={false}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onScroll={(event) => {
+              const pre = event.currentTarget.parentElement?.querySelector('.dshdb-sql-highlight')
+              if (pre instanceof HTMLElement) {
+                pre.scrollTop = event.currentTarget.scrollTop
+                pre.scrollLeft = event.currentTarget.scrollLeft
+              }
+            }}
+            onKeyDown={(event) => {
+              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                event.preventDefault()
+                save()
+              }
+            }}
+          />
+        </div>
+      ) : (
+        <pre className="dshdb-cellvalue" aria-label="单元格完整值">
+          {view.json ? <JsonHighlight text={view.text} /> : view.text}
+        </pre>
+      )}
     </Modal>
   )
 }

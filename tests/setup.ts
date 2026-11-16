@@ -5,5 +5,15 @@
  * allows a whole test.
  */
 import { configure } from '@testing-library/react'
+import { afterEach } from 'vitest'
+
+import { clearTableSnapshots } from '../src/client/tablecache'
 
 configure({ asyncUtilTimeout: 4000 })
+
+// Table tabs keep their last result in memory so reopening one does not query
+// again. Tests render many tabs with the same coordinates, so every case starts
+// from a clean cache.
+afterEach(() => {
+  clearTableSnapshots()
+})

@@ -78,7 +78,8 @@ import {
 import { HistoryPanel, KeyGrid, PagerButton, formatCount } from './console-view'
 import { redisValueText } from './redisvalue'
 import { CellValueModal } from './CellValueModal'
-import { cellValueView, type CellValueView } from './cellvalue'
+import { cellValueView, isJsonColumn, type CellValueView } from './cellvalue'
+import { clearTableSnapshots } from './tablecache'
 
 /** What the tab body receives: the framework's tab reader. */
 export interface ConsoleTabProps {
@@ -652,6 +653,9 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         const maxRows = showAll ? ALL_ROWS : target.size
         const next = await queryWithRetry(selectedId, sqlText, maxRows, target.allowWrite, stmtKey, schema)
         if (token !== runToken.current) return
+        // A write from the console can change any table; table tabs must read
+        // the server again the next time they are opened.
+        if (target.allowWrite) clearTableSnapshots()
         if (paged && !showAll && target.page > 0 && next.rows.length === 0) {
           // The page ran past the end (rows were deleted or the condition got narrower):
           // nothing tells us how many pages are left, so show the first page instead of a blank grid.
@@ -1426,7 +1430,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     [base, connection?.dialect, displayColumns, schema, sourceSql],
   )
   const gridCellOpen = useCallback((column: ColumnInfo, value: CellValue): void => {
-    setCellView(cellValueView(column.name, value))
+    setCellView(cellValueView(column.name, value, isJsonColumn(column)))
   }, [])
 
   /**

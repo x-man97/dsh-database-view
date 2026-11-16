@@ -609,6 +609,25 @@ export const CSS = `
   border-radius: var(--dsw-radius-sm);
 }
 
+/* Full-value editor: the console's transparent textarea over a highlighted pre,
+ * sized so JSON keeps its colors while the cell is being rewritten. */
+.dshdb-cellvalue-editor .dshdb-sql-highlight,
+.dshdb-cellvalue-editor .dshdb-sql-input {
+  height: 220px;
+  min-height: 160px;
+  max-height: 52vh;
+  padding: 10px 12px;
+  font-family: var(--ds-font-family-code, ui-monospace, Menlo, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.dshdb-cellvalue-editor .dshdb-sql-input { resize: none; }
+.dshdb-jtok-key { color: var(--dsw-alias-state-business-primary); }
+.dshdb-jtok-string { color: var(--dsw-alias-state-success-primary); }
+.dshdb-jtok-number { color: var(--dsw-alias-state-warn-primary); }
+.dshdb-jtok-literal { color: var(--dsw-alias-state-business-primary); font-weight: 500; }
+.dshdb-jtok-punct { color: var(--dsw-alias-label-secondary); }
+
 .dshdb-grid-wrap {
   min-height: 0;
   min-width: 0;

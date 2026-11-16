@@ -12,6 +12,7 @@ import type { ClientConnection, ClientTrashedConnection, SchemaObject } from '..
 import { ApiError, api } from './api'
 import { downloadText } from './export'
 import { useDataSources } from './hooks/useDataSources'
+import { clearTableSnapshots } from './tablecache'
 import { setKeybindings } from './keymap'
 import { setConsoleActionOrder } from './consoleactions'
 import { setConsoleAutoComplete } from './consoleprefs'
@@ -542,6 +543,8 @@ export function App(props: AppProps): ReactElement {
   /** A successful structure change invalidates both the tree and the cached description. */
   const refreshAfterDdl = useCallback(
     async (connectionId: string, schema: string): Promise<void> => {
+      // Table tabs that kept a snapshot may now show dropped or altered columns.
+      clearTableSnapshots()
       selectConnection(connectionId)
       // SQL Server serializes requests on one connection, so reading the object
       // list and prefetching at the same time can silently drop one request.
