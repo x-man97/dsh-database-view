@@ -1513,6 +1513,65 @@ export const CSS = `
   white-space: pre;
   tab-size: 2;
 }
+.dshdb-designer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dshdb-designer-identity {
+  display: flex;
+  gap: 12px;
+}
+.dshdb-designer-field {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+.dshdb-designer-field .dshdb-input { width: 100%; }
+.dshdb-designer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dshdb-designer-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dshdb-designer-scroll { overflow-x: auto; }
+.dshdb-designer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.dshdb-designer-table th {
+  padding: 0 6px 4px;
+  color: var(--dsw-alias-label-secondary);
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+.dshdb-designer-table td {
+  padding: 3px 6px;
+  vertical-align: middle;
+}
+.dshdb-designer-table .dshdb-input {
+  width: 100%;
+  min-width: 78px;
+}
+.dshdb-designer-check {
+  width: 34px;
+  text-align: center;
+}
+.dshdb-designer-preview {
+  min-height: 54px;
+  max-height: 220px;
+}
 .dshdb-redis-value {
   display: flex;
   flex: 1 1 auto;

@@ -96,6 +96,13 @@ export interface DataViewProps {
   onOpenConsole: (connectionId: string, schema: string, table: string) => void
   /** Opens a query console for this connection, without a prepared statement. */
   onOpenConsoleTab?: (connectionId: string) => void
+  /** Table designer entries; only present for dialects whose DDL the panel can generate. */
+  onNewTable?: (connectionId: string, schema: string) => void
+  onModifyTable?: (connectionId: string, schema: string, table: string) => void
+  onRenameTable?: (connectionId: string, schema: string, table: string) => void
+  onDropObject?: (connectionId: string, schema: string, object: SchemaObject) => void
+  /** Open the server DDL in a console tab. */
+  onDdlConsole?: (connectionId: string, schema: string, table: string, kind: string) => void
 }
 
 const rowDomId = (index: number): string => `dshdb-tree-row-${index}`
@@ -231,7 +238,11 @@ export function DataView(props: DataViewProps): ReactElement {
       object: SchemaObject,
     ): void => {
       event.preventDefault()
+      const connection = props.connections.find((item) => item.id === connectionId)
       const isRelation = object.kind === 'table' || object.kind === 'view'
+      const isTable = object.kind === 'table'
+      const canManage = connection?.dialect === 'mysql' && connection.readOnly !== true
+      const read = props.onReadDdl
       const items = [
         ...(isRelation
           ? [
@@ -245,7 +256,36 @@ export function DataView(props: DataViewProps): ReactElement {
               },
             ]
           : []),
+        ...(canManage && isTable
+          ? [
+              { label: t('menu.modifyTable'), run: () => props.onModifyTable?.(connectionId, schema, object.name) },
+              { label: t('menu.renameTable'), run: () => props.onRenameTable?.(connectionId, schema, object.name) },
+            ]
+          : []),
+        ...(canManage && isRelation
+          ? [{ label: t('menu.dropObject'), run: () => props.onDropObject?.(connectionId, schema, object) }]
+          : []),
         { label: t('menu.showDdl'), run: () => props.onShowDdl(connectionId, schema, object.name, object.kind) },
+        ...(read !== undefined && isRelation
+          ? [
+              {
+                label: t('menu.copyDdl'),
+                run: () => {
+                  void read(connectionId, schema, object.name, object.kind === 'view' ? 'view' : 'table').then((ddl) => {
+                    if (ddl !== null && ddl.trim() !== '') void copyText(ddl)
+                  })
+                },
+              },
+            ]
+          : []),
+        ...(props.onDdlConsole !== undefined && isRelation
+          ? [
+              {
+                label: t('menu.ddlConsole'),
+                run: () => props.onDdlConsole?.(connectionId, schema, object.name, object.kind),
+              },
+            ]
+          : []),
         { label: t('menu.copyName'), run: () => void copyText(object.name) },
         { label: t('menu.copyQualified'), run: () => void copyText(`${schema}.${object.name}`) },
         {
@@ -258,7 +298,18 @@ export function DataView(props: DataViewProps): ReactElement {
       ]
       setObjectMenu({ ...placeMenu(event.clientX, event.clientY, items), items })
     },
-    [focusTreeFilter, props.connections, props.onOpenConsole, props.onOpenTable, props.onShowDdl],
+    [
+      focusTreeFilter,
+      props.connections,
+      props.onDdlConsole,
+      props.onDropObject,
+      props.onModifyTable,
+      props.onOpenConsole,
+      props.onOpenTable,
+      props.onReadDdl,
+      props.onRenameTable,
+      props.onShowDdl,
+    ],
   )
 
   /** One .sql with every table and view of a schema, in tree order. */
@@ -288,7 +339,12 @@ export function DataView(props: DataViewProps): ReactElement {
   const openSchemaMenu = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>, connectionId: string, schemaName: string): void => {
       event.preventDefault()
+      const connection = props.connections.find((item) => item.id === connectionId)
+      const canManage = connection?.dialect === 'mysql' && connection.readOnly !== true
       const items = [
+        ...(canManage
+          ? [{ label: t('menu.newTable'), run: () => props.onNewTable?.(connectionId, schemaName) }]
+          : []),
         { label: t('menu.copySchema'), run: () => void copyText(schemaName) },
         { label: t('menu.exportSchema'), run: () => exportSchemaScript(connectionId, schemaName) },
         {
@@ -302,7 +358,7 @@ export function DataView(props: DataViewProps): ReactElement {
       ]
       setSchemaMenu({ ...placeMenu(event.clientX, event.clientY, items), items })
     },
-    [exportSchemaScript],
+    [exportSchemaScript, focusTreeFilter, props.connections, props.onNewTable],
   )
 
   const openConnectionMenu = useCallback(

@@ -98,6 +98,8 @@ export interface DataSources {
   toggleFolder: (connectionId: string, schema: string, folder: string) => void
   toggleSchema: (connectionId: string, schema: string) => Promise<void>
   loadObjects: (connectionId: string, schema: string) => Promise<void>
+  /** Re-read a schema even when its list is already loaded (after DDL). */
+  reloadObjects: (connectionId: string, schema: string) => Promise<void>
   loadRedisDatabases: (connectionId: string) => Promise<void>
   loadRedisKeys: (connectionId: string, db: number, more?: boolean) => Promise<void>
   toggleRedisDb: (connectionId: string, db: number) => void
@@ -704,6 +706,36 @@ export function useDataSources(notify: Notify): DataSources {
     [],
   )
 
+  /**
+   * Force a schema's object list after a DDL change and drop its cached
+   * descriptions: `loadObjects` deliberately skips schemas that are already
+   * loaded, which would leave a just-created table invisible.
+   */
+  const reloadObjects = useCallback(async (connectionId: string, schema: string): Promise<void> => {
+    const key = `${connectionId}:${schema}`
+    setDescriptions((previous) => {
+      const prefix = `${connectionId}|${schema}.`
+      const next: Record<string, TableDescription> = {}
+      for (const [entryKey, description] of Object.entries(previous)) {
+        if (!entryKey.startsWith(prefix)) next[entryKey] = description
+      }
+      return next
+    })
+    setLoadingObjects((previous) => ({ ...previous, [key]: true }))
+    try {
+      const result = await api.objects(connectionId, schema)
+      setObjects((previous) => ({ ...previous, [key]: result.objects }))
+      if (result.fetchedAt !== undefined) {
+        const stamp = result.fetchedAt
+        setCachedAt((previous) => ({ ...previous, [connectionId]: stamp }))
+      }
+    } catch {
+      // The DDL itself succeeded; keep the previous list until the next read.
+    } finally {
+      setLoadingObjects((previous) => ({ ...previous, [key]: false }))
+    }
+  }, [])
+
   const selectObject = useCallback(
     async (connectionId: string, schema: string, object: SchemaObject): Promise<void> => {
       const key = `${connectionId}|${schema}.${object.name}`
@@ -998,6 +1030,7 @@ export function useDataSources(notify: Notify): DataSources {
     toggleFolder,
     toggleSchema,
     loadObjects,
+    reloadObjects,
     loadRedisDatabases,
     loadRedisKeys,
     toggleRedisDb,

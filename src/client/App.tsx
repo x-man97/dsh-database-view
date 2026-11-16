@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { ROUTE_PREFIX } from '../shared/presets'
 import type { ClientConnection, ClientTrashedConnection } from '../shared/types'
-import { api } from './api'
+import { ApiError, api } from './api'
 import { downloadText } from './export'
 import { useDataSources } from './hooks/useDataSources'
 import { setKeybindings } from './keymap'
@@ -30,6 +30,9 @@ import { ConnectionModal } from './modals/ConnectionModal'
 import { TrashModal, type TrashBusy } from './modals/TrashModal'
 import { DataView } from './views/DataView'
 import { openConsoleTab, openTableTab } from './tab-open'
+import { dropObjectSql, renameTableSql } from './tableddl'
+import { TableDesigner, type TableDesignerTarget } from './TableDesigner'
+import { TableRenameModal, type TableRenameTarget } from './TableRenameModal'
 import { tableSelectSql } from './tablesql'
 import {
   Banner,
@@ -116,6 +119,8 @@ export function App(props: AppProps): ReactElement {
     source: '',
     warnings: [],
   })
+  const [designer, setDesigner] = useState<TableDesignerTarget | null>(null)
+  const [renameTarget, setRenameTarget] = useState<TableRenameTarget | null>(null)
 
   const notify = useCallback((text: string, tone: 'info' | 'success' | 'error' = 'info') => {
     setToast((previous) => nextToast(previous, text, tone))
@@ -162,6 +167,7 @@ export function App(props: AppProps): ReactElement {
     toggleFolder,
     toggleSchema,
     loadObjects,
+    reloadObjects,
     loadRedisKeys,
     toggleRedisDb,
     toggleKey,
@@ -485,6 +491,120 @@ export function App(props: AppProps): ReactElement {
     [connections, selectConnection],
   )
 
+  /** A structure change on a cold tab opens the connection once, like table reads do. */
+  const executeDdl = useCallback(async (connectionId: string, schema: string, sql: string): Promise<void> => {
+    const run = (): Promise<unknown> => api.query({ id: connectionId, sql, allowWrite: true, schema, maxRows: 1 })
+    try {
+      await run()
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'not-connected') {
+        await api.connect(connectionId)
+        await run()
+        return
+      }
+      throw error
+    }
+  }, [])
+
+  /** A successful structure change invalidates both the tree and the cached description. */
+  const refreshAfterDdl = useCallback(
+    async (connectionId: string, schema: string): Promise<void> => {
+      selectConnection(connectionId)
+      await Promise.allSettled([
+        api.prefetchConnection(connectionId, { refresh: true, schemas: [schema] }),
+        reloadObjects(connectionId, schema),
+      ])
+    },
+    [reloadObjects, selectConnection],
+  )
+
+  const openNewTable = useCallback(
+    (connectionId: string, schema: string): void => {
+      const connection = connections.find((item) => item.id === connectionId)
+      if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
+      setDesigner({ connection, schema })
+    },
+    [connections],
+  )
+
+  const openModifyTable = useCallback(
+    async (connectionId: string, schema: string, table: string): Promise<void> => {
+      const connection = connections.find((item) => item.id === connectionId)
+      if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
+      try {
+        const description = await api.describe(connectionId, schema, table, 'table')
+        setDesigner({ connection, schema, description })
+      } catch (error) {
+        notify(`读取表结构失败：${errorText(error)}`, 'error')
+      }
+    },
+    [connections, notify],
+  )
+
+  const openRenameTable = useCallback(
+    (connectionId: string, schema: string, table: string): void => {
+      const connection = connections.find((item) => item.id === connectionId)
+      if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
+      setRenameTarget({ connection, schema, table })
+    },
+    [connections],
+  )
+
+  const renameTable = useCallback(
+    async (target: TableRenameTarget, name: string): Promise<void> => {
+      await executeDdl(target.connection.id, target.schema, renameTableSql(target.schema, target.table, name))
+      await refreshAfterDdl(target.connection.id, target.schema)
+      notify(t('notify.tableRenamed', { name }), 'success')
+    },
+    [executeDdl, notify, refreshAfterDdl, t],
+  )
+
+  const applyTableDdl = useCallback(
+    async (target: TableDesignerTarget, sql: string, tableName: string): Promise<void> => {
+      await executeDdl(target.connection.id, target.schema, sql)
+      await refreshAfterDdl(target.connection.id, target.schema)
+      notify(
+        target.description === undefined
+          ? t('notify.tableCreated', { name: tableName })
+          : t('notify.tableAltered', { name: target.description.table }),
+        'success',
+      )
+    },
+    [executeDdl, notify, refreshAfterDdl, t],
+  )
+
+  const dropObject = useCallback(
+    async (connectionId: string, schema: string, object: { name: string; kind: string }): Promise<void> => {
+      const connection = connections.find((item) => item.id === connectionId)
+      if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
+      const name = `${schema}.${object.name}`
+      const sql = dropObjectSql(schema, object.name, object.kind === 'view' ? 'view' : 'table')
+      const ok = await askConfirm(t('confirm.dropObject', { name }), sql)
+      if (!ok) return
+      try {
+        await executeDdl(connectionId, schema, sql)
+        await refreshAfterDdl(connectionId, schema)
+        notify(t('notify.objectDropped', { name }), 'success')
+      } catch (error) {
+        notify(`删除失败：${errorText(error)}`, 'error')
+      }
+    },
+    [askConfirm, connections, executeDdl, notify, refreshAfterDdl, t],
+  )
+
+  const openDdlConsole = useCallback(
+    async (connectionId: string, schema: string, table: string, kind: string): Promise<void> => {
+      try {
+        const result = await api.ddl(connectionId, schema, table, kind)
+        selectConnection(connectionId)
+        openConsoleTab({ connectionId, sql: result.ddl })
+      } catch (error) {
+        notify(`读取 DDL 失败：${errorText(error)}`, 'error')
+      }
+    },
+    [notify, selectConnection],
+  )
+
   return (
     <div className="dshdb-root" style={rootStyle} data-plugin-route={ROUTE_PREFIX}>
       {/* IDEA 风格工具窗口：工具栏左对齐，下面是数据源列表 */}
@@ -628,6 +748,11 @@ export function App(props: AppProps): ReactElement {
               onOpenTable={openTableFromTree}
               onOpenConsoleTab={openConsoleTabFromTree}
               onOpenConsole={openConsoleFromTree}
+              onNewTable={openNewTable}
+              onModifyTable={openModifyTable}
+              onRenameTable={openRenameTable}
+              onDropObject={dropObject}
+              onDdlConsole={openDdlConsole}
             />
           </div>
         ) : null}
@@ -750,6 +875,8 @@ export function App(props: AppProps): ReactElement {
           </>
         )}
       </Modal>
+      <TableDesigner target={designer} onClose={() => setDesigner(null)} onExecute={applyTableDdl} />
+      <TableRenameModal target={renameTarget} onClose={() => setRenameTarget(null)} onRename={renameTable} />
       <ConfirmDialog request={confirm?.request ?? null} onConfirm={() => resolveConfirm(true)} onCancel={() => resolveConfirm(false)} />
       <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>

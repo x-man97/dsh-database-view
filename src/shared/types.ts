@@ -329,6 +329,7 @@ export interface ColumnDetail extends ColumnInfo {
   comment?: string
   ordinal?: number
   primaryKey?: boolean
+  autoIncrement?: boolean
 }
 
 export interface IndexInfo {
