@@ -101,6 +101,9 @@ export interface DataViewProps {
   onModifyTable?: (connectionId: string, schema: string, table: string) => void
   onRenameTable?: (connectionId: string, schema: string, table: string) => void
   onDropObject?: (connectionId: string, schema: string, object: SchemaObject) => void
+  /** View designer entries (MySQL). */
+  onNewView?: (connectionId: string, schema: string) => void
+  onModifyView?: (connectionId: string, schema: string, view: string) => void
   /** Open the server DDL in a console tab. */
   onDdlConsole?: (connectionId: string, schema: string, table: string, kind: string) => void
   /** Compare this table's structure with another table in the same schema. */
@@ -264,6 +267,9 @@ export function DataView(props: DataViewProps): ReactElement {
               { label: t('menu.renameTable'), run: () => props.onRenameTable?.(connectionId, schema, object.name) },
             ]
           : []),
+        ...(canManage && object.kind === 'view'
+          ? [{ label: t('menu.modifyView'), run: () => props.onModifyView?.(connectionId, schema, object.name) }]
+          : []),
         ...(canManage && isRelation
           ? [{ label: t('menu.dropObject'), run: () => props.onDropObject?.(connectionId, schema, object) }]
           : []),
@@ -310,6 +316,7 @@ export function DataView(props: DataViewProps): ReactElement {
       props.onDdlConsole,
       props.onDropObject,
       props.onModifyTable,
+      props.onModifyView,
       props.onOpenConsole,
       props.onOpenTable,
       props.onReadDdl,
@@ -349,7 +356,10 @@ export function DataView(props: DataViewProps): ReactElement {
       const canManage = connection?.dialect === 'mysql' && connection.readOnly !== true
       const items = [
         ...(canManage
-          ? [{ label: t('menu.newTable'), run: () => props.onNewTable?.(connectionId, schemaName) }]
+          ? [
+              { label: t('menu.newTable'), run: () => props.onNewTable?.(connectionId, schemaName) },
+              { label: t('menu.newView'), run: () => props.onNewView?.(connectionId, schemaName) },
+            ]
           : []),
         { label: t('menu.copySchema'), run: () => void copyText(schemaName) },
         { label: t('menu.exportSchema'), run: () => exportSchemaScript(connectionId, schemaName) },
@@ -364,7 +374,7 @@ export function DataView(props: DataViewProps): ReactElement {
       ]
       setSchemaMenu({ ...placeMenu(event.clientX, event.clientY, items), items })
     },
-    [exportSchemaScript, focusTreeFilter, props.connections, props.onNewTable],
+    [exportSchemaScript, focusTreeFilter, props.connections, props.onNewTable, props.onNewView],
   )
 
   const openConnectionMenu = useCallback(

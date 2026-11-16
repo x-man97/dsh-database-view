@@ -34,6 +34,8 @@ import { dropObjectSql, renameTableSql } from './tableddl'
 import { TableDesigner, type TableDesignerTarget } from './TableDesigner'
 import { TableRenameModal, type TableRenameTarget } from './TableRenameModal'
 import { CompareStructureModal, type CompareStructureTarget } from './CompareStructureModal'
+import { ViewDesigner, type ViewDesignerTarget } from './ViewDesigner'
+import { extractViewSelect } from './viewddl'
 import { tableSelectSql } from './tablesql'
 import {
   Banner,
@@ -123,6 +125,7 @@ export function App(props: AppProps): ReactElement {
   const [designer, setDesigner] = useState<TableDesignerTarget | null>(null)
   const [renameTarget, setRenameTarget] = useState<TableRenameTarget | null>(null)
   const [compareTarget, setCompareTarget] = useState<CompareStructureTarget | null>(null)
+  const [viewDesigner, setViewDesigner] = useState<ViewDesignerTarget | null>(null)
 
   const notify = useCallback((text: string, tone: 'info' | 'success' | 'error' = 'info') => {
     setToast((previous) => nextToast(previous, text, tone))
@@ -620,6 +623,40 @@ export function App(props: AppProps): ReactElement {
     [connections],
   )
 
+  const openNewView = useCallback(
+    (connectionId: string, schema: string): void => {
+      const connection = connections.find((item) => item.id === connectionId)
+      if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
+      setViewDesigner({ connection, schema })
+    },
+    [connections],
+  )
+
+  const openModifyView = useCallback(
+    async (connectionId: string, schema: string, view: string): Promise<void> => {
+      const connection = connections.find((item) => item.id === connectionId)
+      if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
+      try {
+        const result = await api.ddl(connectionId, schema, view, 'view')
+        const body = extractViewSelect(result.ddl)
+        if (body === null) throw new Error(t('view.error.parse'))
+        setViewDesigner({ connection, schema, view, body })
+      } catch (error) {
+        notify(`读取视图定义失败：${errorText(error)}`, 'error')
+      }
+    },
+    [connections, notify, t],
+  )
+
+  const applyViewDdl = useCallback(
+    async (target: ViewDesignerTarget, sql: string, name: string): Promise<void> => {
+      await executeDdl(target.connection.id, target.schema, sql)
+      await refreshAfterDdl(target.connection.id, target.schema)
+      notify(t(target.view === undefined ? 'notify.viewCreated' : 'notify.viewUpdated', { name }), 'success')
+    },
+    [executeDdl, notify, refreshAfterDdl, t],
+  )
+
   return (
     <div className="dshdb-root" style={rootStyle} data-plugin-route={ROUTE_PREFIX}>
       {/* IDEA 风格工具窗口：工具栏左对齐，下面是数据源列表 */}
@@ -769,6 +806,8 @@ export function App(props: AppProps): ReactElement {
               onDropObject={dropObject}
               onDdlConsole={openDdlConsole}
               onCompareTable={openCompareTable}
+              onNewView={openNewView}
+              onModifyView={openModifyView}
             />
           </div>
         ) : null}
@@ -894,6 +933,7 @@ export function App(props: AppProps): ReactElement {
       <TableDesigner target={designer} onClose={() => setDesigner(null)} onExecute={applyTableDdl} />
       <TableRenameModal target={renameTarget} onClose={() => setRenameTarget(null)} onRename={renameTable} />
       <CompareStructureModal target={compareTarget} onClose={() => setCompareTarget(null)} />
+      <ViewDesigner target={viewDesigner} onClose={() => setViewDesigner(null)} onExecute={applyViewDdl} />
       <ConfirmDialog request={confirm?.request ?? null} onConfirm={() => resolveConfirm(true)} onCancel={() => resolveConfirm(false)} />
       <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>

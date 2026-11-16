@@ -1578,6 +1578,14 @@ export const CSS = `
   gap: 8px;
   min-height: 28px;
 }
+.dshdb-view-body {
+  width: 100%;
+  min-height: 170px;
+  resize: vertical;
+  font-family: var(--ds-font-family-code, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+}
 .dshdb-redis-value {
   display: flex;
   flex: 1 1 auto;
