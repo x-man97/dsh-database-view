@@ -74,6 +74,10 @@ export class SqliteEngine implements DatabaseEngine {
     }
   }
 
+  isOpen(): boolean {
+    return this.db !== undefined
+  }
+
   async ping(): Promise<{ ok: boolean; version?: string }> {
     const row = this.requireDb().prepare('select sqlite_version() as version').get() as { version?: string } | undefined
     return { ok: true, ...(row?.version === undefined ? {} : { version: row.version }) }

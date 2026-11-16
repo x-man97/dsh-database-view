@@ -74,6 +74,7 @@ export interface DatabaseEngine {
   readonly descriptor: EngineDescriptor
   connect(ctx: EngineConnectContext): Promise<ServerInfo>
   disconnect(): Promise<void>
+  isOpen(): boolean
   ping(): Promise<{ ok: boolean; version?: string }>
   listSchemas(filter?: string): Promise<SchemaInfo[]>
   listObjects(schema: string): Promise<SchemaObject[]>

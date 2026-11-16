@@ -116,6 +116,10 @@ export class OracleEngine implements DatabaseEngine {
     if (connection !== undefined) await connection.close().catch(() => undefined)
   }
 
+  isOpen(): boolean {
+    return this.connection !== undefined
+  }
+
   async ping(): Promise<{ ok: boolean; version?: string }> {
     const result = await this.requireConnection().execute("SELECT banner AS version FROM v$version WHERE ROWNUM = 1")
     const rows = result.rows as unknown[] | undefined

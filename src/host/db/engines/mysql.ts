@@ -1,4 +1,4 @@
-import type { Connection, FieldPacket } from 'mysql2/promise'
+import type { Connection, ConnectionOptions, FieldPacket } from 'mysql2/promise'
 
 import type {
   ColumnDetail,
@@ -59,6 +59,34 @@ function qualified(schema: string, table: string): string {
   return `${quoteIdent(schema)}.${quoteIdent(table)}`
 }
 
+function connectionOptions(ctx: EngineConnectContext): ConnectionOptions {
+  const tls = loadTls(ctx.connection.tls)
+  return {
+    host: ctx.endpoint.host,
+    port: ctx.endpoint.port,
+    user: ctx.connection.user,
+    password: ctx.credentials.password,
+    ...(ctx.connection.database.trim() === '' ? {} : { database: ctx.connection.database }),
+    charset: 'utf8mb4',
+    dateStrings: true,
+    supportBigNumbers: true,
+    bigNumberStrings: true,
+    multipleStatements: false,
+    connectTimeout: ctx.settings.connectTimeoutSec * 1000,
+    ...(tls === undefined
+      ? {}
+      : {
+          ssl: {
+            rejectUnauthorized: tls.rejectUnauthorized,
+            verifyIdentity: tls.verifyIdentity,
+            ...(tls.ca === undefined ? {} : { ca: tls.ca }),
+            ...(tls.cert === undefined ? {} : { cert: tls.cert }),
+            ...(tls.key === undefined ? {} : { key: tls.key }),
+          },
+        }),
+  }
+}
+
 function generateDdl(description: TableDescription): string {
   const lines = description.columns.map((column) => {
     const parts = [quoteIdent(column.name), column.typeName || 'TEXT']
@@ -96,36 +124,13 @@ export class MysqlEngine implements DatabaseEngine {
 
   private connection: Connection | undefined
   private context: EngineConnectContext | undefined
+  private readonly running = new Set<string>()
 
   async connect(ctx: EngineConnectContext): Promise<ServerInfo> {
     const mysql = await ctx.drivers.load<typeof import('mysql2/promise')>('mysql2')
-    const tls = loadTls(ctx.connection.tls)
     this.context = ctx
     try {
-      this.connection = await mysql.createConnection({
-        host: ctx.endpoint.host,
-        port: ctx.endpoint.port,
-        user: ctx.connection.user,
-        password: ctx.credentials.password,
-        ...(ctx.connection.database.trim() === '' ? {} : { database: ctx.connection.database }),
-        charset: 'utf8mb4',
-        dateStrings: true,
-        supportBigNumbers: true,
-        bigNumberStrings: true,
-        multipleStatements: false,
-        connectTimeout: ctx.settings.connectTimeoutSec * 1000,
-        ...(tls === undefined
-          ? {}
-          : {
-              ssl: {
-                rejectUnauthorized: tls.rejectUnauthorized,
-                verifyIdentity: tls.verifyIdentity,
-                ...(tls.ca === undefined ? {} : { ca: tls.ca }),
-                ...(tls.cert === undefined ? {} : { cert: tls.cert }),
-                ...(tls.key === undefined ? {} : { key: tls.key }),
-              },
-            }),
-      })
+      this.connection = await mysql.createConnection(connectionOptions(ctx))
       if (ctx.connection.readOnly) {
         await this.connection.query('SET SESSION TRANSACTION READ ONLY').catch(() => undefined)
       }
@@ -153,6 +158,10 @@ export class MysqlEngine implements DatabaseEngine {
     const connection = this.connection
     this.connection = undefined
     if (connection !== undefined) await connection.end().catch(() => undefined)
+  }
+
+  isOpen(): boolean {
+    return this.connection !== undefined
   }
 
   async ping(): Promise<{ ok: boolean; version?: string }> {
@@ -268,6 +277,7 @@ export class MysqlEngine implements DatabaseEngine {
     const connection = this.requireConnection()
     const maxRows = Math.max(1, Math.min(options.maxRows ?? 200, 5000))
     const timeout = Math.max(1, options.timeoutSec ?? 30) * 1000
+    if (options.stmtKey !== undefined) this.running.add(options.stmtKey)
     try {
       const [rows, fields] = await connection.query({ sql, timeout }) as unknown as [unknown, FieldPacket[] | undefined]
       const elapsedMs = Date.now() - started
@@ -304,6 +314,8 @@ export class MysqlEngine implements DatabaseEngine {
       }
     } catch (error) {
       throw new DbError('query-failed', `MySQL 查询失败：${errorMessage(error)}`)
+    } finally {
+      if (options.stmtKey !== undefined) this.running.delete(options.stmtKey)
     }
   }
 
@@ -319,11 +331,40 @@ export class MysqlEngine implements DatabaseEngine {
     else await connection.rollback()
   }
 
-  async cancel(_stmtKey?: string): Promise<boolean> {
+  async cancel(stmtKey: string): Promise<boolean> {
+    // A stale key (the statement already finished) must never touch the shared
+    // connection: several tabs can run on the same session.
+    if (!this.running.has(stmtKey)) return false
     const connection = this.connection
     if (connection === undefined) return false
+    const ctx = this.context
+    const threadId = connection.threadId
+    if (ctx === undefined || typeof threadId !== 'number' || threadId <= 0) {
+      this.dropConnection(connection)
+      return true
+    }
+    try {
+      // The driver's single connection cannot issue KILL while it is busy, so a
+      // short-lived control connection cancels just this query and leaves the
+      // session (tables and consoles sharing it) usable.
+      const mysql = await ctx.drivers.load<typeof import('mysql2/promise')>('mysql2')
+      const control = await mysql.createConnection(connectionOptions(ctx))
+      try {
+        await control.query('KILL QUERY ?', [threadId])
+      } finally {
+        await control.end().catch(() => undefined)
+      }
+      return true
+    } catch {
+      // Without a control connection dropping the query's connection is the only
+      // way to stop it; connect() reopens the session on next use.
+      this.dropConnection(connection)
+      return true
+    }
+  }
+
+  private dropConnection(connection: Connection): void {
     connection.destroy()
-    this.connection = undefined
-    return true
+    if (this.connection === connection) this.connection = undefined
   }
 }

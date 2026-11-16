@@ -132,6 +132,10 @@ export class MssqlEngine implements DatabaseEngine {
     connection?.close()
   }
 
+  isOpen(): boolean {
+    return this.connection !== undefined
+  }
+
   async ping(): Promise<{ ok: boolean; version?: string }> {
     const result = await this.run('SELECT @@VERSION AS version')
     return { ok: true, ...(result.rows[0]?.[0] === undefined ? {} : { version: String(result.rows[0][0]) }) }

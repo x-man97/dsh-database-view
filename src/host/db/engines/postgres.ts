@@ -126,6 +126,10 @@ export class PostgresEngine implements DatabaseEngine {
     if (client !== undefined) await client.end().catch(() => undefined)
   }
 
+  isOpen(): boolean {
+    return this.client !== undefined
+  }
+
   async ping(): Promise<{ ok: boolean; version?: string }> {
     const result = await this.requireClient().query('SELECT version() AS version')
     return { ok: true, ...(typeof result.rows[0]?.version === 'string' ? { version: result.rows[0].version } : {}) }

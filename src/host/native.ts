@@ -74,6 +74,8 @@ export class NativeSqlService {
   private readonly sessions = new Map<string, Session>()
   /** In-flight opens so two table queries cannot start two SSH sessions. */
   private readonly opening = new Map<string, Promise<Session>>()
+  /** Statement key → connection id, so a cancel only reaches the statement's own session. */
+  private readonly running = new Map<string, string>()
   private readonly engines = new EngineRegistry()
 
   constructor(
@@ -203,7 +205,12 @@ export class NativeSqlService {
     if (config === undefined) throw new DbError('not-found', `连接不存在：${id}`)
     if (nativeKindFor(config.driver) === undefined) throw new DbError('unsupported', '该数据库不支持内置引擎')
     const session = this.sessions.get(id)
-    if (session !== undefined) return session.server
+    if (session !== undefined) {
+      if (session.engine.isOpen()) return session.server
+      // The engine dropped its connection (for example a cancelled query): the
+      // session is stale, so open a fresh one instead of reporting it as live.
+      await this.disconnect(id)
+    }
     const password = this.passwordFor(config)
     const sshPassword = this.secrets.resolve(Secrets.nameForSshPassword(id))?.value
     const sshPassphrase = this.secrets.resolve(Secrets.nameForSshPassphrase(id))?.value
@@ -261,20 +268,24 @@ export class NativeSqlService {
     }
     if (options.schema !== undefined && options.schema !== '') await session.engine.setSchema(options.schema)
     const stmtKey = options.stmtKey ?? `stmt-${randomBytes(6).toString('hex')}`
-    return session.engine.query(statement, {
-      maxRows: options.maxRows,
-      timeoutSec: options.timeoutSec,
-      stmtKey,
-      schema: options.schema,
-    })
+    this.running.set(stmtKey, id)
+    try {
+      return await session.engine.query(statement, {
+        maxRows: options.maxRows,
+        timeoutSec: options.timeoutSec,
+        stmtKey,
+        schema: options.schema,
+      })
+    } finally {
+      this.running.delete(stmtKey)
+    }
   }
 
   async cancel(stmtKey: string): Promise<boolean> {
-    let cancelled = false
-    for (const session of this.sessions.values()) {
-      if (await session.engine.cancel(stmtKey)) cancelled = true
-    }
-    return cancelled
+    const id = this.running.get(stmtKey)
+    const session = id === undefined ? undefined : this.sessions.get(id)
+    if (session === undefined) return false
+    return session.engine.cancel(stmtKey)
   }
 
   async dispose(): Promise<void> {

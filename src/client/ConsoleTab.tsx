@@ -688,6 +688,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         setResult(null)
         setFailure(failureText(error))
       } finally {
+        if (stmtRef.current === stmtKey) stmtRef.current = ''
         runningRef.current = Math.max(0, runningRef.current - 1)
         if (token === runToken.current) setRunning(false)
       }
@@ -711,11 +712,12 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     setExportOpen(false)
     const collected: QueryResult[] = []
     let last: QueryResult | null = null
+    let stmtKey = ''
     try {
       for (const [index, part] of parts.entries()) {
         if (token !== runToken.current) return
         setMultiProgress({ index: index + 1, total: parts.length })
-        const stmtKey = `console-${Date.now().toString(36)}-${index}`
+        stmtKey = `console-${Date.now().toString(36)}-${index}`
         stmtRef.current = stmtKey
         try {
           last = await queryWithRetry(
@@ -757,6 +759,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
         void loadSchemaList(selectedId)
       }
     } finally {
+      if (stmtRef.current === stmtKey) stmtRef.current = ''
       runningRef.current = Math.max(0, runningRef.current - 1)
       setMultiProgress(null)
       if (token === runToken.current) setRunning(false)

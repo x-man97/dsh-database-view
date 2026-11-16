@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { waitForConsoleSource } from '../stubs/console-ready'
@@ -94,5 +94,29 @@ describe('closing the console while a statement runs', () => {
 
     view.unmount()
     await waitFor(() => expect(mocks.cancel).toHaveBeenCalledWith(expect.stringMatching(/^console-/)))
+  })
+
+  it('does not cancel after the statement finished', async () => {
+    mocks.query.mockResolvedValueOnce({
+      columns: [{ name: 'id', typeName: 'INT', nullable: false }],
+      rows: [[1]],
+      rowCount: 1,
+      truncated: false,
+      elapsedMs: 1,
+      warnings: [],
+      sql: 'SELECT * FROM orders',
+    })
+
+    const view = render(<ConsoleTab useTabInfo={() => ({ tab: { navigation: { params: { connectionId: 'mysql-1' } } } })} />)
+    await waitForConsoleSource(mocks)
+
+    const area = document.querySelector('textarea') as HTMLTextAreaElement
+    fireEvent.change(area, { target: { value: 'SELECT * FROM orders' } })
+    fireEvent.click(screen.getByRole('button', { name: '执行' }))
+    await waitFor(() => expect((screen.getByRole('button', { name: '执行' }) as HTMLButtonElement).disabled).toBe(false))
+
+    view.unmount()
+    await act(async () => {})
+    expect(mocks.cancel).not.toHaveBeenCalled()
   })
 })
