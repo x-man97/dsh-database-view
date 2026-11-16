@@ -60,10 +60,11 @@ describe('settings data-source toolbar order', () => {
     setup()
     const panel = openPanel()
     const rows = Array.from(panel.querySelectorAll<HTMLElement>('.dshdb-action-row'))
-    expect(rows).toHaveLength(7)
+    expect(rows).toHaveLength(8)
     expect(rows[0]?.textContent).toContain('新增')
     expect(rows[2]?.textContent).toContain('复制')
-    expect(rows[6]?.textContent).toContain('回收站')
+    expect(rows[4]?.textContent).toContain('断开')
+    expect(rows[7]?.textContent).toContain('回收站')
     for (const row of rows) {
       expect(row.querySelector('.dshdb-action-icon svg')).not.toBeNull()
       expect((row.querySelector('.dshdb-driver-name')?.textContent ?? '').length).toBeGreaterThan(0)
@@ -81,7 +82,7 @@ describe('settings data-source toolbar order', () => {
     await vi.waitFor(() => expect(onSave).toHaveBeenCalled())
     const draft = onSave.mock.calls[0]?.[0] as { toolbarActions?: string[] }
     expect(draft.toolbarActions?.slice(0, 2)).toEqual(['edit', 'add'])
-    expect(draft.toolbarActions).toHaveLength(7)
+    expect(draft.toolbarActions).toHaveLength(8)
   })
 
   it('resets the saved order to the default', async () => {

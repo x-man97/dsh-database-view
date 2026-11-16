@@ -8,13 +8,14 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import { orderToolbarActions, type ToolbarActionId } from '../shared/toolbaractions'
 import { t } from './i18n'
-import { CopyIcon, EditIcon, PlusIcon, RecycleIcon, RefreshIcon, TerminalIcon, TrashIcon } from './icons'
+import { CopyIcon, EditIcon, PlusIcon, PowerIcon, RecycleIcon, RefreshIcon, TerminalIcon, TrashIcon } from './icons'
 
 export const TOOLBAR_ACTION_LABEL = {
   get add() { return t('app.add') },
   get edit() { return t('app.edit') },
   get duplicate() { return t('app.copy') },
   get refresh() { return t('app.refresh') },
+  get disconnect() { return t('app.disconnect') },
   get delete() { return t('app.delete') },
   get console() { return t('app.console') },
   get trash() { return t('app.trash') },
@@ -26,6 +27,7 @@ export const TOOLBAR_ACTION_TITLE = {
   get edit() { return t('app.editTitle') },
   get duplicate() { return t('app.copyTitle') },
   get refresh() { return t('app.refreshTitle') },
+  get disconnect() { return t('app.disconnectTitle') },
   get delete() { return t('app.deleteTitle') },
   get console() { return t('app.consoleTitle') },
   get trash() { return t('app.trashTitle') },
@@ -41,6 +43,8 @@ export function toolbarActionIcon(id: ToolbarActionId, size = 14): ReactElement 
       return <CopyIcon size={size} />
     case 'refresh':
       return <RefreshIcon size={size} />
+    case 'disconnect':
+      return <PowerIcon size={size} />
     case 'delete':
       return <TrashIcon size={size} />
     case 'console':

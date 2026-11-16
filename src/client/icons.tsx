@@ -88,6 +88,15 @@ export function StopIcon(props: IconProps): ReactElement {
   )
 }
 
+export function PowerIcon(props: IconProps): ReactElement {
+  return (
+    <Svg {...props}>
+      <path d="M12 3v9" />
+      <path d="M6.4 6.5a8 8 0 1 0 11.2 0" />
+    </Svg>
+  )
+}
+
 export function ChevronRightIcon(props: IconProps): ReactElement {
   return (
     <Svg {...props}>

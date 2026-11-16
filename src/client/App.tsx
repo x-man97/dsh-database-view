@@ -384,6 +384,15 @@ export function App(props: AppProps): ReactElement {
       },
     },
     {
+      id: 'disconnect',
+      label: t('app.disconnect'),
+      title: t('app.disconnectTitle'),
+      disabled: !selected || !server,
+      onClick: () => {
+        if (selected && server) void disconnect(selected.id)
+      },
+    },
+    {
       id: 'delete',
       label: t('app.delete'),
       title: t('app.deleteTitle'),
@@ -882,11 +891,7 @@ export function App(props: AppProps): ReactElement {
             ) : selected.database ? (
               <span className="dshdb-mono">/{selected.database}</span>
             ) : null}
-            {server ? (
-              <Button size="sm" variant="ghost" onClick={() => void disconnect(selected.id)}>
-                {t('app.disconnect')}
-              </Button>
-            ) : (
+            {server ? null : (
               <Button
                 size="sm"
                 variant="ghost"
