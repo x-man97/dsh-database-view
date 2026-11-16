@@ -350,11 +350,6 @@ export const CSS = `
   outline: 1px solid var(--dsw-alias-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 1px;
 }
-.dshdb-connect-action {
-  color: var(--dsw-alias-state-business-primary);
-  opacity: 1;
-  font-weight: 500;
-}
 .dshdb-picker-anchor { position: relative; display: inline-flex; flex: none; }
 .dshdb-picker {
   position: absolute;

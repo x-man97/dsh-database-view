@@ -97,6 +97,17 @@ export function PowerIcon(props: IconProps): ReactElement {
   )
 }
 
+export function PlugIcon(props: IconProps): ReactElement {
+  return (
+    <Svg {...props}>
+      <path d="M9 3v4" />
+      <path d="M15 3v4" />
+      <path d="M7 7h10v4a5 5 0 0 1-10 0V7Z" />
+      <path d="M12 16v5" />
+    </Svg>
+  )
+}
+
 export function ChevronRightIcon(props: IconProps): ReactElement {
   return (
     <Svg {...props}>

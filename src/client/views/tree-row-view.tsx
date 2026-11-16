@@ -171,28 +171,6 @@ function drawContent(row: TreeRow, actions: TreeRowActions, t: ReturnType<typeof
               onToggleAll={(all) => pickerToggleAll(row, actions, all)}
             />
           )}
-          {row.online === true || row.connecting === true ? null : (
-            <span
-              className="dshdb-row-action dshdb-connect-action"
-              role="button"
-              tabIndex={0}
-              title={`连接 ${row.title?.split(' · ')[1] ?? ''}`}
-              onClick={(event) => {
-                event.stopPropagation()
-                if (row.connectionId !== undefined) actions.connect(row.connectionId)
-              }}
-              onDoubleClick={(event) => event.stopPropagation()}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  if (row.connectionId !== undefined) actions.connect(row.connectionId)
-                }
-              }}
-            >
-              {t('app.connect')}
-            </span>
-          )}
           <StateDot
             tone={
               row.online === true ? 'success' : row.connecting === true ? 'warn' : row.redis === true ? 'business' : 'idle'

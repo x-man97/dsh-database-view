@@ -25,7 +25,7 @@ import { usePopoverDismiss } from './popover'
 import type { ToolbarActionId } from '../shared/toolbaractions'
 import { copyText } from './colmenu'
 import { useI18n } from './i18n'
-import { MoreIcon } from './icons'
+import { MoreIcon, PlugIcon, PowerIcon } from './icons'
 import { ConnectionModal } from './modals/ConnectionModal'
 import { TrashModal, type TrashBusy } from './modals/TrashModal'
 import { DataView } from './views/DataView'
@@ -346,6 +346,7 @@ export function App(props: AppProps): ReactElement {
     label: string
     title: string
     disabled?: boolean
+    icon?: (size?: number) => ReactElement
     onClick: () => void
   }[] = [
     {
@@ -385,11 +386,24 @@ export function App(props: AppProps): ReactElement {
     },
     {
       id: 'disconnect',
-      label: t('app.disconnect'),
-      title: t('app.disconnectTitle'),
-      disabled: !selected || !server,
+      label:
+        selected !== undefined && connectingId === selected.id && !server
+          ? t('app.connecting')
+          : server
+            ? t('app.disconnect')
+            : t('app.connect'),
+      title:
+        selected !== undefined && connectingId === selected.id && !server
+          ? t('app.connecting')
+          : server
+            ? t('app.disconnectTitle')
+            : t('app.connectTitle'),
+      disabled: !selected || (connectingId === selected.id && !server),
+      icon: (size = 14) => (server ? <PowerIcon size={size} /> : <PlugIcon size={size} />),
       onClick: () => {
-        if (selected && server) void disconnect(selected.id)
+        if (selected === undefined || (connectingId === selected.id && !server)) return
+        if (server) void disconnect(selected.id)
+        else void connect(selected.id)
       },
     },
     {
@@ -730,7 +744,7 @@ export function App(props: AppProps): ReactElement {
             >
               <ToolButton
                 title={action.title}
-                icon={toolbarActionIcon(action.id)}
+                icon={action.icon === undefined ? toolbarActionIcon(action.id) : action.icon()}
                 onClick={action.onClick}
                 disabled={action.disabled}
               />
@@ -767,7 +781,9 @@ export function App(props: AppProps): ReactElement {
                       action.onClick()
                     }}
                   >
-                    <span className="dshdb-menu-icon">{toolbarActionIcon(action.id, 13)}</span>
+                    <span className="dshdb-menu-icon">
+                      {action.icon === undefined ? toolbarActionIcon(action.id, 13) : action.icon(13)}
+                    </span>
                     {action.label}
                   </button>
                 ))}
@@ -891,16 +907,6 @@ export function App(props: AppProps): ReactElement {
             ) : selected.database ? (
               <span className="dshdb-mono">/{selected.database}</span>
             ) : null}
-            {server ? null : (
-              <Button
-                size="sm"
-                variant="ghost"
-                loading={connectingId === selected.id}
-                onClick={() => void connect(selected.id)}
-              >
-                {t('app.connect')}
-              </Button>
-            )}
           </>
         ) : (
           <span>{t('app.noSelection')}</span>

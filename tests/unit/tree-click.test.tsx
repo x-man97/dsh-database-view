@@ -155,6 +155,12 @@ describe('数据源树：选中与展开分离', () => {
     expect(tree().getByText('列')).toBeTruthy()
   })
 
+  it('数据源行不再显示连接按钮', () => {
+    setup()
+    const row = tree().getByText('演示 MySQL').closest('button') as HTMLButtonElement
+    expect(within(row).queryByText('连接')).toBeNull()
+  })
+
   it('只高亮选中的表，不再同时高亮数据源', () => {
     setup()
     const connectionRow = tree().getByText('演示 MySQL').closest('button') as HTMLButtonElement
