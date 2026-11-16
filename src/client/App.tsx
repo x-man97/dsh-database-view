@@ -38,6 +38,7 @@ import { CompareDataModal, type CompareDataTarget } from './CompareDataModal'
 import { ViewDesigner, type ViewDesignerTarget } from './ViewDesigner'
 import { SqlGeneratorModal, type SqlGeneratorTarget } from './SqlGeneratorModal'
 import { extractViewSelect } from './viewddl'
+import { SqlHighlight } from './sqlhighlight'
 import { tableSelectSql } from './tablesql'
 import {
   Banner,
@@ -74,7 +75,7 @@ function ToolButton({
   icon: ReactElement
   onClick: () => void
   disabled?: boolean
-  children: string
+  children?: string
 }): ReactElement {
   return (
     <button
@@ -86,7 +87,7 @@ function ToolButton({
       disabled={disabled}
     >
       {icon}
-      <span>{children}</span>
+      {children === undefined ? null : <span>{children}</span>}
     </button>
   )
 }
@@ -723,9 +724,7 @@ export function App(props: AppProps): ReactElement {
                 icon={toolbarActionIcon(action.id)}
                 onClick={action.onClick}
                 disabled={action.disabled}
-              >
-                {action.label}
-              </ToolButton>
+              />
             </span>
           ))}
           <span
@@ -978,7 +977,7 @@ export function App(props: AppProps): ReactElement {
             {ddlModal.warnings.length > 0 ? (
               <Banner tone="warn">{ddlModal.warnings.join('；')}</Banner>
             ) : null}
-            <pre className="dshdb-ddl">{ddlModal.text}</pre>
+            <SqlHighlight sql={ddlModal.text} className="dshdb-ddl" trailingNewline={false} />
           </>
         )}
       </Modal>

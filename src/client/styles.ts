@@ -1613,13 +1613,22 @@ export const CSS = `
   gap: 8px;
   min-height: 28px;
 }
-.dshdb-view-body {
+.dshdb-view-sql {
   width: 100%;
-  min-height: 170px;
-  resize: vertical;
+  box-sizing: border-box;
   font-family: var(--ds-font-family-code, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
   font-size: 12px;
   line-height: 1.5;
+}
+textarea.dshdb-view-sql {
+  height: 170px;
+  min-height: 170px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+pre.dshdb-view-sql {
+  min-height: 170px;
+  padding: 8px 10px;
 }
 .dshdb-redis-value {
   display: flex;

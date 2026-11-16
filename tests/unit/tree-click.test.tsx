@@ -155,6 +155,17 @@ describe('数据源树：选中与展开分离', () => {
     expect(tree().getByText('列')).toBeTruthy()
   })
 
+  it('只高亮选中的表，不再同时高亮数据源', () => {
+    setup()
+    const connectionRow = tree().getByText('演示 MySQL').closest('button') as HTMLButtonElement
+    expect(connectionRow.getAttribute('data-active')).toBe('true')
+
+    fireEvent.click(tree().getByText('customers'))
+    const tableRow = tree().getByText('customers').closest('button') as HTMLButtonElement
+    expect(tableRow.getAttribute('data-active')).toBe('true')
+    expect(connectionRow.getAttribute('data-active')).toBe('false')
+  })
+
   it('点击 schema 名只选中，不收起；点击箭头才收起', () => {
     const { calls } = setup()
     const row = tree().getByText('crm').closest('button') as HTMLButtonElement

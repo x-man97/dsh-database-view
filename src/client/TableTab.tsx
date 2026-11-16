@@ -1767,20 +1767,9 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
       <div className="dshdb-pager">
         {loading ? <Tag tone="business">{t('table.querying')}</Tag> : null}
         {sqlText !== '' ? (
-          <>
-            <span className="dshdb-pager-sql" title={sqlText}>
-              {sqlText}
-            </span>
-            <button
-              type="button"
-              className="dshdb-pager-btn"
-              title="复制实际执行的 SQL"
-              aria-label="复制 SQL"
-              onClick={() => void copyText(sqlText)}
-            >
-              <CopyIcon size={12} />
-            </button>
-          </>
+          <span className="dshdb-pager-sql" title={sqlText}>
+            {sqlText}
+          </span>
         ) : null}
         <span className="dshdb-pager-spacer" />
         <button

@@ -8,6 +8,7 @@ import type { ClientConnection, SchemaObject, TableDescription } from '../shared
 import { copyText } from './colmenu'
 import { useCopyFlash } from './copyflash'
 import { useI18n } from './i18n'
+import { SqlHighlight } from './sqlhighlight'
 import {
   alterTableStatements as alterMysqlTableStatements,
   createTableSql,
@@ -723,9 +724,18 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
             {statements.length > 0 ? <span className="dshdb-muted">{editing ? 'ALTER' : 'CREATE'}</span> : null}
           </div>
           {editing && DESTRUCTIVE.test(previewSql) ? <Banner tone="warn">{t('designer.destructive')}</Banner> : null}
-          <pre className="dshdb-ddl dshdb-designer-preview" aria-label={t('designer.preview')}>
-            {statements.length === 0 ? t('designer.noChanges') : previewSql}
-          </pre>
+          {statements.length === 0 ? (
+            <pre className="dshdb-ddl dshdb-designer-preview" aria-label={t('designer.preview')}>
+              {t('designer.noChanges')}
+            </pre>
+          ) : (
+            <SqlHighlight
+              sql={previewSql}
+              className="dshdb-ddl dshdb-designer-preview"
+              ariaLabel={t('designer.preview')}
+              trailingNewline={false}
+            />
+          )}
         </section>
       </div>
     </Modal>

@@ -24,6 +24,7 @@ import { filterTargets, matchesFilteredObject, parseFilter } from '../treefilter
 import { shortcutHit } from '../keymap'
 import { RedisValuePanel } from '../redisview'
 import { copyText } from '../colmenu'
+import { SqlHighlight } from '../sqlhighlight'
 import { selectColumnsSql } from '../tablesql'
 import { tableSelectSql } from '../tablesql'
 import { supportsSqlDesign } from '../tableddl'
@@ -862,7 +863,7 @@ export function DataView(props: DataViewProps): ReactElement {
 
   const isSelected = (row: TreeRow): boolean =>
     row.kind === 'connection'
-      ? row.connectionId === selectedId
+      ? row.connectionId === selectedId && props.selectedKey === ''
       : row.selectedKey !== undefined && row.selectedKey === props.selectedKey
 
   // The detail spinner keeps a thin strip at the top; the filter itself is a
@@ -1087,7 +1088,7 @@ export function DataView(props: DataViewProps): ReactElement {
           ) : null}
           {typeof detail.ddl === 'string' && detail.ddl !== '' ? (
             <div style={{ marginTop: detail.columns.length > 0 ? 10 : 0 }}>
-              <pre className="dshdb-ddl" style={{ maxHeight: 280 }}>{detail.ddl}</pre>
+              <SqlHighlight sql={detail.ddl} className="dshdb-ddl" style={{ maxHeight: 280 }} trailingNewline={false} />
               <div className="dshdb-muted" style={{ marginTop: 4 }}>
                 {detail.ddlSource === 'generated' ? t('structure.ddlGenerated') : t('structure.ddlServer')}
                 {detail.ddlWarnings !== undefined && detail.ddlWarnings.length > 0

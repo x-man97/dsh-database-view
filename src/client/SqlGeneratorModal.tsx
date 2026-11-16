@@ -10,6 +10,7 @@ import { useCopyFlash } from './copyflash'
 import { downloadText } from './export'
 import { useI18n } from './i18n'
 import { composeScript, generateObjectDdl, type GeneratedEntry } from './sqlgenerator'
+import { SqlHighlight } from './sqlhighlight'
 import { Banner, Button, Loading, Modal, Select } from './ui'
 
 export interface SqlGeneratorTarget {
@@ -277,9 +278,18 @@ export function SqlGeneratorModal({ target, onClose, onOpenConsole }: SqlGenerat
             <strong>{t('sqlgen.preview')}</strong>
             {preview !== '' ? <span className="dshdb-muted">{`${String(preview.split('\n').length)} lines`}</span> : null}
           </div>
-          <pre className="dshdb-ddl dshdb-designer-preview" aria-label={t('sqlgen.preview')}>
-            {preview === '' ? t('sqlgen.emptyPreview') : preview}
-          </pre>
+          {preview === '' ? (
+            <pre className="dshdb-ddl dshdb-designer-preview" aria-label={t('sqlgen.preview')}>
+              {t('sqlgen.emptyPreview')}
+            </pre>
+          ) : (
+            <SqlHighlight
+              sql={preview}
+              className="dshdb-ddl dshdb-designer-preview"
+              ariaLabel={t('sqlgen.preview')}
+              trailingNewline={false}
+            />
+          )}
         </section>
       </div>
     </Modal>

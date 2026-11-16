@@ -87,6 +87,15 @@ describe('data-source toolbar', () => {
     ])
   })
 
+  it('renders the data-source actions as icon-only buttons', async () => {
+    mockStatus()
+    render(<App />)
+    await waitFor(() => expect(slots()).toHaveLength(7))
+    const add = screen.getByLabelText('新增数据源') as HTMLButtonElement
+    expect(add.textContent).toBe('')
+    expect(add.querySelector('svg')).toBeTruthy()
+  })
+
   it('keeps the "…" button hidden while every action fits', async () => {
     mockStatus()
     render(<App />)

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -79,16 +79,10 @@ describe('table SQL copy', () => {
     })
   })
 
-  it('copies the statement the page actually ran', async () => {
+  it('shows the executed statement without a copy button', async () => {
     render(<TableTab useTabInfo={tab} />)
-    const copy = (await screen.findByLabelText('复制 SQL')) as HTMLButtonElement
-    await waitFor(() => expect(copy.disabled).toBe(false))
-
-    fireEvent.click(copy)
-
-    await waitFor(() => expect(copies).toHaveBeenCalledTimes(1))
-    const statement = (copies.mock.calls[0] as string[])[0]
-    expect(statement).toContain('SELECT * FROM `shop`.`orders`')
-    expect(statement).toContain('LIMIT 500 OFFSET 0')
+    await waitFor(() => expect(mocks.query).toHaveBeenCalled())
+    expect(screen.queryByLabelText('复制 SQL')).toBeNull()
+    expect(screen.getByTitle(/SELECT \* FROM `shop`\.`orders`/)).toBeTruthy()
   })
 })

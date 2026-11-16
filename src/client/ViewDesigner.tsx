@@ -7,8 +7,10 @@ import type { ClientConnection } from '../shared/types'
 import { copyText } from './colmenu'
 import { useCopyFlash } from './copyflash'
 import { useI18n } from './i18n'
+import { SqlBodyEditor } from './SqlBodyEditor'
+import { SqlHighlight } from './sqlhighlight'
 import { createViewStatements, validateViewDraft, type ViewDraftIssue } from './viewddl'
-import { Banner, Button, Modal, TextArea, TextInput } from './ui'
+import { Banner, Button, Modal, TextInput } from './ui'
 
 export interface ViewDesignerTarget {
   connection: ClientConnection
@@ -126,25 +128,35 @@ export function ViewDesigner({ target, onClose, onExecute }: ViewDesignerProps):
             onChange={(event) => setName(event.target.value)}
           />
         </label>
-        <label className="dshdb-designer-field">
+        <div className="dshdb-designer-field">
           <span>{t('view.body')}</span>
-          <TextArea
-            className="dshdb-view-body"
+          <SqlBodyEditor
             value={body}
-            aria-label={t('view.body')}
+            onChange={setBody}
+            ariaLabel={t('view.body')}
             placeholder={t('view.placeholder')}
-            spellCheck={false}
-            onChange={(event) => setBody(event.target.value)}
+            connectionId={target.connection.id}
+            schema={target.schema}
+            dialect={target.connection.dialect}
           />
-        </label>
+        </div>
         <section className="dshdb-designer-section">
           <div className="dshdb-designer-section-head">
             <strong>{t('designer.preview')}</strong>
             {sql !== '' ? <span className="dshdb-muted">{editing ? 'OR REPLACE' : 'CREATE'}</span> : null}
           </div>
-          <pre className="dshdb-ddl dshdb-designer-preview" aria-label={t('designer.preview')}>
-            {sql === '' ? t('designer.noChanges') : sql}
-          </pre>
+          {sql === '' ? (
+            <pre className="dshdb-ddl dshdb-designer-preview" aria-label={t('designer.preview')}>
+              {t('designer.noChanges')}
+            </pre>
+          ) : (
+            <SqlHighlight
+              sql={sql}
+              className="dshdb-ddl dshdb-designer-preview"
+              ariaLabel={t('designer.preview')}
+              trailingNewline={false}
+            />
+          )}
         </section>
       </div>
     </Modal>

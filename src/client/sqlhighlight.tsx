@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
 import { SQL_KEYWORDS } from './completion/keywords'
 
 const KEYWORDS = new Set(SQL_KEYWORDS.map((word) => word.toUpperCase()))
@@ -81,13 +81,25 @@ export function tokenizeSql(sql: string): SqlToken[] {
   return tokens
 }
 
-export function SqlHighlight(props: { sql: string; className?: string }): ReactElement {
+export function SqlHighlight(props: {
+  sql: string
+  className?: string
+  /** Set for a visible preview; omitted for the transparent editor underlay. */
+  ariaLabel?: string
+  style?: CSSProperties
+  trailingNewline?: boolean
+}): ReactElement {
   return (
-    <pre className={props.className ?? 'dshdb-sql-highlight'} aria-hidden>
+    <pre
+      className={props.className ?? 'dshdb-sql-highlight'}
+      aria-label={props.ariaLabel}
+      aria-hidden={props.ariaLabel === undefined ? true : undefined}
+      style={props.style}
+    >
       {tokenizeSql(props.sql).map((token, index) =>
         token.kind === 'plain' ? token.text : <span key={index} className={`dshdb-tok-${token.kind}`}>{token.text}</span>,
       )}
-      {'\n'}
+      {props.trailingNewline === false ? null : '\n'}
     </pre>
   )
 }
