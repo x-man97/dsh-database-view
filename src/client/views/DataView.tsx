@@ -1082,6 +1082,23 @@ export function DataView(props: DataViewProps): ReactElement {
               ))}
             </div>
           ) : null}
+          {detail.foreignKeys !== undefined && detail.foreignKeys.length > 0 ? (
+            <div className="dshdb-kv" style={{ padding: '8px 0 0' }}>
+              {detail.foreignKeys.map((foreignKey) => (
+                <span key={foreignKey.name} style={{ display: 'contents' }}>
+                  <span className="dshdb-kv-key">
+                    {t('structure.foreignKey')} {foreignKey.name}
+                  </span>
+                  <span className="dshdb-kv-val dshdb-mono">
+                    {foreignKey.columns.join(', ')} → {foreignKey.referencedSchema}.{foreignKey.referencedTable} (
+                    {foreignKey.referencedColumns.join(', ')})
+                    {foreignKey.onDelete === undefined ? '' : ` · ON DELETE ${foreignKey.onDelete}`}
+                    {foreignKey.onUpdate === undefined ? '' : ` · ON UPDATE ${foreignKey.onUpdate}`}
+                  </span>
+                </span>
+              ))}
+            </div>
+          ) : null}
         </Panel>
       ) : null}
 

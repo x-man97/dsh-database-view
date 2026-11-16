@@ -4,34 +4,37 @@
  * purely client-side; App executes the previewed SQL and refreshes the tree.
  */
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
-import type { ClientConnection, TableDescription } from '../shared/types'
+import type { ClientConnection, SchemaObject, TableDescription } from '../shared/types'
 import { copyText } from './colmenu'
 import { useCopyFlash } from './copyflash'
 import { useI18n } from './i18n'
 import {
-  alterTableSql,
+  alterTableStatements,
   createTableSql,
   tableDraftFromDescription,
   validateTableDraft,
   type TableColumnDraft,
   type TableDraft,
   type TableDraftIssue,
+  type TableForeignKeyDraft,
   type TableIndexDraft,
 } from './tableddl'
-import { Banner, Button, Modal, TextInput } from './ui'
+import { Banner, Button, Modal, Select, TextInput } from './ui'
 
 export interface TableDesignerTarget {
   connection: ClientConnection
   schema: string
   /** Present when an existing table is being modified. */
   description?: TableDescription
+  /** Tables in the same schema, offered as foreign-key targets. */
+  tables?: SchemaObject[]
 }
 
 export interface TableDesignerProps {
   target: TableDesignerTarget | null
   onClose: () => void
-  /** Execute the previewed statement; reject to keep the dialog open. */
-  onExecute: (target: TableDesignerTarget, sql: string, tableName: string) => Promise<void>
+  /** Execute the previewed statements; reject to keep the dialog open. */
+  onExecute: (target: TableDesignerTarget, statements: string[], tableName: string) => Promise<void>
 }
 
 const TYPE_SUGGESTIONS = [
@@ -65,7 +68,14 @@ const ISSUE_KEYS: Record<TableDraftIssue, string> = {
   'duplicate-index': 'designer.error.duplicateIndex',
   'index-columns': 'designer.error.indexColumns',
   'unknown-index-column': 'designer.error.unknownIndexColumn',
+  'foreign-key-name': 'designer.error.foreignKeyName',
+  'duplicate-foreign-key': 'designer.error.duplicateForeignKey',
+  'foreign-key-columns': 'designer.error.foreignKeyColumns',
+  'unknown-foreign-key-column': 'designer.error.unknownForeignKeyColumn',
+  'foreign-key-target': 'designer.error.foreignKeyTarget',
 }
+
+const FOREIGN_KEY_ACTIONS = ['RESTRICT', 'CASCADE', 'SET NULL', 'NO ACTION', 'SET DEFAULT']
 
 const DESTRUCTIVE = /\b(?:drop\s+(?:column|primary\s+key|index))\b/i
 
@@ -96,6 +106,7 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
   const [tableName, setTableName] = useState('')
   const [columns, setColumns] = useState<TableColumnDraft[]>(initialColumns)
   const [indexes, setIndexes] = useState<TableIndexDraft[]>([])
+  const [foreignKeys, setForeignKeys] = useState<TableForeignKeyDraft[]>([])
   const [original, setOriginal] = useState<TableDraft | null>(null)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
@@ -112,6 +123,7 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
       setTableName('')
       setColumns(initialColumns())
       setIndexes([])
+      setForeignKeys([])
       setTimeout(() => nameRef.current?.focus(), 0)
       return
     }
@@ -120,6 +132,7 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
     setTableName(draft.table)
     setColumns(draft.columns.map((column) => ({ ...column })))
     setIndexes(draft.indexes.map((index) => ({ ...index, columns: [...index.columns] })))
+    setForeignKeys(draft.foreignKeys.map((foreignKey) => ({ ...foreignKey, columns: [...foreignKey.columns], referencedColumns: [...foreignKey.referencedColumns] })))
   }, [target, flash.reset])
 
   const editing = original !== null
@@ -130,11 +143,14 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
       table: tableName.trim(),
       columns,
       indexes,
+      foreignKeys,
     }),
-    [target?.schema, tableName, columns, indexes],
+    [target?.schema, tableName, columns, indexes, foreignKeys],
   )
   const issue = target === null ? null : validateTableDraft(draft, !editing)
-  const sql = issue === null ? (original === null ? createTableSql(draft) : alterTableSql(original, draft)) : ''
+  const statements =
+    issue === null ? (original === null ? [createTableSql(draft)] : alterTableStatements(original, draft)) : []
+  const previewSql = statements.join(';\n\n')
 
   if (target === null) return null
 
@@ -144,6 +160,12 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
       const from = current.name.toLowerCase()
       const to = patch.name
       setIndexes((entries) =>
+        entries.map((entry) => ({
+          ...entry,
+          columns: entry.columns.map((name) => (name.toLowerCase() === from ? to : name)),
+        })),
+      )
+      setForeignKeys((entries) =>
         entries.map((entry) => ({
           ...entry,
           columns: entry.columns.map((name) => (name.toLowerCase() === from ? to : name)),
@@ -159,6 +181,9 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
     const from = removed.name.toLowerCase()
     setColumns((current) => current.filter((_, position) => position !== index))
     setIndexes((entries) =>
+      entries.map((entry) => ({ ...entry, columns: entry.columns.filter((name) => name.toLowerCase() !== from) })),
+    )
+    setForeignKeys((entries) =>
       entries.map((entry) => ({ ...entry, columns: entry.columns.filter((name) => name.toLowerCase() !== from) })),
     )
   }
@@ -195,12 +220,32 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
     ])
   }
 
+  const updateForeignKey = (index: number, patch: Partial<TableForeignKeyDraft>): void => {
+    setForeignKeys((current) => current.map((entry, position) => (position === index ? { ...entry, ...patch } : entry)))
+  }
+
+  const addForeignKey = (): void => {
+    const name = uniqueName(`fk_${String(foreignKeys.length + 1)}`, foreignKeys.map((foreignKey) => foreignKey.name))
+    setForeignKeys((current) => [
+      ...current,
+      {
+        name,
+        columns: columns[0] === undefined ? [] : [columns[0].name],
+        referencedSchema: target.schema,
+        referencedTable: '',
+        referencedColumns: [],
+        onDelete: 'RESTRICT',
+        onUpdate: 'RESTRICT',
+      },
+    ])
+  }
+
   const execute = async (): Promise<void> => {
-    if (sql === '' || readOnly || busy) return
+    if (statements.length === 0 || readOnly || busy) return
     setBusy(true)
     setFailure(null)
     try {
-      await onExecute(target, sql, tableName.trim())
+      await onExecute(target, statements, tableName.trim())
       onClose()
     } catch (error) {
       setFailure(error instanceof Error ? error.message : String(error))
@@ -222,14 +267,14 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
       footer={
         <>
           <span className="dshdb-muted">
-            {issue !== null ? t(ISSUE_KEYS[issue]) : sql === '' ? t('designer.noChanges') : editing ? t('designer.alterHint') : t('designer.createHint')}
+            {issue !== null ? t(ISSUE_KEYS[issue]) : statements.length === 0 ? t('designer.noChanges') : editing ? t('designer.alterHint') : t('designer.createHint')}
           </span>
           <span className="dshdb-toolbar-spacer" />
           <Button
             size="sm"
-            disabled={sql === ''}
+            disabled={statements.length === 0}
             onClick={() => {
-              void copyText(sql).then((ok) => flash.flash(ok))
+              void copyText(previewSql).then((ok) => flash.flash(ok))
             }}
           >
             {flash.copied ? t('designer.copied') : t('designer.copy')}
@@ -237,7 +282,7 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
           <Button size="sm" onClick={onClose} disabled={busy}>
             {t('designer.cancel')}
           </Button>
-          <Button size="sm" variant="primary" loading={busy} disabled={sql === '' || readOnly} onClick={() => void execute()}>
+          <Button size="sm" variant="primary" loading={busy} disabled={statements.length === 0 || readOnly} onClick={() => void execute()}>
             {t('designer.execute')}
           </Button>
         </>
@@ -439,12 +484,121 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
 
         <section className="dshdb-designer-section">
           <div className="dshdb-designer-section-head">
-            <strong>{t('designer.preview')}</strong>
-            {sql !== '' ? <span className="dshdb-muted">{editing ? 'ALTER' : 'CREATE'}</span> : null}
+            <strong>{t('designer.foreignKeys')}</strong>
+            <Button size="sm" onClick={addForeignKey}>
+              {t('designer.addForeignKey')}
+            </Button>
           </div>
-          {editing && DESTRUCTIVE.test(sql) ? <Banner tone="warn">{t('designer.destructive')}</Banner> : null}
+          {foreignKeys.length === 0 ? (
+            <p className="dshdb-muted">{t('designer.noForeignKeys')}</p>
+          ) : (
+            <div className="dshdb-designer-scroll">
+              <table className="dshdb-designer-table">
+                <thead>
+                  <tr>
+                    <th>{t('designer.fk.name')}</th>
+                    <th>{t('designer.fk.columns')}</th>
+                    <th>{t('designer.fk.refTable')}</th>
+                    <th>{t('designer.fk.refColumns')}</th>
+                    <th>{t('designer.fk.onDelete')}</th>
+                    <th>{t('designer.fk.onUpdate')}</th>
+                    <th aria-label={t('designer.fk.remove')} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {foreignKeys.map((foreignKey, position) => (
+                    <tr key={position}>
+                      <td>
+                        <TextInput
+                          value={foreignKey.name}
+                          aria-label={`${t('designer.fk.name')} ${String(position + 1)}`}
+                          onChange={(event) => updateForeignKey(position, { name: event.target.value })}
+                        />
+                      </td>
+                      <td>
+                        <TextInput
+                          value={foreignKey.columns.join(', ')}
+                          aria-label={`${t('designer.fk.columns')} ${String(position + 1)}`}
+                          onChange={(event) =>
+                            updateForeignKey(position, {
+                              columns: event.target.value
+                                .split(',')
+                                .map((name) => name.trim())
+                                .filter((name) => name !== ''),
+                            })
+                          }
+                        />
+                      </td>
+                      <td>
+                        <TextInput
+                          value={foreignKey.referencedTable}
+                          list="dshdb-fk-ref-tables"
+                          aria-label={`${t('designer.fk.refTable')} ${String(position + 1)}`}
+                          onChange={(event) => updateForeignKey(position, { referencedTable: event.target.value })}
+                        />
+                      </td>
+                      <td>
+                        <TextInput
+                          value={foreignKey.referencedColumns.join(', ')}
+                          aria-label={`${t('designer.fk.refColumns')} ${String(position + 1)}`}
+                          onChange={(event) =>
+                            updateForeignKey(position, {
+                              referencedColumns: event.target.value
+                                .split(',')
+                                .map((name) => name.trim())
+                                .filter((name) => name !== ''),
+                            })
+                          }
+                        />
+                      </td>
+                      <td>
+                        <Select
+                          aria-label={`${t('designer.fk.onDelete')} ${String(position + 1)}`}
+                          value={foreignKey.onDelete}
+                          options={FOREIGN_KEY_ACTIONS.map((action) => ({ value: action, label: action }))}
+                          onValueChange={(value) => updateForeignKey(position, { onDelete: value })}
+                        />
+                      </td>
+                      <td>
+                        <Select
+                          aria-label={`${t('designer.fk.onUpdate')} ${String(position + 1)}`}
+                          value={foreignKey.onUpdate}
+                          options={FOREIGN_KEY_ACTIONS.map((action) => ({ value: action, label: action }))}
+                          onValueChange={(value) => updateForeignKey(position, { onUpdate: value })}
+                        />
+                      </td>
+                      <td>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={t('designer.fk.remove')}
+                          title={t('designer.fk.remove')}
+                          onClick={() => setForeignKeys((current) => current.filter((_, index) => index !== position))}
+                        >
+                          ×
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <datalist id="dshdb-fk-ref-tables">
+                {(target.tables ?? []).map((table) => (
+                  <option key={table.name} value={table.name} />
+                ))}
+              </datalist>
+            </div>
+          )}
+        </section>
+
+        <section className="dshdb-designer-section">
+          <div className="dshdb-designer-section-head">
+            <strong>{t('designer.preview')}</strong>
+            {statements.length > 0 ? <span className="dshdb-muted">{editing ? 'ALTER' : 'CREATE'}</span> : null}
+          </div>
+          {editing && DESTRUCTIVE.test(previewSql) ? <Banner tone="warn">{t('designer.destructive')}</Banner> : null}
           <pre className="dshdb-ddl dshdb-designer-preview" aria-label={t('designer.preview')}>
-            {sql === '' ? t('designer.noChanges') : sql}
+            {statements.length === 0 ? t('designer.noChanges') : previewSql}
           </pre>
         </section>
       </div>

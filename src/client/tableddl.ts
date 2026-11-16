@@ -25,11 +25,24 @@ export interface TableIndexDraft {
   columns: string[]
 }
 
+export interface TableForeignKeyDraft {
+  /** Set for foreign keys read from the server; undefined for new ones. */
+  originalName?: string
+  name: string
+  columns: string[]
+  referencedSchema: string
+  referencedTable: string
+  referencedColumns: string[]
+  onDelete: string
+  onUpdate: string
+}
+
 export interface TableDraft {
   schema: string
   table: string
   columns: TableColumnDraft[]
   indexes: TableIndexDraft[]
+  foreignKeys: TableForeignKeyDraft[]
 }
 
 export type TableDraftIssue =
@@ -42,6 +55,11 @@ export type TableDraftIssue =
   | 'duplicate-index'
   | 'index-columns'
   | 'unknown-index-column'
+  | 'foreign-key-name'
+  | 'duplicate-foreign-key'
+  | 'foreign-key-columns'
+  | 'unknown-foreign-key-column'
+  | 'foreign-key-target'
 
 /** Identifiers are always backtick-quoted; embedded backticks are doubled. */
 export function quoteMysqlIdent(name: string): string {
@@ -81,6 +99,30 @@ function columnDefinition(column: TableColumnDraft): string {
   const comment = column.comment.trim()
   if (comment !== '') parts.push(`COMMENT ${stringLiteral(comment)}`)
   return parts.join(' ')
+}
+
+function foreignKeyConstraintSql(fk: TableForeignKeyDraft, defaultSchema: string): string {
+  const referencedSchema = fk.referencedSchema.trim() === '' ? defaultSchema : fk.referencedSchema.trim()
+  const parts = [
+    `CONSTRAINT ${quoteMysqlIdent(fk.name.trim())} FOREIGN KEY (${fk.columns.map(quoteMysqlIdent).join(', ')})`,
+    `REFERENCES ${qualified(referencedSchema, fk.referencedTable.trim())} (${fk.referencedColumns.map(quoteMysqlIdent).join(', ')})`,
+  ]
+  if (fk.onDelete.trim() !== '') parts.push(`ON DELETE ${fk.onDelete.trim().toUpperCase()}`)
+  if (fk.onUpdate.trim() !== '') parts.push(`ON UPDATE ${fk.onUpdate.trim().toUpperCase()}`)
+  return parts.join(' ')
+}
+
+function foreignKeySignature(fk: TableForeignKeyDraft, defaultSchema: string): string {
+  const referencedSchema = fk.referencedSchema.trim() === '' ? defaultSchema : fk.referencedSchema.trim()
+  return [
+    fk.name.trim(),
+    fk.columns.join(','),
+    referencedSchema,
+    fk.referencedTable.trim(),
+    fk.referencedColumns.join(','),
+    fk.onDelete.trim().toUpperCase(),
+    fk.onUpdate.trim().toUpperCase(),
+  ].join('|')
 }
 
 function sameColumn(left: TableColumnDraft, right: TableColumnDraft): boolean {
@@ -127,6 +169,16 @@ export function tableDraftFromDescription(description: TableDescription): TableD
         unique: index.unique === true,
         columns: [...index.columns],
       })),
+    foreignKeys: (description.foreignKeys ?? []).map((foreignKey) => ({
+      originalName: foreignKey.name,
+      name: foreignKey.name,
+      columns: [...foreignKey.columns],
+      referencedSchema: foreignKey.referencedSchema,
+      referencedTable: foreignKey.referencedTable,
+      referencedColumns: [...foreignKey.referencedColumns],
+      onDelete: foreignKey.onDelete ?? 'RESTRICT',
+      onUpdate: foreignKey.onUpdate ?? 'RESTRICT',
+    })),
   }
 }
 
@@ -152,6 +204,24 @@ export function validateTableDraft(draft: TableDraft, requireTableName = true): 
       if (!names.has(column.trim().toLowerCase())) return 'unknown-index-column'
     }
   }
+  const foreignKeyNames = new Set<string>()
+  for (const foreignKey of draft.foreignKeys ?? []) {
+    const name = foreignKey.name.trim()
+    if (name === '') return 'foreign-key-name'
+    if (foreignKeyNames.has(name.toLowerCase())) return 'duplicate-foreign-key'
+    foreignKeyNames.add(name.toLowerCase())
+    if (foreignKey.columns.length === 0) return 'foreign-key-columns'
+    for (const column of foreignKey.columns) {
+      if (!names.has(column.trim().toLowerCase())) return 'unknown-foreign-key-column'
+    }
+    if (
+      foreignKey.referencedTable.trim() === '' ||
+      foreignKey.referencedColumns.length !== foreignKey.columns.length ||
+      foreignKey.referencedColumns.some((column) => column.trim() === '')
+    ) {
+      return 'foreign-key-target'
+    }
+  }
   return null
 }
 
@@ -164,14 +234,19 @@ export function createTableSql(draft: TableDraft): string {
       `  ${index.unique ? 'UNIQUE ' : ''}INDEX ${quoteMysqlIdent(index.name)} (${index.columns.map(quoteMysqlIdent).join(', ')})`,
     )
   }
+  for (const foreignKey of draft.foreignKeys ?? []) {
+    lines.push(`  ${foreignKeyConstraintSql(foreignKey, draft.schema)}`)
+  }
   return `CREATE TABLE ${qualified(draft.schema, draft.table)} (\n${lines.join(',\n')}\n)`
 }
 
 /**
- * One ALTER TABLE with the clauses needed to turn `original` into `next`.
- * Returns '' when nothing changed. Column renames are expressed as CHANGE.
+ * One or more ALTER TABLE statements needed to turn `original` into `next`.
+ * Foreign-key drops go in their own statement: MySQL rejects dropping and
+ * re-adding the same constraint name inside one ALTER. Returns [] when nothing
+ * changed. Column renames are expressed as CHANGE.
  */
-export function alterTableSql(original: TableDraft, next: TableDraft): string {
+export function alterTableStatements(original: TableDraft, next: TableDraft): string[] {
   const originalColumns = new Map(original.columns.map((column) => [column.originalName ?? column.name, column]))
   const nextOriginalNames = new Set(next.columns.map((column) => column.originalName ?? column.name))
   // Index text the user did not edit still references the old column name after
@@ -184,9 +259,26 @@ export function alterTableSql(original: TableDraft, next: TableDraft): string {
     ...index,
     columns: index.columns.map((column) => renames.get(column) ?? column),
   }))
+  const nextForeignKeys = (next.foreignKeys ?? []).map((foreignKey) => ({
+    ...foreignKey,
+    columns: foreignKey.columns.map((column) => renames.get(column) ?? column),
+  }))
   const originalIndexes = new Map(original.indexes.map((index) => [index.originalName ?? index.name, index]))
+  const originalForeignKeys = new Map(
+    (original.foreignKeys ?? []).map((foreignKey) => [foreignKey.originalName ?? foreignKey.name, foreignKey]),
+  )
 
   const clauses: string[] = []
+  const foreignDropClauses: string[] = []
+  // Foreign keys go first: dropping a referenced column or index fails while
+  // the constraint still exists.
+  for (const foreignKey of original.foreignKeys ?? []) {
+    const key = foreignKey.originalName ?? foreignKey.name
+    const match = nextForeignKeys.find((entry) => (entry.originalName ?? entry.name) === key)
+    if (match === undefined || foreignKeySignature(match, original.schema) !== foreignKeySignature(foreignKey, original.schema)) {
+      foreignDropClauses.push(`DROP FOREIGN KEY ${quoteMysqlIdent(key)}`)
+    }
+  }
   for (const index of original.indexes) {
     const key = index.originalName ?? index.name
     const match = nextIndexes.find((entry) => (entry.originalName ?? entry.name) === key)
@@ -231,8 +323,26 @@ export function alterTableSql(original: TableDraft, next: TableDraft): string {
     }
   }
 
-  if (clauses.length === 0) return ''
-  return `ALTER TABLE ${qualified(original.schema, original.table)}\n  ${clauses.join(',\n  ')}`
+  const foreignAddClauses: string[] = []
+  for (const foreignKey of nextForeignKeys) {
+    const key = foreignKey.originalName ?? foreignKey.name
+    const match = originalForeignKeys.get(key)
+    if (match === undefined || foreignKeySignature(foreignKey, original.schema) !== foreignKeySignature(match, original.schema)) {
+      foreignAddClauses.push(`ADD ${foreignKeyConstraintSql(foreignKey, original.schema)}`)
+    }
+  }
+
+  const table = qualified(original.schema, original.table)
+  const statements: string[] = []
+  if (foreignDropClauses.length > 0) statements.push(`ALTER TABLE ${table}\n  ${foreignDropClauses.join(',\n  ')}`)
+  if (clauses.length > 0) statements.push(`ALTER TABLE ${table}\n  ${clauses.join(',\n  ')}`)
+  if (foreignAddClauses.length > 0) statements.push(`ALTER TABLE ${table}\n  ${foreignAddClauses.join(',\n  ')}`)
+  return statements
+}
+
+/** Preview form: the statements joined by blank lines. */
+export function alterTableSql(original: TableDraft, next: TableDraft): string {
+  return alterTableStatements(original, next).join(';\n\n')
 }
 
 export function dropObjectSql(schema: string, table: string, kind: ObjectKind): string {

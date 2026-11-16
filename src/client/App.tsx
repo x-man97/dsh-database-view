@@ -524,9 +524,10 @@ export function App(props: AppProps): ReactElement {
     (connectionId: string, schema: string): void => {
       const connection = connections.find((item) => item.id === connectionId)
       if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
-      setDesigner({ connection, schema })
+      const tables = (objects[`${connectionId}:${schema}`] ?? []).filter((object) => object.kind === 'table')
+      setDesigner({ connection, schema, tables })
     },
-    [connections],
+    [connections, objects],
   )
 
   const openModifyTable = useCallback(
@@ -535,12 +536,13 @@ export function App(props: AppProps): ReactElement {
       if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
       try {
         const description = await api.describe(connectionId, schema, table, 'table')
-        setDesigner({ connection, schema, description })
+        const tables = (objects[`${connectionId}:${schema}`] ?? []).filter((object) => object.kind === 'table')
+        setDesigner({ connection, schema, description, tables })
       } catch (error) {
         notify(`读取表结构失败：${errorText(error)}`, 'error')
       }
     },
-    [connections, notify],
+    [connections, notify, objects],
   )
 
   const openRenameTable = useCallback(
@@ -562,8 +564,10 @@ export function App(props: AppProps): ReactElement {
   )
 
   const applyTableDdl = useCallback(
-    async (target: TableDesignerTarget, sql: string, tableName: string): Promise<void> => {
-      await executeDdl(target.connection.id, target.schema, sql)
+    async (target: TableDesignerTarget, statements: string[], tableName: string): Promise<void> => {
+      for (const statement of statements) {
+        await executeDdl(target.connection.id, target.schema, statement)
+      }
       await refreshAfterDdl(target.connection.id, target.schema)
       notify(
         target.description === undefined

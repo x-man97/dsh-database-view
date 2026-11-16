@@ -24,7 +24,7 @@ function column(overrides) {
 }
 
 function draft(overrides = {}) {
-  return { schema: 'app', table: 'users', columns: [column({ primaryKey: true })], indexes: [], ...overrides }
+  return { schema: 'app', table: 'users', columns: [column({ primaryKey: true })], indexes: [], foreignKeys: [], ...overrides }
 }
 
 describe('createTableSql', () => {
@@ -167,6 +167,93 @@ describe('validateTableDraft', () => {
 
   it('does not require a table name when altering', () => {
     expect(validateTableDraft(draft({ table: '' }), false)).toBeNull()
+  })
+})
+
+describe('foreign keys', () => {
+  const foreignKey = (overrides = {}) => ({
+    name: 'fk_user',
+    columns: ['user_id'],
+    referencedSchema: 'app',
+    referencedTable: 'users',
+    referencedColumns: ['id'],
+    onDelete: 'RESTRICT',
+    onUpdate: 'RESTRICT',
+    ...overrides,
+  })
+
+  it('emits a constraint in CREATE TABLE', () => {
+    const sql = createTableSql(
+      draft({
+        columns: [column({ name: 'id', primaryKey: true }), column({ name: 'user_id', typeName: 'INT' })],
+        foreignKeys: [foreignKey({ onDelete: 'CASCADE' })],
+      }),
+    )
+    expect(sql).toContain(
+      'CONSTRAINT `fk_user` FOREIGN KEY (`user_id`) REFERENCES `app`.`users` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT',
+    )
+  })
+
+  it('drops and re-adds a foreign key when its rule changes', () => {
+    const description = {
+      schema: 'app',
+      table: 'orders',
+      kind: 'table',
+      columns: [column({ name: 'id', primaryKey: true }), column({ name: 'user_id', typeName: 'INT' })],
+      indexes: [],
+      foreignKeys: [foreignKey()],
+    }
+    const original = tableDraftFromDescription(description)
+    const next = tableDraftFromDescription(description)
+    next.foreignKeys[0].onDelete = 'CASCADE'
+    expect(alterTableSql(original, next)).toBe(
+      [
+        'ALTER TABLE `app`.`orders`',
+        '  DROP FOREIGN KEY `fk_user`;',
+        '',
+        'ALTER TABLE `app`.`orders`',
+        '  ADD CONSTRAINT `fk_user` FOREIGN KEY (`user_id`) REFERENCES `app`.`users` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT',
+      ].join('\n'),
+    )
+  })
+
+  it('renames a local column referenced by a foreign key', () => {
+    const description = {
+      schema: 'app',
+      table: 'orders',
+      kind: 'table',
+      columns: [column({ name: 'id', primaryKey: true }), column({ name: 'user_id', typeName: 'INT' })],
+      indexes: [],
+      foreignKeys: [foreignKey()],
+    }
+    const original = tableDraftFromDescription(description)
+    const next = tableDraftFromDescription(description)
+    next.columns[1].name = 'buyer_id'
+    expect(alterTableSql(original, next)).toBe(
+      [
+        'ALTER TABLE `app`.`orders`',
+        '  DROP FOREIGN KEY `fk_user`;',
+        '',
+        'ALTER TABLE `app`.`orders`',
+        '  CHANGE COLUMN `user_id` `buyer_id` INT NOT NULL;',
+        '',
+        'ALTER TABLE `app`.`orders`',
+        '  ADD CONSTRAINT `fk_user` FOREIGN KEY (`buyer_id`) REFERENCES `app`.`users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT',
+      ].join('\n'),
+    )
+  })
+
+  it('validates names, local columns and referenced targets', () => {
+    const withColumns = (entry) =>
+      draft({
+        columns: [column({ name: 'id', primaryKey: true }), column({ name: 'user_id', typeName: 'INT' })],
+        foreignKeys: [entry],
+      })
+    expect(validateTableDraft(withColumns(foreignKey({ name: '' })))).toBe('foreign-key-name')
+    expect(validateTableDraft(withColumns(foreignKey({ columns: ['missing'] })))).toBe('unknown-foreign-key-column')
+    expect(validateTableDraft(withColumns(foreignKey({ referencedTable: '' })))).toBe('foreign-key-target')
+    expect(validateTableDraft(withColumns(foreignKey({ referencedColumns: ['id', 'extra'] })))).toBe('foreign-key-target')
+    expect(validateTableDraft(withColumns(foreignKey()))).toBeNull()
   })
 })
 

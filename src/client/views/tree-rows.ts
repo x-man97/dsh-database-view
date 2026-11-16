@@ -63,7 +63,7 @@ export type TreeRowKind =
   | 'redis-key'
   | 'redis-action'
 
-export type TreeDetailSection = 'columns' | 'keys' | 'indexes'
+export type TreeDetailSection = 'columns' | 'keys' | 'indexes' | 'foreignKeys'
 
 export type TreePickerMode = 'schemas' | 'redis-dbs'
 
@@ -602,6 +602,49 @@ function appendObject(
           object,
           label: index.name,
           meta: index.columns.join(', '),
+        })
+      }
+    }
+  }
+
+  const foreignKeys = description.foreignKeys ?? []
+  if (foreignKeys.length > 0) {
+    const foreignFolder = `${objectKey}#foreignKeys`
+    const foreignOpen = state.expanded[foreignFolder] === true
+    rows.push({
+      key: foreignFolder,
+      kind: 'detail-folder',
+      dataKind: 'folder',
+      ariaLevel: 5,
+      depth: 4,
+      navigable: true,
+      expandable: true,
+      open: foreignOpen,
+      toggleKey: foreignFolder,
+      detailSection: 'foreignKeys',
+      connectionId: connection.id,
+      schema: schema.name,
+      object,
+      label: t('tree.foreignKeys'),
+      meta: String(foreignKeys.length),
+      count: foreignKeys.length,
+    })
+    if (foreignOpen) {
+      for (const foreignKey of foreignKeys) {
+        rows.push({
+          key: `${foreignFolder}:${foreignKey.name}`,
+          kind: 'key',
+          dataKind: 'key',
+          ariaLevel: 6,
+          depth: 5,
+          navigable: false,
+          expandable: false,
+          open: false,
+          connectionId: connection.id,
+          schema: schema.name,
+          object,
+          label: foreignKey.name,
+          meta: `${foreignKey.columns.join(', ')} → ${foreignKey.referencedTable} (${foreignKey.referencedColumns.join(', ')})`,
         })
       }
     }

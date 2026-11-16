@@ -34,9 +34,10 @@ describe('table designer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '执行' }))
     await waitFor(() => expect(onExecute).toHaveBeenCalledTimes(1))
-    const [, sql, tableName] = onExecute.mock.calls[0]
+    const [, statements, tableName] = onExecute.mock.calls[0]
     expect(tableName).toBe('orders')
-    expect(sql).toContain('CREATE TABLE `app`.`orders`')
+    expect(statements).toHaveLength(1)
+    expect(statements[0]).toContain('CREATE TABLE `app`.`orders`')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
@@ -64,6 +65,19 @@ describe('table designer', () => {
     fireEvent.change(screen.getByLabelText('注释 1'), { target: { value: '主键' } })
     expect(screen.getByLabelText('DDL 预览').textContent).toContain('ALTER TABLE `app`.`users`')
     expect(screen.getByLabelText('DDL 预览').textContent).toContain("COMMENT '主键'")
+  })
+
+  it('previews a foreign-key constraint', () => {
+    render(
+      <TableDesigner target={{ connection, schema: 'app' }} onClose={() => undefined} onExecute={vi.fn()} />,
+    )
+    fireEvent.change(screen.getByLabelText('表名'), { target: { value: 'orders' } })
+    fireEvent.click(screen.getByRole('button', { name: '添加外键' }))
+    fireEvent.change(screen.getByLabelText('引用表 1'), { target: { value: 'users' } })
+    fireEvent.change(screen.getByLabelText('引用列（逗号分隔） 1'), { target: { value: 'id' } })
+    expect(screen.getByLabelText('DDL 预览').textContent).toContain(
+      'CONSTRAINT `fk_1` FOREIGN KEY (`id`) REFERENCES `app`.`users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT',
+    )
   })
 
   it('blocks execution while the draft is invalid', () => {

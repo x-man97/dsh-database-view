@@ -4,6 +4,7 @@ import type {
   ColumnDetail,
   DdlResult,
   ExplainResult,
+  ForeignKeyInfo,
   IndexInfo,
   ObjectKind,
   QueryResult,
@@ -241,7 +242,42 @@ export class MysqlEngine implements DatabaseEngine {
       entry.columns.push(String(row.columnName))
       byName.set(name, entry)
     }
-    return { schema, table, kind, columns, indexes: [...byName.values()] }
+    const [foreignKeyRows] = await connection.query(
+      `SELECT k.CONSTRAINT_NAME AS name, k.COLUMN_NAME AS columnName,
+              k.REFERENCED_TABLE_SCHEMA AS refSchema, k.REFERENCED_TABLE_NAME AS refTable,
+              k.REFERENCED_COLUMN_NAME AS refColumn,
+              r.UPDATE_RULE AS onUpdate, r.DELETE_RULE AS onDelete
+       FROM information_schema.KEY_COLUMN_USAGE k
+       JOIN information_schema.REFERENTIAL_CONSTRAINTS r
+         ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA
+        AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME
+        AND r.TABLE_NAME = k.TABLE_NAME
+       WHERE k.TABLE_SCHEMA = ? AND k.TABLE_NAME = ? AND k.REFERENCED_TABLE_NAME IS NOT NULL
+       ORDER BY k.CONSTRAINT_NAME, k.ORDINAL_POSITION`,
+      [schema, table],
+    )
+    const foreignKeys: ForeignKeyInfo[] = []
+    const foreignByName = new Map<string, ForeignKeyInfo>()
+    for (const row of (Array.isArray(foreignKeyRows) ? foreignKeyRows : []) as Array<Record<string, unknown>>) {
+      const name = String(row.name)
+      let entry = foreignByName.get(name)
+      if (entry === undefined) {
+        entry = {
+          name,
+          columns: [],
+          referencedSchema: String(row.refSchema),
+          referencedTable: String(row.refTable),
+          referencedColumns: [],
+          ...(typeof row.onUpdate === 'string' ? { onUpdate: row.onUpdate } : {}),
+          ...(typeof row.onDelete === 'string' ? { onDelete: row.onDelete } : {}),
+        }
+        foreignByName.set(name, entry)
+        foreignKeys.push(entry)
+      }
+      entry.columns.push(String(row.columnName))
+      entry.referencedColumns.push(String(row.refColumn))
+    }
+    return { schema, table, kind, columns, indexes: [...byName.values()], foreignKeys }
   }
 
   async ddl(schema: string, table: string, kind: ObjectKind): Promise<DdlResult> {

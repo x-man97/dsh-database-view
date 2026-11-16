@@ -19,7 +19,7 @@ function table(overrides = {}) {
 describe('diffTableStructures', () => {
   it('reports no differences for identical structures', () => {
     const diff = diffTableStructures(table(), table())
-    expect(diff).toEqual({ columns: [], indexes: [], equal: true })
+    expect(diff).toEqual({ columns: [], indexes: [], foreignKeys: [], equal: true })
   })
 
   it('reports added, removed and changed columns with field details', () => {
@@ -87,5 +87,35 @@ describe('diffTableStructures', () => {
       },
       { name: 'idx_id', status: 'added', changes: [] },
     ])
+  })
+
+  it('compares foreign keys and their actions', () => {
+    const foreignKey = (overrides = {}) => ({
+      name: 'fk_user',
+      columns: ['id'],
+      referencedSchema: 'app',
+      referencedTable: 'users',
+      referencedColumns: ['id'],
+      onDelete: 'RESTRICT',
+      onUpdate: 'RESTRICT',
+      ...overrides,
+    })
+    const left = table({ foreignKeys: [foreignKey()] })
+    const right = table({
+      foreignKeys: [
+        foreignKey({ onDelete: 'CASCADE' }),
+        foreignKey({ name: 'fk_extra', columns: ['name'], referencedColumns: ['name'] }),
+      ],
+    })
+    const diff = diffTableStructures(left, right)
+    expect(diff.foreignKeys).toEqual([
+      {
+        name: 'fk_user',
+        status: 'changed',
+        changes: [{ field: 'onDelete', left: 'RESTRICT', right: 'CASCADE' }],
+      },
+      { name: 'fk_extra', status: 'added', changes: [] },
+    ])
+    expect(diff.equal).toBe(false)
   })
 })

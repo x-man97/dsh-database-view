@@ -127,9 +127,18 @@ export function CompareStructureModal({ target, onClose }: CompareStructureModal
             {diff === null
               ? t('compare.hint')
               : t('compare.summary', {
-                  added: diff.columns.filter((entry) => entry.status === 'added').length + diff.indexes.filter((entry) => entry.status === 'added').length,
-                  removed: diff.columns.filter((entry) => entry.status === 'removed').length + diff.indexes.filter((entry) => entry.status === 'removed').length,
-                  changed: diff.columns.filter((entry) => entry.status === 'changed').length + diff.indexes.filter((entry) => entry.status === 'changed').length,
+                  added:
+                    diff.columns.filter((entry) => entry.status === 'added').length +
+                    diff.indexes.filter((entry) => entry.status === 'added').length +
+                    diff.foreignKeys.filter((entry) => entry.status === 'added').length,
+                  removed:
+                    diff.columns.filter((entry) => entry.status === 'removed').length +
+                    diff.indexes.filter((entry) => entry.status === 'removed').length +
+                    diff.foreignKeys.filter((entry) => entry.status === 'removed').length,
+                  changed:
+                    diff.columns.filter((entry) => entry.status === 'changed').length +
+                    diff.indexes.filter((entry) => entry.status === 'changed').length +
+                    diff.foreignKeys.filter((entry) => entry.status === 'changed').length,
                 })}
           </span>
           <span className="dshdb-toolbar-spacer" />
@@ -185,6 +194,12 @@ export function CompareStructureModal({ target, onClose }: CompareStructureModal
                   <strong>{t('compare.indexes')}</strong>
                 </div>
                 {diff.indexes.length === 0 ? <p className="dshdb-muted">{t('compare.none')}</p> : deltaRows(diff.indexes)}
+              </section>
+              <section className="dshdb-designer-section">
+                <div className="dshdb-designer-section-head">
+                  <strong>{t('compare.foreignKeys')}</strong>
+                </div>
+                {diff.foreignKeys.length === 0 ? <p className="dshdb-muted">{t('compare.none')}</p> : deltaRows(diff.foreignKeys)}
               </section>
             </>
           )

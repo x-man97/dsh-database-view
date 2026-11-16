@@ -64,6 +64,7 @@ const folderIcon = (folder: TreeRow['folder']): ReactNode => {
 const detailIcon = (section: TreeRow['detailSection']): ReactNode => {
   if (section === 'columns') return <ColumnIcon size={13} />
   if (section === 'keys') return <KeyIcon size={13} />
+  if (section === 'foreignKeys') return <KeyIcon size={13} />
   return <IndexIcon size={13} />
 }
 

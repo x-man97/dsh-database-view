@@ -339,12 +339,24 @@ export interface IndexInfo {
   primary?: boolean
 }
 
+export interface ForeignKeyInfo {
+  name: string
+  columns: string[]
+  referencedSchema: string
+  referencedTable: string
+  referencedColumns: string[]
+  onUpdate?: string
+  onDelete?: string
+}
+
 export interface TableDescription {
   schema: string
   table: string
   kind: ObjectKind
   columns: ColumnDetail[]
   indexes: IndexInfo[]
+  /** Foreign keys; MySQL describes these, engines without support leave it empty. */
+  foreignKeys?: ForeignKeyInfo[]
   /**
    * Inline DDL for objects without a column structure (routines, sequences,
    * triggers), fetched on demand so the detail panel can show its definition.

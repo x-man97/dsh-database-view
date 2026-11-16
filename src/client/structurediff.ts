@@ -21,6 +21,7 @@ export interface StructureDelta {
 export interface StructureDiff {
   columns: StructureDelta[]
   indexes: StructureDelta[]
+  foreignKeys: StructureDelta[]
   equal: boolean
 }
 
@@ -53,6 +54,26 @@ function indexChanges(left: TableDescription['indexes'][number], right: TableDes
   return changes
 }
 
+function referenceTable(entry: { referencedSchema: string; referencedTable: string }): string {
+  return entry.referencedSchema === '' ? entry.referencedTable : `${entry.referencedSchema}.${entry.referencedTable}`
+}
+
+function foreignKeyChanges(
+  left: NonNullable<TableDescription['foreignKeys']>[number],
+  right: NonNullable<TableDescription['foreignKeys']>[number],
+): StructureFieldChange[] {
+  const changes: StructureFieldChange[] = []
+  const push = (field: string, leftValue: string, rightValue: string): void => {
+    if (leftValue !== rightValue) changes.push({ field, left: leftValue, right: rightValue })
+  }
+  push('columns', left.columns.join(', '), right.columns.join(', '))
+  push('refTable', referenceTable(left), referenceTable(right))
+  push('refColumns', left.referencedColumns.join(', '), right.referencedColumns.join(', '))
+  push('onDelete', left.onDelete ?? '', right.onDelete ?? '')
+  push('onUpdate', left.onUpdate ?? '', right.onUpdate ?? '')
+  return changes
+}
+
 function merge<T extends { name: string }>(
   left: T[],
   right: T[],
@@ -79,5 +100,11 @@ function merge<T extends { name: string }>(
 export function diffTableStructures(left: TableDescription, right: TableDescription): StructureDiff {
   const columns = merge(left.columns, right.columns, columnChanges)
   const indexes = merge(left.indexes, right.indexes, indexChanges)
-  return { columns, indexes, equal: columns.length === 0 && indexes.length === 0 }
+  const foreignKeys = merge(left.foreignKeys ?? [], right.foreignKeys ?? [], foreignKeyChanges)
+  return {
+    columns,
+    indexes,
+    foreignKeys,
+    equal: columns.length === 0 && indexes.length === 0 && foreignKeys.length === 0,
+  }
 }
