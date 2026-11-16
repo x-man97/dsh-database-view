@@ -4,8 +4,46 @@
 
 由 `npm run changelog` 根据 `git log` 生成，不要手工编辑。
 
-## 新功能（260）
+## 新功能（298）
 
+- `9cba9d8` feat: port upstream script splitter, export safety and redis read list
+- `5ffa7f1` feat: highlight and complete SQL in table view filters
+- `2083bc3` feat: toggle connection from the toolbar power action
+- `c308e51` feat: move data-source disconnect action next to refresh
+- `e854a8a` feat: highlight SQL previews and refine toolbar and tree UI
+- `46f6861` feat: add SQLite, SQL Server and Oracle designers plus SQL Generator
+- `7a3f60c` feat: add PostgreSQL object designer support
+- `aaa787c` feat: add related-row navigation and copy to database
+- `2fc34c7` feat: add row-level table data comparison
+- `ee46ddf` feat: add a MySQL view designer
+- `088fe70` feat: add foreign-key editing and comparison for MySQL tables
+- `d624e51` feat: add CSV import and table structure comparison
+- `226c065` feat: add spreadsheet-style range editing to table results
+- `f2bc449` feat: add a MySQL table designer with table DDL actions
+- `aa37999` feat: open prefilled new-connection form from duplicate
+- `28049aa` feat: localize Redis data source and console
+- `fe418b9` feat: auto-save database settings
+- `c6fb8c4` feat: add duplicate data source action
+- `b8bce81` feat: rename to Database View and use database settings icon
+- `b2f3994` feat: refine inline row editing and translate table filters
+- `224db16` feat: localize structure preview and context menus
+- `e5c37c5` feat: finish settings, modal and console localization
+- `fbf5705` feat: localize shortcuts, tree details and table controls
+- `cc23809` feat: localize tree folders and schema picker
+- `612e89e` feat: follow DSH locale with zh/en dictionaries
+- `7256245` feat: move plugin settings into DSH settings
+- `edf15a5` feat: batched inline DML with preview and direct submit
+- `621215d` feat: inline row editing and SQL console highlighting
+- `9142aae` feat: add TLS configuration and right-sidebar UX fixes
+- `58fc6ea` feat: add PostgreSQL, SQLite, SQL Server and Oracle engines
+- `bc964f6` feat: M0 native MySQL over SSH with bundled driver pack
+- `5868f5e` feat(client): 树筛选框改为右上角浮层，Esc 关闭
+- `726445d` feat(client): 树筛选框默认收起按快捷键展开
+- `70360b4` feat(client): 控制台数据源与数据库下拉支持查找
+- `cd8fc61` feat(client): Schema 选择弹层支持查找过滤
+- `542e2ed` feat(cache): 缓存例程、序列与触发器的定义以支持离线查看
+- `9a21007` feat(client): 控制台按树中选中的 Schema 打开
+- `be80113` feat(connection): 只读标记改为创建后不可修改
 - `850afc6` feat(client): 补齐锁模式链、维护语句与赋值子查询尾部
 - `00c6f94` feat(client): 补齐 ALTER 子句列表与字面量参数补全
 - `b55b604` feat(client): 补齐例程、游标与 FROM 别名尾部补全
@@ -267,8 +305,37 @@
 - `334013a` feat(console): 支持把编辑器 SQL 保存为脚本文件
 - `57d5388` feat(console): 支持导入 .sql 文件到编辑器
 
-## 修复（95）
+## 修复（124）
 
+- `88440f3` fix(client): 补全排序忽略继承频率键
+- `f092102` fix(client): Markdown 导出展平单独回车
+- `e26a945` fix(client): 已过期 Redis 键按剩余寿命排序
+- `bee9f17` fix(host): 描述缓存避免带点表名键冲突
+- `2890739` fix(host): 描述缓存保留带点表名
+- `31ac196` fix(client): 复制整行时展平换行
+- `d5f6080` fix(client): JSON 导出不再丢失特殊列名
+- `4058f3d` fix(client): 导出文件名替换非法字符
+- `0d440bb` fix(client): 脚本拆分支持 PostgreSQL 美元引号
+- `e99f25c` fix: keep the shared connection alive when a console tab closes
+- `45e10fd` fix: use copied credentials when testing duplicated connection
+- `d5ca981` fix: restore cell editing and allow read-only edits; single settings save
+- `9e28a32` fix: reuse saved password when testing an edited connection
+- `bdaade7` fix: stabilize MySQL auto-connect and finish remaining translations
+- `f22afee` fix: localize remaining settings, tree, trash and console copy
+- `ddc82c6` fix: use plain up arrow for direct DML submit
+- `719cc05` fix: warn when inline DML has no primary key
+- `7e65d10` fix: migrate v1 config to native-only schema
+- `1edf2ab` fix: verify SQL Server and Oracle engines against live instances
+- `e94d1e9` fix: harden SQLite hydration, Oracle version, SSH test secrets
+- `4435830` fix(client): 快速滚动数据源树时不再出现空白
+- `e605bb6` fix(client): 点击筛选命中不再退出搜索
+- `08c37bb` fix(client): 点击筛选命中不再退出搜索
+- `c17549d` fix(client): 加载提示改为浮层避免挤动树
+- `23b8e16` fix(client): 无内容时不再渲染树工具栏
+- `41166d8` fix(client): 树筛选框默认隐藏，仅快捷键唤出
+- `eb0bd4e` fix(client): 嵌套弹窗显示在父弹窗之上
+- `b15d8b4` fix(client): 连接后保留已展开的树节点
+- `c8a59a9` fix(client): SQL 格式化保留多字符运算符
 - `634189d` fix(client): 自动补全不再空弹窗并保留引号
 - `8d72c10` fix(client): 字符串与注释内不再弹出补全候选
 - `6a0a8a7` fix(console): 补全候选按子句刷新并保留关键字
@@ -365,8 +432,11 @@
 - `020ecc5` fix(sql): 只读校验识破 EXPLAIN ANALYZE 与 WITH 后的写语句
 - `b4e1530` fix(export): MySQL 字面量转义反斜杠，导出的 INSERT 还原原值
 
-## 性能（29）
+## 性能（32）
 
+- `268a03f` perf(client): 数据源树改为虚拟化渲染
+- `9081368` perf(client): 树改为扁平虚拟列表
+- `915daf9` perf(client): 树筛选命中索引与派生展开
 - `d61a94b` perf(console): 补全目录接入批量元数据并限制缓存大小
 - `7ca94bf` perf(console): 补全元数据增加失败负缓存
 - `2a12edb` perf(cache): 描述改为追加式日志并瘦身结构快照
@@ -397,8 +467,11 @@
 - `b2ec0e1` perf(structure): 新增免拷贝访问器并去掉分页冗余写入
 - `9770cba` perf(redis): SCAN 键元信息改为流水线批量读取
 
-## 重构（11）
+## 重构（14）
 
+- `4536881` refactor: remove JDBC, Java bridge and non-native connection paths
+- `56b47ba` refactor(client): 统一加载提示样式
+- `70da990` refactor(client): 移除虚拟树不再使用的筛选索引
 - `4c37147` refactor(redis): 键名筛选抽成 filterRedisKeys
 - `f5122ec` refactor(ddl): 单行文本查询收成一个私有方法
 - `864db0f` refactor(ui): 历史与树详情共用一个时间描述函数
@@ -411,8 +484,12 @@
 - `7a005aa` refactor(console): 拆出历史、键网格与分页按钮等展示组件
 - `e6a6af4` refactor(export): 抽出分页收集器供两处全量导出复用
 
-## 测试（35）
+## 测试（39）
 
+- `98875c8` test(client): 等待控制台数据源界面就绪
+- `51df1d5` test(client): 完成度基准偶发超时重试一次
+- `dedc641` test(client): 覆盖虚拟树窗口与行模型
+- `d3ca4e1` test(client): 补充树筛选、缓存与行预算用例
 - `2407f02` test(console): 补全性能基准与专项测试脚本
 - `4a6089c` test: 列名提示用例等输入框挂载后再断言
 - `7415e23` test(console): 逻辑库回退用例等待记忆写入完成
@@ -449,8 +526,18 @@
 - `9e57421` test: 控制台用例等数据源就绪再操作
 - `ce31875` test: 统一放宽 jsdom 异步查询超时避免并发偶发失败
 
-## 文档（35）
+## 文档（45）
 
+- `d730f4f` docs(client): 修正导出文件名的注释
+- `559fd04` docs: read-only flag is editable
+- `84dea19` docs: remove remaining JDBC wording
+- `7a98da0` docs: mark M0 vertical slice complete
+- `e2e04e0` docs: make README English and add Chinese translation
+- `9f7a71d` docs: fix engine count in release milestone
+- `9107679` docs: include SQL Server and Oracle in this iteration
+- `e352a57` docs: limit this iteration to T1 mainstream engines
+- `67c384c` docs: note chosen npm package name
+- `3848de6` docs: add feasibility study and B+C design
 - `24f631b` docs: README 只留两张截图，其余收进截图索引
 - `d72ed9c` docs: 快捷键表补上数据表页的 Esc
 - `cfbdd77` docs: 重新生成变更日志
@@ -487,8 +574,13 @@
 - `5f4e78c` docs: 补上树筛选命中数的说明
 - `44061d4` docs: 去掉键表格说明里重复的排序描述
 
-## 杂项（19）
+## 杂项（24）
 
+- `2a6d693` chore: rebuild lib bundles after subsystem port
+- `8f3dcd4` chore: release 0.6.0
+- `0cb206a` chore: release 0.5.0
+- `7a0c2ed` chore: prepare 0.1.0 release
+- `7caacaa` chore(release): 发布 0.4.0
 - `98f6fed` chore(cache): 补全旧缓存迁移的 0.5.0 移除标记
 - `73dd463` chore(cache): 标记 0.5.0 移除旧缓存迁移
 - `b7e5ff8` chore(release): 发布 0.3.2
@@ -509,8 +601,14 @@
 - `909ab5d` chore(console): 删除不再使用的整行筛选辅助函数
 - `69d3148` chore(format): 删掉没人调用的单元格/Redis 预览辅助函数
 
-## 其它（10）
+## 其它（16）
 
+- `2918643` ci: skip npm publish when the version is already public
+- `c5d4697` ci: always publish npm for a release tag
+- `d5a1efb` ci: rerun 0.6.0 release after trusted publisher setup
+- `624a70b` ci: use published npm 11 version for trusted publishing
+- `71edd0f` ci: skip npm publish when version already exists
+- `b69ff07` ci: publish npm through GitHub trusted publishing
 - `04a451a` build: 重新构建客户端 bundle
 - `5f91b56` ci(release): Release 附件补充无版本号副本
 - `15606ad` Merge branch 'main' of github.com:qwq1999/dsh-ide-database
