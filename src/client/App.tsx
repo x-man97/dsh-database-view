@@ -37,6 +37,8 @@ import { TableRenameModal, type TableRenameTarget } from './TableRenameModal'
 import { CompareStructureModal, type CompareStructureTarget } from './CompareStructureModal'
 import { CompareDataModal, type CompareDataTarget } from './CompareDataModal'
 import { ViewDesigner, type ViewDesignerTarget } from './ViewDesigner'
+import { SchemaCreateModal, type SchemaCreateTarget } from './SchemaCreateModal'
+import { createSchemaSql, supportsCreateSchema } from './schemaddl'
 import { SqlGeneratorModal, type SqlGeneratorTarget } from './SqlGeneratorModal'
 import { extractViewSelect } from './viewddl'
 import { SqlHighlight } from './sqlhighlight'
@@ -131,6 +133,7 @@ export function App(props: AppProps): ReactElement {
   const [compareTarget, setCompareTarget] = useState<CompareStructureTarget | null>(null)
   const [compareDataTarget, setCompareDataTarget] = useState<CompareDataTarget | null>(null)
   const [viewDesigner, setViewDesigner] = useState<ViewDesignerTarget | null>(null)
+  const [schemaCreate, setSchemaCreate] = useState<SchemaCreateTarget | null>(null)
   const [sqlGenerator, setSqlGenerator] = useState<SqlGeneratorTarget | null>(null)
 
   const notify = useCallback((text: string, tone: 'info' | 'success' | 'error' = 'info') => {
@@ -179,6 +182,8 @@ export function App(props: AppProps): ReactElement {
     toggleSchema,
     loadObjects,
     reloadObjects,
+    reloadSchemas,
+    revealSchema,
     loadRedisKeys,
     toggleRedisDb,
     toggleKey,
@@ -564,6 +569,30 @@ export function App(props: AppProps): ReactElement {
     [connections, objects],
   )
 
+  const openCreateSchema = useCallback(
+    (connectionId: string): void => {
+      const connection = connections.find((item) => item.id === connectionId)
+      if (connection === undefined || connection.readOnly === true || !supportsCreateSchema(connection.dialect)) return
+      setSchemaCreate({ connection })
+    },
+    [connections],
+  )
+
+  const applyCreateSchema = useCallback(
+    async (target: SchemaCreateTarget, name: string): Promise<void> => {
+      const sql = createSchemaSql(target.connection.dialect, name)
+      if (sql === null) return
+      await executeDdl(target.connection.id, target.connection.database, sql)
+      // The new namespace is not in any cached list yet: re-read the schema
+      // list and make sure a filtered tree shows it.
+      await reloadSchemas(target.connection.id)
+      revealSchema(target.connection.id, name)
+      selectSchema(target.connection.id, name)
+      notify(t('notify.schemaCreated', { name }), 'success')
+    },
+    [executeDdl, notify, reloadSchemas, revealSchema, selectSchema, t],
+  )
+
   const openModifyTable = useCallback(
     async (connectionId: string, schema: string, table: string): Promise<void> => {
       const connection = connections.find((item) => item.id === connectionId)
@@ -878,6 +907,7 @@ export function App(props: AppProps): ReactElement {
               onOpenConsoleTab={openConsoleTabFromTree}
               onOpenConsole={openConsoleFromTree}
               onNewTable={openNewTable}
+              onCreateSchema={openCreateSchema}
               onModifyTable={openModifyTable}
               onRenameTable={openRenameTable}
               onDropObject={dropObject}
@@ -1000,6 +1030,11 @@ export function App(props: AppProps): ReactElement {
       <CompareStructureModal target={compareTarget} onClose={() => setCompareTarget(null)} />
       <CompareDataModal target={compareDataTarget} onClose={() => setCompareDataTarget(null)} />
       <ViewDesigner target={viewDesigner} onClose={() => setViewDesigner(null)} onExecute={applyViewDdl} />
+      <SchemaCreateModal
+        target={schemaCreate}
+        onClose={() => setSchemaCreate(null)}
+        onCreate={applyCreateSchema}
+      />
       <SqlGeneratorModal
         target={sqlGenerator}
         onClose={() => setSqlGenerator(null)}

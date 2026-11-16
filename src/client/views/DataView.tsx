@@ -28,6 +28,7 @@ import { SqlHighlight } from '../sqlhighlight'
 import { selectColumnsSql } from '../tablesql'
 import { tableSelectSql } from '../tablesql'
 import { supportsSqlDesign } from '../tableddl'
+import { supportsCreateSchema } from '../schemaddl'
 import { TreeMenu, placeMenu, type TreeMenuState } from './tree-menu'
 import { objectIcon } from './tree-parts'
 import { buildTreeRows, folderOf, type TreeRow } from './tree-rows'
@@ -100,6 +101,8 @@ export interface DataViewProps {
   onOpenConsoleTab?: (connectionId: string) => void
   /** Table designer entries; only present for dialects whose DDL the panel can generate. */
   onNewTable?: (connectionId: string, schema: string) => void
+  /** Create a new schema (database on MySQL) on this connection. */
+  onCreateSchema?: (connectionId: string) => void
   onModifyTable?: (connectionId: string, schema: string, table: string) => void
   onRenameTable?: (connectionId: string, schema: string, table: string) => void
   onDropObject?: (connectionId: string, schema: string, object: SchemaObject) => void
@@ -373,6 +376,9 @@ export function DataView(props: DataViewProps): ReactElement {
           ? [
               { label: t('menu.newTable'), run: () => props.onNewTable?.(connectionId, schemaName) },
               { label: t('menu.newView'), run: () => props.onNewView?.(connectionId, schemaName) },
+              ...(props.onCreateSchema !== undefined && supportsCreateSchema(connection.dialect)
+                ? [{ label: t('menu.newSchema'), run: () => props.onCreateSchema?.(connectionId) }]
+                : []),
             ]
           : []),
         ...(props.onSqlGenerator !== undefined && connection?.dialect !== 'redis'
@@ -391,13 +397,16 @@ export function DataView(props: DataViewProps): ReactElement {
       ]
       setSchemaMenu({ ...placeMenu(event.clientX, event.clientY, items), items })
     },
-    [exportSchemaScript, focusTreeFilter, props.connections, props.onNewTable, props.onNewView, props.onSqlGenerator],
+    [exportSchemaScript, focusTreeFilter, props.connections, props.onCreateSchema, props.onNewTable, props.onNewView, props.onSqlGenerator],
   )
 
   const openConnectionMenu = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>, connection: ClientConnection): void => {
       event.preventDefault()
       const items = [
+        ...(props.onCreateSchema !== undefined && supportsCreateSchema(connection.dialect) && connection.readOnly !== true
+          ? [{ label: t('menu.newSchema'), run: () => props.onCreateSchema?.(connection.id) }]
+          : []),
         { label: t('menu.copyConnectionName'), run: () => void copyText(connection.name) },
         { label: t('menu.copyConnectionId'), run: () => void copyText(connection.id) },
         { label: t('menu.copyAddress'), run: () => void copyText(`${connection.host}:${connection.port}`) },
@@ -408,7 +417,7 @@ export function DataView(props: DataViewProps): ReactElement {
       ]
       setConnectionMenu({ ...placeMenu(event.clientX, event.clientY, items), items })
     },
-    [props.onConnect, props.onOpenConsoleTab],
+    [props.onConnect, props.onCreateSchema, props.onOpenConsoleTab],
   )
 
   const menuHandlers = useRef({ openObjectMenu, openSchemaMenu, openConnectionMenu })

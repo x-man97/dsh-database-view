@@ -103,6 +103,13 @@ describe('schema context menu', () => {
     const filter = screen.getAllByPlaceholderText(/筛选/)[0] as HTMLInputElement
     await waitFor(() => expect(filter.value).toBe('shop.'))
   })
+  it('creates a new schema from the schema menu', async () => {
+    const onCreateSchema = vi.fn()
+    render(<DataView {...props({ onCreateSchema })} />)
+    fireEvent.contextMenu(schemaRow())
+    fireEvent.click(await screen.findByRole('menuitem', { name: '新建 Schema…' }))
+    expect(onCreateSchema).toHaveBeenCalledWith('c1')
+  })
   it('exports every table of the schema as one script', async () => {
     const readDdl = vi.fn(
       async (_connectionId: string, _schema: string, table: string): Promise<string | null> =>

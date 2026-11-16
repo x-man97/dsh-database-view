@@ -100,6 +100,10 @@ export interface DataSources {
   loadObjects: (connectionId: string, schema: string) => Promise<void>
   /** Re-read a schema even when its list is already loaded (after DDL). */
   reloadObjects: (connectionId: string, schema: string) => Promise<void>
+  /** Re-read a connection's schema list after CREATE SCHEMA. */
+  reloadSchemas: (connectionId: string) => Promise<void>
+  /** Make a just-created schema visible when the tree shows a selected list. */
+  revealSchema: (connectionId: string, schema: string) => void
   loadRedisDatabases: (connectionId: string) => Promise<void>
   loadRedisKeys: (connectionId: string, db: number, more?: boolean) => Promise<void>
   toggleRedisDb: (connectionId: string, db: number) => void
@@ -527,6 +531,31 @@ export function useDataSources(notify: Notify): DataSources {
     },
     [notify, schedulePrefetch],
   )
+
+  /**
+   * A CREATE SCHEMA changes the schema list; re-read it so the new name shows
+   * up without a full connection refresh.
+   */
+  const reloadSchemas = useCallback(
+    async (connectionId: string): Promise<void> => {
+      await loadSchemas(connectionId)
+    },
+    [loadSchemas],
+  )
+
+  /**
+   * A tree filtered to selected schemas must show the one just created; a
+   * `null`/missing choice already shows every schema.
+   */
+  const revealSchema = useCallback((connectionId: string, schema: string): void => {
+    setVisibleSchemas((previous) => {
+      const current = previous[connectionId]
+      if (current === null || current === undefined || current.includes(schema)) return previous
+      const next = [...current, schema]
+      writeStoredList(`${VISIBLE_SCHEMAS_KEY}${connectionId}`, next)
+      return { ...previous, [connectionId]: next }
+    })
+  }, [])
 
   /** Read the server's logical-database count; the cached value is enough offline. */
   const loadRedisDatabases = useCallback(async (connectionId: string): Promise<void> => {
@@ -1031,6 +1060,8 @@ export function useDataSources(notify: Notify): DataSources {
     toggleSchema,
     loadObjects,
     reloadObjects,
+    reloadSchemas,
+    revealSchema,
     loadRedisDatabases,
     loadRedisKeys,
     toggleRedisDb,

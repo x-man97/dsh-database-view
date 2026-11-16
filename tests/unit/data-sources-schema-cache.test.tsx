@@ -136,38 +136,30 @@ describe('data sources cache only visible schemas', () => {
     expect(mocks.prefetchConnection).toHaveBeenCalledWith('a', { refresh: true, schemas: ['shop'] })
   })
 
-  it('keeps cached objects across a plain connect and prunes them on refresh', async () => {
+  it('re-reads the schema list and reveals a newly created schema', async () => {
     const hook = renderHook(() => useDataSources(() => undefined))
     await waitFor(() => expect(hook.result.current.selectedId).toBe('a'))
     await act(async () => {
       await hook.result.current.connect('a')
     })
+    await waitFor(() => expect(hook.result.current.visibleSchemas.a).toEqual(['shop']))
 
-    // Expanding a schema reads its list once.
-    await act(async () => {
-      await hook.result.current.toggleSchema('a', 'shop')
+    mocks.schemas.mockResolvedValue({
+      schemas: [
+        { name: 'audit', system: false },
+        { name: 'fresh', system: false },
+        { name: 'shop', system: false },
+      ],
     })
-    await waitFor(() => expect(hook.result.current.objects['a:shop']).toEqual([]))
+    await act(async () => {
+      await hook.result.current.reloadSchemas('a')
+    })
+    act(() => {
+      hook.result.current.revealSchema('a', 'fresh')
+    })
 
-    // Collapsing it keeps the rows, so a filter can still search them.
-    await act(async () => {
-      await hook.result.current.toggleSchema('a', 'shop')
-    })
-    await waitFor(() => expect(hook.result.current.expanded['a:shop']).toBe(false))
-    expect(hook.result.current.objects['a:shop']).toEqual([])
-
-    mocks.objects.mockClear()
-    await act(async () => {
-      await hook.result.current.connect('a')
-    })
-    // No branch is open, so a plain connect must not re-read or drop anything.
-    expect(mocks.objects).not.toHaveBeenCalled()
-    expect(hook.result.current.objects['a:shop']).toEqual([])
-
-    // An explicit refresh is the only thing that drops closed cached lists.
-    await act(async () => {
-      await hook.result.current.refreshSelected()
-    })
-    await waitFor(() => expect(hook.result.current.objects['a:shop']).toBeUndefined())
+    await waitFor(() => expect(hook.result.current.schemas.a?.map((schema) => schema.name)).toContain('fresh'))
+    expect(hook.result.current.visibleSchemas.a).toEqual(['shop', 'fresh'])
+    expect(window.localStorage.getItem(`${SCHEMAS_KEY}a`)).toBe('["shop","fresh"]')
   })
 })

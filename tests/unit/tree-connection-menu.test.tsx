@@ -116,4 +116,19 @@ describe('connection context menu', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: '重新连接' }))
     expect(onConnect).toHaveBeenCalledWith('c1')
   })
+
+  it('creates a new schema from the menu', async () => {
+    const onCreateSchema = vi.fn()
+    render(<DataView {...props({ onCreateSchema })} />)
+    fireEvent.contextMenu(connectionRow())
+    fireEvent.click(await screen.findByRole('menuitem', { name: '新建 Schema…' }))
+    expect(onCreateSchema).toHaveBeenCalledWith('c1')
+  })
+
+  it('hides schema creation on sources without schemas', async () => {
+    const sqlite = { ...connection, driver: 'sqlite', dialect: 'sqlite' } as ClientConnection
+    render(<DataView {...props({ connections: [sqlite], onCreateSchema: vi.fn() })} />)
+    fireEvent.contextMenu(connectionRow())
+    expect(screen.queryByRole('menuitem', { name: '新建 Schema…' })).toBeNull()
+  })
 })
