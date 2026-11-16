@@ -330,6 +330,8 @@ export interface ColumnDetail extends ColumnInfo {
   ordinal?: number
   primaryKey?: boolean
   autoIncrement?: boolean
+  /** Server-side default constraint name (SQL Server) so an edit can drop it. */
+  defaultConstraint?: string
 }
 
 export interface IndexInfo {
@@ -361,6 +363,8 @@ export interface TableDescription {
   indexes: IndexInfo[]
   /** Foreign keys; MySQL describes these, engines without support leave it empty. */
   foreignKeys?: ForeignKeyInfo[]
+  /** Trigger definitions to restore when an engine rebuilder recreates a table. */
+  triggers?: string[]
   /**
    * Inline DDL for objects without a column structure (routines, sequences,
    * triggers), fetched on demand so the detail panel can show its definition.

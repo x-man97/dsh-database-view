@@ -38,6 +38,8 @@ dsh plugin add dsh-database-view
 | 连接 | 直连 TCP 和 SSH（密码、私钥、ssh-agent）；TOFU 主机密钥固定 |
 | 浏览 | Schema → 表/视图 → 列/索引；离线可浏览结构缓存 |
 | 表预览 | 分页、过滤、排序、行内新增/修改/删除、SQL 预览、撤销、DDL、CSV/JSON 导出 |
+| 对象设计 | 新建/修改表、列、主键、索引、外键、注释和视图；支持 MySQL、PostgreSQL、SQLite、SQL Server、Oracle |
+| SQL Generator | 按 Schema 或对象生成建表/建视图脚本，可含 DROP、复制、保存或在控制台打开 |
 | SQL 控制台 | 语法高亮、补全、默认只读、多语句脚本、历史、取消 |
 | Agent 工具 | 连接、Schema、表、DDL、EXPLAIN、有界 SQL、Redis 查看 |
 

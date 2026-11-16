@@ -7,7 +7,7 @@ import type { ClientConnection } from '../shared/types'
 import { copyText } from './colmenu'
 import { useCopyFlash } from './copyflash'
 import { useI18n } from './i18n'
-import { createViewSql, validateViewDraft, type ViewDraftIssue } from './viewddl'
+import { createViewStatements, validateViewDraft, type ViewDraftIssue } from './viewddl'
 import { Banner, Button, Modal, TextArea, TextInput } from './ui'
 
 export interface ViewDesignerTarget {
@@ -22,7 +22,7 @@ export interface ViewDesignerTarget {
 export interface ViewDesignerProps {
   target: ViewDesignerTarget | null
   onClose: () => void
-  onExecute: (target: ViewDesignerTarget, sql: string, name: string) => Promise<void>
+  onExecute: (target: ViewDesignerTarget, statements: string[], name: string) => Promise<void>
 }
 
 const ISSUE_KEYS: Record<ViewDraftIssue, string> = {
@@ -57,18 +57,19 @@ export function ViewDesigner({ target, onClose, onExecute }: ViewDesignerProps):
   const editing = target?.view !== undefined
   const readOnly = target?.connection.readOnly === true
   const issue = target === null ? null : validateViewDraft(name, body, !editing)
-  const sql = issue === null && target !== null
-    ? createViewSql(target.schema, name, body, editing, target.connection.dialect)
-    : ''
+  const statements = issue === null && target !== null
+    ? createViewStatements(target.schema, name, body, editing, target.connection.dialect)
+    : []
+  const sql = statements.join(';\n\n')
 
   if (target === null) return null
 
   const execute = async (): Promise<void> => {
-    if (sql === '' || readOnly || busy) return
+    if (statements.length === 0 || readOnly || busy) return
     setBusy(true)
     setFailure(null)
     try {
-      await onExecute(target, sql, name.trim())
+      await onExecute(target, statements, name.trim())
       onClose()
     } catch (error) {
       setFailure(errorText(error))
@@ -95,7 +96,7 @@ export function ViewDesigner({ target, onClose, onExecute }: ViewDesignerProps):
           <span className="dshdb-toolbar-spacer" />
           <Button
             size="sm"
-            disabled={sql === ''}
+            disabled={statements.length === 0}
             onClick={() => {
               void copyText(sql).then((ok) => flash.flash(ok))
             }}
@@ -105,7 +106,7 @@ export function ViewDesigner({ target, onClose, onExecute }: ViewDesignerProps):
           <Button size="sm" onClick={onClose} disabled={busy}>
             {t('designer.cancel')}
           </Button>
-          <Button size="sm" variant="primary" loading={busy} disabled={sql === '' || readOnly} onClick={() => void execute()}>
+          <Button size="sm" variant="primary" loading={busy} disabled={statements.length === 0 || readOnly} onClick={() => void execute()}>
             {editing ? t('view.save') : t('view.create')}
           </Button>
         </>

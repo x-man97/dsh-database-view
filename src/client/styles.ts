@@ -1572,6 +1572,41 @@ export const CSS = `
   min-height: 54px;
   max-height: 220px;
 }
+.dshdb-sqlgen-options {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 28px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+}
+.dshdb-sqlgen-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.dshdb-sqlgen-objects {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 2px 14px;
+  max-height: 190px;
+  overflow: auto;
+  padding: 6px 10px;
+  border: 1px solid var(--dshdb-border);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-1);
+}
+.dshdb-sqlgen-object {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  font-size: 12px;
+}
+.dshdb-sqlgen-object .dshdb-muted {
+  margin-left: auto;
+  font-size: 11px;
+}
 .dshdb-import-file {
   display: flex;
   align-items: center;

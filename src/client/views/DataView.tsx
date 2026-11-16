@@ -111,6 +111,8 @@ export interface DataViewProps {
   onCompareTable?: (connectionId: string, schema: string, table: string) => void
   /** Compare this table's rows with another table in the same schema. */
   onCompareData?: (connectionId: string, schema: string, table: string) => void
+  /** Open the SQL Generator dialog for a schema, optionally preselecting an object. */
+  onSqlGenerator?: (connectionId: string, schema: string, object?: SchemaObject) => void
 }
 
 const rowDomId = (index: number): string => `dshdb-tree-row-${index}`
@@ -283,6 +285,9 @@ export function DataView(props: DataViewProps): ReactElement {
         ...(props.onCompareData !== undefined && isTable
           ? [{ label: t('menu.compareData'), run: () => props.onCompareData?.(connectionId, schema, object.name) }]
           : []),
+        ...(props.onSqlGenerator !== undefined && isRelation && connection?.dialect !== 'redis'
+          ? [{ label: t('menu.sqlGenerator'), run: () => props.onSqlGenerator?.(connectionId, schema, object) }]
+          : []),
         ...(read !== undefined && isRelation
           ? [
               {
@@ -329,6 +334,7 @@ export function DataView(props: DataViewProps): ReactElement {
       props.onReadDdl,
       props.onRenameTable,
       props.onShowDdl,
+      props.onSqlGenerator,
     ],
   )
 
@@ -368,6 +374,9 @@ export function DataView(props: DataViewProps): ReactElement {
               { label: t('menu.newView'), run: () => props.onNewView?.(connectionId, schemaName) },
             ]
           : []),
+        ...(props.onSqlGenerator !== undefined && connection?.dialect !== 'redis'
+          ? [{ label: t('menu.sqlGenerator'), run: () => props.onSqlGenerator?.(connectionId, schemaName) }]
+          : []),
         { label: t('menu.copySchema'), run: () => void copyText(schemaName) },
         { label: t('menu.exportSchema'), run: () => exportSchemaScript(connectionId, schemaName) },
         {
@@ -381,7 +390,7 @@ export function DataView(props: DataViewProps): ReactElement {
       ]
       setSchemaMenu({ ...placeMenu(event.clientX, event.clientY, items), items })
     },
-    [exportSchemaScript, focusTreeFilter, props.connections, props.onNewTable, props.onNewView],
+    [exportSchemaScript, focusTreeFilter, props.connections, props.onNewTable, props.onNewView, props.onSqlGenerator],
   )
 
   const openConnectionMenu = useCallback(

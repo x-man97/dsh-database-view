@@ -8,7 +8,7 @@ import {
   type ReactElement,
 } from 'react'
 import { ROUTE_PREFIX } from '../shared/presets'
-import type { ClientConnection, ClientTrashedConnection } from '../shared/types'
+import type { ClientConnection, ClientTrashedConnection, SchemaObject } from '../shared/types'
 import { ApiError, api } from './api'
 import { downloadText } from './export'
 import { useDataSources } from './hooks/useDataSources'
@@ -36,6 +36,7 @@ import { TableRenameModal, type TableRenameTarget } from './TableRenameModal'
 import { CompareStructureModal, type CompareStructureTarget } from './CompareStructureModal'
 import { CompareDataModal, type CompareDataTarget } from './CompareDataModal'
 import { ViewDesigner, type ViewDesignerTarget } from './ViewDesigner'
+import { SqlGeneratorModal, type SqlGeneratorTarget } from './SqlGeneratorModal'
 import { extractViewSelect } from './viewddl'
 import { tableSelectSql } from './tablesql'
 import {
@@ -128,6 +129,7 @@ export function App(props: AppProps): ReactElement {
   const [compareTarget, setCompareTarget] = useState<CompareStructureTarget | null>(null)
   const [compareDataTarget, setCompareDataTarget] = useState<CompareDataTarget | null>(null)
   const [viewDesigner, setViewDesigner] = useState<ViewDesignerTarget | null>(null)
+  const [sqlGenerator, setSqlGenerator] = useState<SqlGeneratorTarget | null>(null)
 
   const notify = useCallback((text: string, tone: 'info' | 'success' | 'error' = 'info') => {
     setToast((previous) => nextToast(previous, text, tone))
@@ -517,10 +519,10 @@ export function App(props: AppProps): ReactElement {
   const refreshAfterDdl = useCallback(
     async (connectionId: string, schema: string): Promise<void> => {
       selectConnection(connectionId)
-      await Promise.allSettled([
-        api.prefetchConnection(connectionId, { refresh: true, schemas: [schema] }),
-        reloadObjects(connectionId, schema),
-      ])
+      // SQL Server serializes requests on one connection, so reading the object
+      // list and prefetching at the same time can silently drop one request.
+      await reloadObjects(connectionId, schema)
+      await api.prefetchConnection(connectionId, { refresh: true, schemas: [schema] }).catch(() => undefined)
     },
     [reloadObjects, selectConnection],
   )
@@ -570,8 +572,17 @@ export function App(props: AppProps): ReactElement {
 
   const applyTableDdl = useCallback(
     async (target: TableDesignerTarget, statements: string[], tableName: string): Promise<void> => {
-      for (const statement of statements) {
-        await executeDdl(target.connection.id, target.schema, statement)
+      try {
+        for (const statement of statements) {
+          await executeDdl(target.connection.id, target.schema, statement)
+        }
+      } catch (error) {
+        // SQLite rebuilds run inside BEGIN; do not leave the session in a transaction.
+        if (target.connection.dialect === 'sqlite' && statements.some((statement) => /^BEGIN\b/i.test(statement))) {
+          await executeDdl(target.connection.id, target.schema, 'ROLLBACK').catch(() => undefined)
+          await executeDdl(target.connection.id, target.schema, 'PRAGMA foreign_keys = ON').catch(() => undefined)
+        }
+        throw error
       }
       await refreshAfterDdl(target.connection.id, target.schema)
       notify(
@@ -660,12 +671,40 @@ export function App(props: AppProps): ReactElement {
   )
 
   const applyViewDdl = useCallback(
-    async (target: ViewDesignerTarget, sql: string, name: string): Promise<void> => {
-      await executeDdl(target.connection.id, target.schema, sql)
+    async (target: ViewDesignerTarget, statements: string[], name: string): Promise<void> => {
+      // SQLite replaces a view with DROP + CREATE; keep the old view if CREATE fails.
+      const transactional = target.connection.dialect === 'sqlite' && statements.length > 1
+      if (transactional) await executeDdl(target.connection.id, target.schema, 'BEGIN')
+      try {
+        for (const statement of statements) {
+          await executeDdl(target.connection.id, target.schema, statement)
+        }
+        if (transactional) await executeDdl(target.connection.id, target.schema, 'COMMIT')
+      } catch (error) {
+        if (transactional) await executeDdl(target.connection.id, target.schema, 'ROLLBACK').catch(() => undefined)
+        throw error
+      }
       await refreshAfterDdl(target.connection.id, target.schema)
       notify(t(target.view === undefined ? 'notify.viewCreated' : 'notify.viewUpdated', { name }), 'success')
     },
     [executeDdl, notify, refreshAfterDdl, t],
+  )
+
+  const openSqlGenerator = useCallback(
+    (connectionId: string, schema: string, object?: SchemaObject): void => {
+      const connection = connections.find((item) => item.id === connectionId)
+      if (connection === undefined || connection.dialect === 'redis') return
+      setSqlGenerator({ connection, schema, ...(object === undefined ? {} : { object }) })
+    },
+    [connections],
+  )
+
+  const openGeneratedConsole = useCallback(
+    (connectionId: string, schema: string, sql: string): void => {
+      selectConnection(connectionId)
+      openConsoleTab({ connectionId, schema, sql })
+    },
+    [selectConnection],
   )
 
   return (
@@ -820,6 +859,7 @@ export function App(props: AppProps): ReactElement {
               onCompareData={openCompareData}
               onNewView={openNewView}
               onModifyView={openModifyView}
+              onSqlGenerator={openSqlGenerator}
             />
           </div>
         ) : null}
@@ -947,6 +987,11 @@ export function App(props: AppProps): ReactElement {
       <CompareStructureModal target={compareTarget} onClose={() => setCompareTarget(null)} />
       <CompareDataModal target={compareDataTarget} onClose={() => setCompareDataTarget(null)} />
       <ViewDesigner target={viewDesigner} onClose={() => setViewDesigner(null)} onExecute={applyViewDdl} />
+      <SqlGeneratorModal
+        target={sqlGenerator}
+        onClose={() => setSqlGenerator(null)}
+        onOpenConsole={openGeneratedConsole}
+      />
       <ConfirmDialog request={confirm?.request ?? null} onConfirm={() => resolveConfirm(true)} onCancel={() => resolveConfirm(false)} />
       <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>

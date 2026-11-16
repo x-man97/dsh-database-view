@@ -15,6 +15,8 @@ export interface TableColumnDraft {
   comment: string
   autoIncrement: boolean
   primaryKey: boolean
+  /** Existing SQL Server default constraint, dropped when the default changes. */
+  originalDefaultConstraint?: string
 }
 
 export interface TableIndexDraft {
@@ -45,6 +47,10 @@ export interface TableDraft {
   foreignKeys: TableForeignKeyDraft[]
   /** Name of the existing primary-key constraint, when the server reported one. */
   primaryKeyName?: string
+  /** Constraint-backed unique indexes that the editor must not change but a rebuild has to keep. */
+  preservedIndexes?: TableIndexDraft[]
+  /** Trigger definitions replayed after an engine rebuilds the table. */
+  preservedTriggers?: string[]
 }
 
 export type TableDraftIssue =
@@ -62,6 +68,8 @@ export type TableDraftIssue =
   | 'foreign-key-columns'
   | 'unknown-foreign-key-column'
   | 'foreign-key-target'
+  | 'auto-increment'
+  | 'identity-change'
 
 /** Identifiers are always backtick-quoted; embedded backticks are doubled. */
 export function quoteMysqlIdent(name: string): string {
@@ -151,6 +159,10 @@ function indexSignature(index: TableIndexDraft): string {
 /** Build the editable draft from the structure the server described. */
 export function tableDraftFromDescription(description: TableDescription): TableDraft {
   const primaryIndex = description.indexes.find((index) => index.primary === true)
+  const renamableIndex = (index: TableDescription['indexes'][number]): boolean =>
+    index.primary !== true &&
+    index.columns.length > 0 &&
+    (index.definition === undefined || !/\bWHERE\b/i.test(index.definition))
   return {
     schema: description.schema,
     table: description.table,
@@ -163,15 +175,10 @@ export function tableDraftFromDescription(description: TableDescription): TableD
       comment: column.comment ?? '',
       autoIncrement: column.autoIncrement === true,
       primaryKey: column.primaryKey === true,
+      ...(column.defaultConstraint === undefined ? {} : { originalDefaultConstraint: column.defaultConstraint }),
     })),
     indexes: description.indexes
-      .filter(
-        (index) =>
-          index.primary !== true &&
-          index.constraint !== true &&
-          index.columns.length > 0 &&
-          (index.definition === undefined || !/\bWHERE\b/i.test(index.definition)),
-      )
+      .filter((index) => index.constraint !== true && renamableIndex(index))
       .map((index) => ({
         originalName: index.name,
         name: index.name,
@@ -189,6 +196,20 @@ export function tableDraftFromDescription(description: TableDescription): TableD
       onUpdate: foreignKey.onUpdate ?? 'RESTRICT',
     })),
     ...(primaryIndex === undefined ? {} : { primaryKeyName: primaryIndex.name }),
+    ...(() => {
+      const preserved = description.indexes
+        .filter((index) => index.constraint === true && index.primary !== true && renamableIndex(index))
+        .map((index) => ({
+          originalName: index.name,
+          name: index.name,
+          unique: index.unique === true,
+          columns: [...index.columns],
+        }))
+      return preserved.length === 0 ? {} : { preservedIndexes: preserved }
+    })(),
+    ...(description.triggers === undefined || description.triggers.length === 0
+      ? {}
+      : { preservedTriggers: [...description.triggers] }),
   }
 }
 
@@ -357,23 +378,46 @@ export function alterTableSql(original: TableDraft, next: TableDraft): string {
 
 /** Dialects whose object designer this client can generate SQL for. */
 export function supportsSqlDesign(dialect: string | undefined): boolean {
-  return dialect === 'mysql' || dialect === 'postgres'
+  return (
+    dialect === 'mysql' ||
+    dialect === 'postgres' ||
+    dialect === 'sqlite' ||
+    dialect === 'mssql' ||
+    dialect === 'oracle'
+  )
 }
 
 function quotePgIdent(name: string): string {
   return `"${name.replaceAll('"', '""')}"`
 }
 
-export function dropObjectSql(dialect: string | undefined, schema: string, table: string, kind: ObjectKind): string {
-  if (dialect === 'postgres') {
-    return `DROP ${kind === 'view' ? 'VIEW' : 'TABLE'} ${quotePgIdent(schema)}.${quotePgIdent(table)}`
+function quoteMssqlIdent(name: string): string {
+  return `[${name.replaceAll(']', ']]')}]`
+}
+
+function quoteMssqlLiteral(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`
+}
+
+function qualifiedFor(dialect: string | undefined, schema: string, table: string): string {
+  if (dialect === 'postgres' || dialect === 'sqlite' || dialect === 'oracle') {
+    return `${quotePgIdent(schema)}.${quotePgIdent(table)}`
   }
-  return `DROP ${kind === 'view' ? 'VIEW' : 'TABLE'} ${qualified(schema, table)}`
+  if (dialect === 'mssql') return `${quoteMssqlIdent(schema)}.${quoteMssqlIdent(table)}`
+  return qualified(schema, table)
+}
+
+export function dropObjectSql(dialect: string | undefined, schema: string, table: string, kind: ObjectKind): string {
+  return `DROP ${kind === 'view' ? 'VIEW' : 'TABLE'} ${qualifiedFor(dialect, schema, table)}`
 }
 
 export function renameTableSql(dialect: string | undefined, schema: string, table: string, nextName: string): string {
-  if (dialect === 'postgres') {
-    return `ALTER TABLE ${quotePgIdent(schema)}.${quotePgIdent(table)} RENAME TO ${quotePgIdent(nextName.trim())}`
+  const next = nextName.trim()
+  if (dialect === 'postgres' || dialect === 'sqlite' || dialect === 'oracle') {
+    return `ALTER TABLE ${qualifiedFor(dialect, schema, table)} RENAME TO ${quotePgIdent(next)}`
   }
-  return `RENAME TABLE ${qualified(schema, table)} TO ${qualified(schema, nextName.trim())}`
+  if (dialect === 'mssql') {
+    return `EXEC sp_rename ${quoteMssqlLiteral(`${schema}.${table}`)}, ${quoteMssqlLiteral(next)}`
+  }
+  return `RENAME TABLE ${qualified(schema, table)} TO ${qualified(schema, next)}`
 }

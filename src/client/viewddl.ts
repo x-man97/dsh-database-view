@@ -9,7 +9,10 @@ function quotePgIdent(name: string): string {
 }
 
 function qualified(schema: string, name: string, dialect: string | undefined): string {
-  if (dialect === 'postgres') return `${quotePgIdent(schema)}.${quotePgIdent(name)}`
+  if (dialect === 'postgres' || dialect === 'sqlite' || dialect === 'oracle') {
+    return `${quotePgIdent(schema)}.${quotePgIdent(name)}`
+  }
+  if (dialect === 'mssql') return `[${schema.replaceAll(']', ']]')}].[${name.replaceAll(']', ']]')}]`
   return `${quoteMysqlIdent(schema)}.${quoteMysqlIdent(name)}`
 }
 
@@ -50,7 +53,26 @@ export function createViewSql(
   dialect?: string,
 ): string {
   const statement = body.trim().replace(/;+\s*$/u, '')
-  return `${replace ? 'CREATE OR REPLACE VIEW' : 'CREATE VIEW'} ${qualified(schema, name.trim(), dialect)} AS\n${statement}`
+  const keyword = dialect === 'mssql' && replace ? 'CREATE OR ALTER VIEW' : replace ? 'CREATE OR REPLACE VIEW' : 'CREATE VIEW'
+  return `${keyword} ${qualified(schema, name.trim(), dialect)} AS\n${statement}`
+}
+
+/**
+ * Statements that install the view. SQLite has no CREATE OR REPLACE, so an
+ * edit drops the old view first; SQL Server uses CREATE OR ALTER.
+ */
+export function createViewStatements(
+  schema: string,
+  name: string,
+  body: string,
+  editing: boolean,
+  dialect?: string,
+): string[] {
+  const statement = body.trim().replace(/;+\s*$/u, '')
+  if (dialect === 'sqlite' && editing) {
+    return [`DROP VIEW IF EXISTS ${qualified(schema, name.trim(), dialect)}`, `CREATE VIEW ${qualified(schema, name.trim(), dialect)} AS\n${statement}`]
+  }
+  return [createViewSql(schema, name, body, editing, dialect)]
 }
 
 /** SHOW CREATE VIEW is `... VIEW \`name\` AS select ...`; keep everything after AS. */

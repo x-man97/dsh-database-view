@@ -263,12 +263,22 @@ describe('drop and rename', () => {
     expect(dropObjectSql('mysql', 'app', 'users_view', 'view')).toBe('DROP VIEW `app`.`users_view`')
     expect(dropObjectSql('postgres', 'app', 'users', 'table')).toBe('DROP TABLE "app"."users"')
     expect(dropObjectSql('postgres', 'app', 'users_view', 'view')).toBe('DROP VIEW "app"."users_view"')
+    expect(dropObjectSql('sqlite', 'main', 'users', 'table')).toBe('DROP TABLE "main"."users"')
+    expect(dropObjectSql('mssql', 'dbo', 'users', 'table')).toBe('DROP TABLE [dbo].[users]')
+    expect(dropObjectSql('oracle', 'APP', 'USERS', 'view')).toBe('DROP VIEW "APP"."USERS"')
   })
 
   it('renames inside the same schema', () => {
     expect(renameTableSql('mysql', 'app', 'users', ' people ')).toBe('RENAME TABLE `app`.`users` TO `app`.`people`')
     expect(renameTableSql('postgres', 'app', 'users', 'people')).toBe(
       'ALTER TABLE "app"."users" RENAME TO "people"',
+    )
+    expect(renameTableSql('sqlite', 'main', 'users', 'people')).toBe(
+      'ALTER TABLE "main"."users" RENAME TO "people"',
+    )
+    expect(renameTableSql('mssql', 'dbo', 'users', 'people')).toBe("EXEC sp_rename 'dbo.users', 'people'")
+    expect(renameTableSql('oracle', 'APP', 'USERS', 'PEOPLE')).toBe(
+      'ALTER TABLE "APP"."USERS" RENAME TO "PEOPLE"',
     )
   })
 })

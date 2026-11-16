@@ -78,7 +78,13 @@ function primaryKeyOf(draft: TableDraft): string[] {
 export function createTableStatements(draft: TableDraft): string[] {
   const lines = draft.columns.map((column) => `  ${columnDefinition(column)}`)
   const primary = primaryKeyOf(draft)
-  if (primary.length > 0) lines.push(`  PRIMARY KEY (${primary.map(quoteIdent).join(', ')})`)
+  if (primary.length > 0) {
+    const named = draft.primaryKeyName === undefined ? '' : `CONSTRAINT ${quoteIdent(draft.primaryKeyName)} `
+    lines.push(`  ${named}PRIMARY KEY (${primary.map(quoteIdent).join(', ')})`)
+  }
+  for (const index of draft.preservedIndexes ?? []) {
+    lines.push(`  CONSTRAINT ${quoteIdent(index.name)} UNIQUE (${index.columns.map(quoteIdent).join(', ')})`)
+  }
   for (const foreignKey of draft.foreignKeys ?? []) lines.push(`  ${foreignKeySql(foreignKey, draft.schema)}`)
   const statements = [`CREATE TABLE ${qualified(draft.schema, draft.table)} (\n${lines.join(',\n')}\n)`]
   for (const index of draft.indexes) statements.push(indexSql(draft.schema, draft.table, index))

@@ -128,6 +128,7 @@ describe('tree row context menu', () => {
         {...props({
           onShowDdl: (connectionId, schema, table, kind) => calls.push(`ddl:${connectionId}:${schema}:${table}:${kind}`),
           onOpenTable: (connectionId, schema, object) => calls.push(`open:${connectionId}:${schema}:${object.name}`),
+          onSqlGenerator: (connectionId, schema, object) => calls.push(`sql:${connectionId}:${schema}:${object?.name ?? ''}`),
         })}
       />,
     )
@@ -135,7 +136,9 @@ describe('tree row context menu', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '打开数据' }))
     openMenu()
     fireEvent.click(screen.getByRole('menuitem', { name: '查看 DDL' }))
-    expect(calls).toEqual(['open:c1:shop:orders', 'ddl:c1:shop:orders:table'])
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'SQL Generator…' }))
+    expect(calls).toEqual(['open:c1:shop:orders', 'ddl:c1:shop:orders:table', 'sql:c1:shop:orders'])
   })
 
   it('opens the console for a table', () => {

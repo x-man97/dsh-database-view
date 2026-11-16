@@ -20,6 +20,21 @@ import {
   type TableIndexDraft,
 } from './tableddl'
 import { alterTableStatements as alterPgTableStatements, createTableStatements as createPgTableStatements } from './tableddl-pg'
+import {
+  alterSqliteTableStatements,
+  createSqliteTableStatements,
+  validateSqliteDraft,
+} from './tableddl-sqlite'
+import {
+  alterMssqlTableStatements,
+  createMssqlTableStatements,
+  validateMssqlDraft,
+} from './tableddl-mssql'
+import {
+  alterOracleTableStatements,
+  createOracleTableStatements,
+  validateOracleDraft,
+} from './tableddl-oracle'
 import { Banner, Button, Modal, Select, TextInput } from './ui'
 
 export interface TableDesignerTarget {
@@ -79,8 +94,49 @@ const POSTGRES_TYPES = [
   'bytea',
 ]
 
+const SQLITE_TYPES = ['INTEGER', 'TEXT', 'REAL', 'BLOB', 'NUMERIC', 'BOOLEAN', 'DATE', 'DATETIME']
+
+const MSSQL_TYPES = [
+  'int',
+  'bigint',
+  'smallint',
+  'tinyint',
+  'decimal(10,2)',
+  'float',
+  'real',
+  'bit',
+  'nvarchar(255)',
+  'varchar(255)',
+  'nchar(1)',
+  'ntext',
+  'date',
+  'datetime2',
+  'time',
+  'uniqueidentifier',
+  'varbinary(max)',
+]
+
+const ORACLE_TYPES = [
+  'NUMBER',
+  'NUMBER(10)',
+  'NUMBER(10,2)',
+  'FLOAT',
+  'VARCHAR2(255)',
+  'NVARCHAR2(255)',
+  'CHAR(1)',
+  'CLOB',
+  'DATE',
+  'TIMESTAMP',
+  'BLOB',
+  'RAW(16)',
+]
+
 function typeSuggestions(dialect: string | undefined): string[] {
-  return dialect === 'postgres' ? POSTGRES_TYPES : MYSQL_TYPES
+  if (dialect === 'postgres') return POSTGRES_TYPES
+  if (dialect === 'sqlite') return SQLITE_TYPES
+  if (dialect === 'mssql') return MSSQL_TYPES
+  if (dialect === 'oracle') return ORACLE_TYPES
+  return MYSQL_TYPES
 }
 
 const ISSUE_KEYS: Record<TableDraftIssue, string> = {
@@ -98,17 +154,26 @@ const ISSUE_KEYS: Record<TableDraftIssue, string> = {
   'foreign-key-columns': 'designer.error.foreignKeyColumns',
   'unknown-foreign-key-column': 'designer.error.unknownForeignKeyColumn',
   'foreign-key-target': 'designer.error.foreignKeyTarget',
+  'auto-increment': 'designer.error.autoIncrement',
+  'identity-change': 'designer.error.identityChange',
 }
 
 const FOREIGN_KEY_ACTIONS = ['RESTRICT', 'CASCADE', 'SET NULL', 'NO ACTION', 'SET DEFAULT']
 
-const DESTRUCTIVE = /\b(?:drop\s+(?:column|primary\s+key|index|constraint))\b/i
+const DESTRUCTIVE = /\b(?:drop\s+(?:column|table|primary\s+key|index|constraint))\b/i
+
+const AUTO_INCREMENT_TYPE: Record<string, string> = {
+  sqlite: 'INTEGER',
+  postgres: 'integer',
+  mssql: 'int',
+  oracle: 'NUMBER',
+}
 
 function initialColumns(dialect: string | undefined): TableColumnDraft[] {
   return [
     {
       name: 'id',
-      typeName: dialect === 'postgres' ? 'integer' : 'INT',
+      typeName: AUTO_INCREMENT_TYPE[dialect ?? 'mysql'] ?? 'INT',
       nullable: false,
       defaultValue: '',
       comment: '',
@@ -169,20 +234,45 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
       columns,
       indexes,
       foreignKeys,
+      ...(original?.primaryKeyName === undefined ? {} : { primaryKeyName: original.primaryKeyName }),
+      ...(original?.preservedIndexes === undefined ? {} : { preservedIndexes: original.preservedIndexes }),
+      ...(original?.preservedTriggers === undefined ? {} : { preservedTriggers: original.preservedTriggers }),
     }),
-    [target?.schema, tableName, columns, indexes, foreignKeys],
+    [target?.schema, tableName, columns, indexes, foreignKeys, original],
   )
-  const issue = target === null ? null : validateTableDraft(draft, !editing)
   const dialect = target?.connection.dialect
+  const dialectIssue =
+    target === null
+      ? null
+      : dialect === 'sqlite'
+        ? validateSqliteDraft(draft)
+        : dialect === 'mssql'
+          ? validateMssqlDraft(original, draft)
+          : dialect === 'oracle'
+            ? validateOracleDraft(draft)
+            : null
+  const issue = target === null ? null : validateTableDraft(draft, !editing) ?? dialectIssue
   const statements =
     issue === null
       ? original === null
         ? dialect === 'postgres'
           ? createPgTableStatements(draft)
-          : [createTableSql(draft)]
+          : dialect === 'sqlite'
+            ? createSqliteTableStatements(draft)
+            : dialect === 'mssql'
+              ? createMssqlTableStatements(draft)
+              : dialect === 'oracle'
+                ? createOracleTableStatements(draft)
+                : [createTableSql(draft)]
         : dialect === 'postgres'
           ? alterPgTableStatements(original, draft)
-          : alterMysqlTableStatements(original, draft)
+          : dialect === 'sqlite'
+            ? alterSqliteTableStatements(original, draft)
+            : dialect === 'mssql'
+              ? alterMssqlTableStatements(original, draft)
+              : dialect === 'oracle'
+                ? alterOracleTableStatements(original, draft)
+                : alterMysqlTableStatements(original, draft)
       : []
   const previewSql = statements.join(';\n\n')
 
@@ -402,6 +492,8 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
                     <td>
                       <TextInput
                         value={column.comment}
+                        disabled={dialect === 'sqlite'}
+                        title={dialect === 'sqlite' ? t('designer.commentUnsupported') : undefined}
                         aria-label={`${t('designer.column.comment')} ${String(index + 1)}`}
                         onChange={(event) => updateColumn(index, { comment: event.target.value })}
                       />

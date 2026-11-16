@@ -37,9 +37,9 @@ describe('view designer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '创建' }))
     await waitFor(() => expect(onExecute).toHaveBeenCalledTimes(1))
-    const [, sql, name] = onExecute.mock.calls[0]
+    const [, statements, name] = onExecute.mock.calls[0]
     expect(name).toBe('active_users')
-    expect(sql).toContain('CREATE VIEW `app`.`active_users`')
+    expect(statements).toEqual(['CREATE VIEW `app`.`active_users` AS\nselect id from users'])
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 

@@ -119,6 +119,14 @@ describe('schema context menu', () => {
     expect(text).toContain('CREATE TABLE users (id INT);')
   })
 
+  it('opens the SQL Generator for the schema', async () => {
+    const generate = vi.fn()
+    render(<DataView {...props({ onSqlGenerator: generate })} />)
+    fireEvent.contextMenu(schemaRow())
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'SQL Generator…' }))
+    expect(generate).toHaveBeenCalledWith('c1', 'shop')
+  })
+
   it('focuses the filter box so the prefix can be extended', async () => {
     render(<DataView {...props()} />)
     fireEvent.contextMenu(schemaRow(), { clientX: 10, clientY: 10 })

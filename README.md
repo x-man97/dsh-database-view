@@ -38,6 +38,8 @@ Then open **Database View** from the right-sidebar guide or DSH Settings.
 | Connections | Direct TCP and SSH (password, private key, ssh-agent); TOFU host-key pinning |
 | Browsing | Schemas → tables/views → columns/indexes; cached structure for offline browsing |
 | Table preview | Pagination, filters, sorting, inline add/edit/delete with SQL preview, undo, DDL, CSV/JSON export |
+| Object design | Create/modify tables, columns, keys, indexes, foreign keys, comments and views on MySQL, PostgreSQL, SQLite, SQL Server and Oracle |
+| SQL Generator | Generate CREATE scripts per schema or object, with optional DROPs, copy, save or open in the console |
 | SQL console | Syntax highlighting, completion, read-only by default, multi-statement scripts, history, cancel |
 | Agent tools | Connections, schemas, tables, DDL, EXPLAIN, bounded SQL, Redis inspection |
 

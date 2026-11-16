@@ -4,6 +4,7 @@ import type {
   ColumnDetail,
   DdlResult,
   ExplainResult,
+  ForeignKeyInfo,
   IndexInfo,
   ObjectKind,
   QueryResult,
@@ -105,10 +106,42 @@ export class SqliteEngine implements DatabaseEngine {
     for (const index of indexes) {
       const name = String(index.name)
       const info = db.prepare(`PRAGMA index_info(${quoteIdent(name)})`).all() as Array<Record<string, unknown>>
-      indexInfos.push({ name, columns: info.map((row) => String(row.name)), unique: Number(index.unique) === 1 })
+      indexInfos.push({
+        name,
+        columns: info.map((row) => String(row.name)),
+        unique: Number(index.unique) === 1,
+        ...(name.startsWith('sqlite_autoindex_') ? { constraint: true } : {}),
+      })
     }
     const primary = columns.filter((row) => Number(row.pk) > 0).map((row) => String(row.name))
-    if (primary.length > 0) indexInfos.push({ name: 'PRIMARY', columns: primary, primary: true, unique: true })
+    if (primary.length > 0) indexInfos.push({ name: 'PRIMARY', columns: primary, primary: true, unique: true, constraint: true })
+    const triggerRows = kind === 'table'
+      ? db.prepare("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ? AND sql IS NOT NULL ORDER BY name").all(table) as Array<{ sql: string }>
+      : []
+    const tableSql = (db
+      .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(table) as { sql?: string } | undefined)?.sql ?? ''
+    const autoColumn = /\bAUTOINCREMENT\b/i.test(tableSql) && primary.length === 1 ? primary[0] : undefined
+    const foreignKeyRows = db.prepare(`PRAGMA foreign_key_list(${quoteIdent(table)})`).all() as Array<Record<string, unknown>>
+    const foreignByName = new Map<string, ForeignKeyInfo>()
+    for (const row of foreignKeyRows) {
+      const name = `fk_${table}_${String(row.id)}`
+      let entry = foreignByName.get(name)
+      if (entry === undefined) {
+        entry = {
+          name,
+          columns: [],
+          referencedSchema: 'main',
+          referencedTable: String(row.table),
+          referencedColumns: [],
+          ...(typeof row.on_update === 'string' ? { onUpdate: row.on_update } : {}),
+          ...(typeof row.on_delete === 'string' ? { onDelete: row.on_delete } : {}),
+        }
+        foreignByName.set(name, entry)
+      }
+      entry.columns.push(String(row.from))
+      entry.referencedColumns.push(String(row.to))
+    }
     return {
       schema: 'main',
       table,
@@ -119,8 +152,11 @@ export class SqliteEngine implements DatabaseEngine {
         nullable: Number(row.notnull) === 0,
         ...(row.dflt_value === null || row.dflt_value === undefined ? {} : { defaultValue: String(row.dflt_value) }),
         ...(Number(row.pk) > 0 ? { primaryKey: true } : {}),
+        ...(autoColumn === String(row.name) ? { autoIncrement: true } : {}),
       })),
       indexes: indexInfos,
+      foreignKeys: [...foreignByName.values()],
+      ...(triggerRows.length === 0 ? {} : { triggers: triggerRows.map((row) => row.sql) }),
     }
   }
 
