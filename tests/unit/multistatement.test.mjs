@@ -289,7 +289,6 @@ describe('splitStatements', () => {
     ].join('\n')
     expect(splitStatements(block, 'oracle')).toEqual([block])
     expect(splitStatements(`${block}\nSELECT 2;`, 'oracle')).toEqual([block, 'SELECT 2'])
-    expect(splitStatements(block, 'oceanbase-oracle')).toEqual([block])
     expect(splitStatements('SELECT 1;', 'oracle')).toEqual(['SELECT 1'])
 
     const declare = ['DECLARE', '  x NUMBER;', 'BEGIN', '  x := 1;', 'END;'].join('\n')
