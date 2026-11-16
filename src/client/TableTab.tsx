@@ -32,7 +32,8 @@ import { cellValueView, type CellValueView } from './cellvalue'
 import { tableDumpText } from './tabledump'
 import { SqlHighlight } from './sqlhighlight'
 import { useI18n } from './i18n'
-import { deleteRowSql, insertRowSql, updateRowSql } from './rowedit'
+import { deleteRowSql, insertRowSql, updateRowSql, DEFAULT_VALUE, type RowValue } from './rowedit'
+import { summarizeRange, type GridRange } from './gridrange'
 
 /** What the tab body receives: the framework's tab reader. */
 export interface TableTabProps {
@@ -116,8 +117,9 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const [error, setError] = useState<Failure | null>(null)
   const [description, setDescription] = useState<TableDescription | null>(null)
   const [pendingNew, setPendingNew] = useState<Array<Record<string, string>>>([])
-  const [pendingUpdates, setPendingUpdates] = useState<Record<number, Record<string, string>>>({})
+  const [pendingUpdates, setPendingUpdates] = useState<Record<number, Record<string, string | typeof DEFAULT_VALUE>>>({})
   const [pendingDeletes, setPendingDeletes] = useState<Set<number>>(new Set())
+  const [cellRange, setCellRange] = useState<GridRange | null>(null)
   const [cellEdit, setCellEdit] = useState<{ rowIndex: number; column: string; value: string } | null>(null)
   const [newCell, setNewCell] = useState<{ rowIndex: number; column: string; value: string } | null>(null)
   const [dmlOpen, setDmlOpen] = useState(false)
@@ -338,7 +340,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   )
   applyRef.current = apply
 
-  const editableColumns = description?.columns ?? []
+  const editableColumns = useMemo(() => description?.columns ?? [], [description])
   const keyColumns = editableColumns.filter((column) => column.primaryKey === true)
   const effectiveKey = keyColumns.length > 0 ? keyColumns : editableColumns
   const canMutate =
@@ -368,7 +370,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     if (row === undefined) return
     const index = displayColumns.findIndex((entry) => entry.name === column.name)
     const loaded = index < 0 ? null : row[index] ?? null
-    const current = pendingUpdates[rowIndex]?.[column.name] ?? loaded
+    const pending = pendingUpdates[rowIndex]?.[column.name]
+    const current = pending === DEFAULT_VALUE ? '' : pending ?? loaded
     setRowError('')
     setCellEdit({ rowIndex, column: column.name, value: current === null ? '' : String(current) })
   }, [canMutate, displayColumns, displayRows, pendingDeletes, pendingUpdates])
@@ -393,6 +396,47 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     setCellEdit(null)
   }
   const cancelCell = (): void => setCellEdit(null)
+  /** Explicit NULL/DEFAULT assignments from the cell menu. */
+  const setCellPending = useCallback(
+    (rowIndex: number, column: ColumnInfo, value: string | typeof DEFAULT_VALUE): void => {
+      if (!canMutate || pendingDeletes.has(rowIndex)) return
+      setRowError('')
+      setPendingUpdates((previous) => {
+        const next = { ...previous }
+        next[rowIndex] = { ...(next[rowIndex] ?? {}), [column.name]: value }
+        return next
+      })
+    },
+    [canMutate, pendingDeletes],
+  )
+  /** Copy one row's current values into a pending insert; generated keys stay empty. */
+  const duplicateRow = useCallback(
+    (rowIndex: number): void => {
+      if (!canMutate || rowSaving) return
+      const row = displayRows[rowIndex]
+      if (row === undefined) return
+      const values: Record<string, string> = {}
+      for (const column of editableColumns) {
+        if (column.primaryKey === true && column.autoIncrement === true) continue
+        const index = displayColumns.findIndex((entry) => entry.name === column.name)
+        if (index < 0) continue
+        const pending = pendingUpdates[rowIndex]?.[column.name]
+        const value: CellValue =
+          pending === DEFAULT_VALUE ? null : pending === undefined ? (row[index] ?? null) : pending === '' ? null : pending
+        if (value === null || value === '') continue
+        values[column.name] = String(value)
+      }
+      const newIndex = pendingNew.length
+      setPendingNew((previous) => [...previous, values])
+      const firstEmpty = editableColumns.find((column) => values[column.name] === undefined)
+      const target = firstEmpty ?? editableColumns[0]
+      if (target !== undefined) {
+        setNewCell({ rowIndex: newIndex, column: target.name, value: values[target.name] ?? '' })
+      }
+      setRowError('')
+    },
+    [canMutate, displayColumns, displayRows, editableColumns, pendingNew.length, pendingUpdates, rowSaving],
+  )
   const startNewCell = (rowIndex: number, column: string): void => {
     const value = pendingNew[rowIndex]?.[column] ?? ''
     setNewCell({ rowIndex, column, value })
@@ -406,6 +450,33 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     setPendingNew((previous) => previous.map((row, index) => index === rowIndex ? { ...row, [column]: value } : row))
     setNewCell(null)
   }
+  /** Fill pending edits from a pasted TSV block, clipped to the current page. */
+  const pasteRange = useCallback(
+    (anchor: { rowIndex: number; columnIndex: number }, text: string): void => {
+      if (!canMutate || rowSaving) return
+      const lines = text.replace(/\r\n/gu, '\n').replace(/\n$/u, '').split('\n')
+      const next: Record<number, Record<string, string | typeof DEFAULT_VALUE>> = { ...pendingUpdates }
+      let changed = 0
+      for (const [rowOffset, line] of lines.entries()) {
+        const rowIndex = anchor.rowIndex + rowOffset
+        if (rowIndex >= displayRows.length) break
+        if (pendingDeletes.has(rowIndex)) continue
+        for (const [columnOffset, cellText] of line.split('\t').entries()) {
+          const column = shownColumns[anchor.columnIndex + columnOffset]
+          if (column === undefined) continue
+          if (!editableColumns.some((entry) => entry.name === column.name)) continue
+          next[rowIndex] = { ...(next[rowIndex] ?? {}), [column.name]: cellText }
+          changed += 1
+        }
+      }
+      if (changed === 0) return
+      setPendingUpdates(next)
+      setRowError('')
+      setExportNote(t('table.pasted', { n: changed }))
+    },
+    [canMutate, displayRows.length, editableColumns, pendingDeletes, pendingUpdates, rowSaving, shownColumns, t],
+  )
+
   const cancelNewCell = (): void => setNewCell(null)
   const removeNewRow = (rowIndex: number): void => {
     setNewCell((previous) => (previous?.rowIndex === rowIndex ? null : previous))
@@ -449,9 +520,14 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
       const index = Number(rawIndex)
       const row = displayRows[index]
       if (row === undefined || pendingDeletes.has(index)) continue
-      const values = editableColumns
+      const values: RowValue[] = editableColumns
         .filter((column) => changes[column.name] !== undefined)
-        .map((column) => ({ column, value: changes[column.name] === '' ? null : changes[column.name] }))
+        .map((column) => {
+          const changed = changes[column.name]
+          const value: CellValue | null | typeof DEFAULT_VALUE =
+            changed === DEFAULT_VALUE ? DEFAULT_VALUE : changed === '' || changed === undefined ? null : changed
+          return { column, value }
+        })
       if (values.length === 0) continue
       const original = new Map(effectiveKey.map((column) => [column.name, rowValue(column.name, row)]))
       statements.push(`${updateRowSql(dialect, params.schema, params.table, values, effectiveKey, original)};`)
@@ -646,6 +722,25 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                   run: () => startCellEdit(cell.rowIndex, cell.column),
                 }]
               : []),
+            ...(canMutate && editableColumns.some((entry) => entry.name === cell.column.name)
+              ? [
+                  {
+                    label: t('menu.setNull'),
+                    disabled: pendingDeletes.has(cell.rowIndex),
+                    run: () => setCellPending(cell.rowIndex, cell.column, ''),
+                  },
+                  {
+                    label: t('menu.setDefault'),
+                    disabled: pendingDeletes.has(cell.rowIndex),
+                    run: () => setCellPending(cell.rowIndex, cell.column, DEFAULT_VALUE),
+                  },
+                  {
+                    label: t('menu.duplicateRow'),
+                    disabled: rowSaving,
+                    run: () => duplicateRow(cell.rowIndex),
+                  },
+                ]
+              : []),
             {
               label: t('menu.viewFull'),
               run: () => setCellView(cellValueView(cell.column.name, cell.value)),
@@ -711,7 +806,22 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
                 applyRef.current({ page: 0 })
               },
             },],
-    [canMutate, connection, displayColumns, displayRows, filters, pageSize, params.schema, params.table, pendingDeletes, startCellEdit],
+    [
+      canMutate,
+      connection,
+      displayColumns,
+      displayRows,
+      duplicateRow,
+      editableColumns,
+      filters,
+      pageSize,
+      params.schema,
+      params.table,
+      pendingDeletes,
+      rowSaving,
+      setCellPending,
+      startCellEdit,
+    ],
   )
   const hasPrevious = page > 0
   const lastPage = total === undefined ? undefined : Math.max(Math.ceil(total / pageSize) - 1, 0)
@@ -986,10 +1096,23 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const pendingCell = useCallback(
     (rowIndex: number, column: string, original: CellValue): CellValue | undefined => {
       const changed = pendingUpdates[rowIndex]?.[column]
-      return changed === undefined ? undefined : changed === '' ? null : changed
+      if (changed === undefined) return undefined
+      if (changed === DEFAULT_VALUE) return 'DEFAULT'
+      return changed === '' ? null : changed
     },
     [pendingUpdates],
   )
+  const cellAggregate = useMemo(() => {
+    if (cellRange === null) return null
+    return summarizeRange(shownColumns, shownRows, cellRange, (rowIndex, columnIndex) => {
+      const loaded: CellValue = shownRows[rowIndex]?.[columnIndex] ?? null
+      const column = shownColumns[columnIndex]
+      if (column === undefined) return loaded
+      const pending = pendingUpdates[rowIndex]?.[column.name]
+      if (pending === undefined) return loaded
+      return pending === DEFAULT_VALUE ? null : pending === '' ? null : pending
+    })
+  }, [cellRange, pendingUpdates, shownColumns, shownRows])
 
   if (error !== null && rows.length === 0) {
     return (
@@ -1129,6 +1252,18 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           disabled={!canMutate || rowSaving}
         >
           <PlusIcon size={13} />
+        </button>
+        <button
+          type="button"
+          className="dshdb-pager-btn"
+          title={canMutate ? t('table.duplicateRow') : 'Not duplicable'}
+          aria-label={t('table.duplicateRow')}
+          onClick={() => {
+            if (selectedIndex !== undefined) duplicateRow(selectedIndex)
+          }}
+          disabled={!canMutate || selectedIndex === undefined || rowSaving}
+        >
+          <CopyIcon size={13} />
         </button>
         <button
           type="button"
@@ -1510,6 +1645,8 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           deletedRows={pendingDeletes}
           editedCells={editedCell}
           pendingCellValue={pendingCell}
+          onRangeChange={setCellRange}
+          {...(canMutate ? { onPasteRange: pasteRange } : {})}
           {...(cellEdit === null ? {} : {
             cellEdit: {
               rowIndex: cellEdit.rowIndex,
@@ -1523,6 +1660,22 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
           {...(canMutate ? { onCellDoubleClick: startCellEdit } : {})}
         />
       )}
+
+      {cellAggregate !== null ? (
+        <div className="dshdb-grid-aggregate" role="status">
+          <span>{t('table.rangeSize', { rows: cellAggregate.rows, columns: cellAggregate.columns })}</span>
+          <span>{t('table.rangeNonNull', { n: cellAggregate.nonNull })}</span>
+          {cellAggregate.numeric > 0 ? (
+            <>
+              <span>{t('table.rangeSum', { n: String(cellAggregate.sum) })}</span>
+              <span>{t('table.rangeAverage', { n: String(Math.round((cellAggregate.average ?? 0) * 100) / 100) })}</span>
+              <span>{t('table.rangeMin', { n: String(cellAggregate.min ?? '') })}</span>
+              <span>{t('table.rangeMax', { n: String(cellAggregate.max ?? '') })}</span>
+            </>
+          ) : null}
+          <span className="dshdb-grid-aggregate-hint">{t('table.rangeCopyHint')}</span>
+        </div>
+      ) : null}
 
       <div className="dshdb-pager">
         {loading ? <Tag tone="business">{t('table.querying')}</Tag> : null}

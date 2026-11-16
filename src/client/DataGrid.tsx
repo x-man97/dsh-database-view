@@ -8,18 +8,20 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
 import type { CellValue, ColumnInfo, Row } from '../shared/types'
-import type { ColumnMenuItem } from './colmenu'
+import { copyText, type ColumnMenuItem } from './colmenu'
 import { t } from './i18n'
 import { clearWidths, readWidths, writeWidths } from './columnWidths'
 import { formatCell } from './format'
+import {
+  normalizeGridRange,
+  numericColumn,
+  rangeContains,
+  rangeToTsv,
+  type GridCell,
+  type GridRange,
+} from './gridrange'
 
 /** Rows are rendered with a fixed height so offsets need no measurement. */
-export const NUMERIC_TYPE = /(?:^|\b)(?:tiny|small|medium|big)?int(?:eger)?\b|decimal|numeric|float|double|real|number|money/i
-
-function numericColumn(column: ColumnInfo): boolean {
-  return NUMERIC_TYPE.test(column.typeName)
-}
-
 const GRID_ROW_HEIGHT = 22
 /** Cells longer than this are clipped on screen; the tooltip and the
  * double-click dialog still carry the whole value. */
@@ -110,6 +112,10 @@ export interface DataGridProps {
   pendingCellValue?: (rowIndex: number, column: string, original: CellValue) => CellValue | undefined
   /** Double-clicking a cell starts in-place editing instead of opening it. */
   onCellDoubleClick?: (rowIndex: number, column: ColumnInfo) => void
+  /** Rectangular cell selection changed (table tab uses it for the aggregate bar). */
+  onRangeChange?: (range: GridRange | null) => void
+  /** Paste a TSV block whose top-left cell is `anchor`. */
+  onPasteRange?: (anchor: GridCell, text: string) => void
 }
 
 const MIN_COLUMN_WIDTH = 48
@@ -207,18 +213,26 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
     editedCells,
     pendingCellValue,
     onCellDoubleClick,
+    onRangeChange,
+    onPasteRange,
   } = props
   const selectable = onToggleRow !== undefined
   const selectedCount = selectedRows?.size ?? 0
   const colSpan = columns.length + (selectable ? 2 : 1)
   const [menu, setMenu] = useState<{ items: ColumnMenuItem[]; x: number; y: number } | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const [selection, setSelection] = useState<{ anchor: GridCell; focus: GridCell } | null>(null)
+  const dragging = useRef(false)
   const dragIndex = useRef<number | null>(null)
   const dragged = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const tableRef = useRef<HTMLTableElement>(null)
-  const { range, onScroll } = useVirtualRange(rows.length, containerRef)
-  const visible = rows.slice(range.start, range.end)
+  const { range: virtualRange, onScroll } = useVirtualRange(rows.length, containerRef)
+  const visible = rows.slice(virtualRange.start, virtualRange.end)
+  const selectedRange = useMemo(
+    () => (selection === null ? null : normalizeGridRange(selection.anchor, selection.focus)),
+    [selection],
+  )
 
   const openMenu = useCallback((items: ColumnMenuItem[], clientX: number, clientY: number): void => {
     const width = 200
@@ -229,6 +243,81 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
       y: Math.min(clientY, window.innerHeight - height - 8),
     })
   }, [])
+
+  // A new page, filter or result set invalidates row/column coordinates.
+  useEffect(() => {
+    setSelection(null)
+  }, [rows, columns.length])
+
+  useEffect(() => {
+    onRangeChange?.(selectedRange)
+  }, [selectedRange, onRangeChange])
+
+  useEffect(() => {
+    const up = (): void => {
+      dragging.current = false
+    }
+    window.addEventListener('mouseup', up)
+    return () => window.removeEventListener('mouseup', up)
+  }, [])
+
+  // Copy/paste belong to the page while a block is selected, but never steal
+  // keystrokes from an editor input.
+  useEffect(() => {
+    if (selectedRange === null) return undefined
+    const isEditor = (target: EventTarget | null): boolean =>
+      target instanceof HTMLElement &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+    const valueOf = (rowIndex: number, columnIndex: number): CellValue => {
+      const row = rows[rowIndex]
+      const loaded: CellValue = row?.[columnIndex] ?? null
+      const column = columns[columnIndex]
+      if (column === undefined || pendingCellValue === undefined) return loaded
+      const pending = pendingCellValue(rowIndex, column.name, loaded)
+      return pending === undefined ? loaded : pending
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (isEditor(event.target)) return
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c') {
+        const text = rangeToTsv(columns, rows, selectedRange, valueOf)
+        if (text === '') return
+        event.preventDefault()
+        void copyText(text)
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setSelection(null)
+      }
+    }
+    const onPaste = (event: ClipboardEvent): void => {
+      if (onPasteRange === undefined || isEditor(event.target)) return
+      const text = event.clipboardData?.getData('text/plain') ?? ''
+      if (text === '') return
+      event.preventDefault()
+      onPasteRange({ rowIndex: selectedRange.startRow, columnIndex: selectedRange.startColumn }, text)
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('paste', onPaste)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('paste', onPaste)
+    }
+  }, [columns, onPasteRange, pendingCellValue, rows, selectedRange])
+
+  const selectCell = (event: React.MouseEvent<HTMLTableCellElement>, cell: GridCell): void => {
+    if (event.button !== 0) return
+    setSelection((current) =>
+      event.shiftKey && current !== null ? { anchor: current.anchor, focus: cell } : { anchor: cell, focus: cell },
+    )
+    dragging.current = true
+    // Keep the browser from starting a text selection across cells.
+    event.preventDefault()
+  }
+  const extendCell = (cell: GridCell): void => {
+    if (!dragging.current) return
+    setSelection((current) => (current === null ? current : { anchor: current.anchor, focus: cell }))
+  }
 
   const [widths, setWidths] = useState<number[] | null>(() =>
     storageKey === undefined ? null : readWidths(storageKey, columns.length),
@@ -452,13 +541,13 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
               <td colSpan={colSpan}>{emptyText}</td>
             </tr>
           ) : null}
-          {range.paddingTop > 0 ? (
+          {virtualRange.paddingTop > 0 ? (
             <tr className="dshdb-vpad" aria-hidden="true">
-              <td colSpan={colSpan} style={{ height: range.paddingTop }} />
+              <td colSpan={colSpan} style={{ height: virtualRange.paddingTop }} />
             </tr>
           ) : null}
           {visible.map((row, index) => {
-            const rowIndex = range.start + index
+            const rowIndex = virtualRange.start + index
             const rowNo = rowNumbers?.[rowIndex] ?? offset + rowIndex + 1
             const checked = selectedRows?.has(rowIndex) === true
             const deleted = deletedRows?.has(rowIndex) === true
@@ -507,19 +596,29 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
                   const text = formatCell(value)
                   const shown = text.length > CELL_TEXT_LIMIT ? `${text.slice(0, CELL_TEXT_LIMIT)}…` : text
                   const changed = editedCells?.(rowIndex, column.name) === true
+                  const selected = selectedRange !== null && rangeContains(selectedRange, rowIndex, columnIndex)
+                  const anchored =
+                    selection !== null &&
+                    selection.anchor.rowIndex === rowIndex &&
+                    selection.anchor.columnIndex === columnIndex
                   return (
                     <td
                       key={`${column.name}-${columnIndex}`}
                       title={text}
+                      data-cell-selected={selected ? 'true' : undefined}
                       className={
                         [
                           numericColumn(column) ? 'dshdb-cell-num' : '',
                           changed ? 'dshdb-cell-edited' : '',
+                          selected ? 'dshdb-cell-selected' : '',
+                          anchored ? 'dshdb-cell-anchor' : '',
                           cellClass?.(column, value) ?? '',
                         ]
                           .filter((value) => value !== '')
                           .join(' ') || undefined
                       }
+                      onMouseDown={(event) => selectCell(event, { rowIndex, columnIndex })}
+                      onMouseEnter={() => extendCell({ rowIndex, columnIndex })}
                       onClick={onCellClick === undefined ? undefined : () => onCellClick(column, value)}
                       onDoubleClick={
                         onCellDoubleClick === undefined
@@ -531,6 +630,9 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
                           ? undefined
                           : (event) => {
                               event.preventDefault()
+                              if (selectedRange === null || !rangeContains(selectedRange, rowIndex, columnIndex)) {
+                                setSelection({ anchor: { rowIndex, columnIndex }, focus: { rowIndex, columnIndex } })
+                              }
                               openMenu(cellMenu({ column, value, row, rowIndex }), event.clientX, event.clientY)
                             }
                       }
@@ -583,9 +685,9 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
               })}
             </tr>
           ))}
-          {range.paddingBottom > 0 ? (
+          {virtualRange.paddingBottom > 0 ? (
             <tr className="dshdb-vpad" aria-hidden="true">
-              <td colSpan={colSpan} style={{ height: range.paddingBottom }} />
+              <td colSpan={colSpan} style={{ height: virtualRange.paddingBottom }} />
             </tr>
           ) : null}
         </tbody>

@@ -1669,6 +1669,27 @@ export const CSS = `
 tr[data-deleted="true"] { background: color-mix(in srgb, var(--dsw-alias-label-tertiary) 10%, transparent) !important; }
 tr[data-deleted="true"] td { background: color-mix(in srgb, var(--dsw-alias-label-tertiary) 12%, transparent) !important; color: var(--dsw-alias-label-tertiary); text-decoration: line-through; opacity: 0.72; }
 .dshdb-cell-edited { background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, transparent); }
+.dshdb-grid td.dshdb-cell-selected {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
+}
+.dshdb-grid td.dshdb-cell-anchor {
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary);
+}
+.dshdb-grid-aggregate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 8px;
+  border-top: 1px solid var(--dshdb-border);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11.5px;
+}
+.dshdb-grid-aggregate .dshdb-grid-aggregate-hint {
+  margin-left: auto;
+  color: var(--dsw-alias-label-tertiary);
+}
 .dshdb-dml-sql {
   margin: 0;
   padding: 10px 12px;

@@ -3,10 +3,17 @@ import { isNumericType, quoteIdent, quoteLiteral, qualifiedName, temporalLiteral
 
 export interface RowValue {
   column: ColumnInfo
-  value: CellValue | null
+  value: CellValue | null | typeof DEFAULT_VALUE
 }
 
-export function sqlValue(dialect: SqlDialect, column: ColumnInfo, value: CellValue | null): string {
+/**
+ * Marker for "DEFAULT" in a pending update: the column is set to its server
+ * default instead of a literal value. `sqlValue` emits the keyword unquoted.
+ */
+export const DEFAULT_VALUE: unique symbol = Symbol('dshdb-default-value')
+
+export function sqlValue(dialect: SqlDialect, column: ColumnInfo, value: CellValue | null | typeof DEFAULT_VALUE): string {
+  if (value === DEFAULT_VALUE) return 'DEFAULT'
   if (value === null) return 'NULL'
   if (typeof value === 'boolean') {
     if (dialect === 'mysql' || dialect === 'mssql') return value ? '1' : '0'
