@@ -4,7 +4,12 @@
  */
 import { quoteMysqlIdent } from './tableddl'
 
-function qualified(schema: string, name: string): string {
+function quotePgIdent(name: string): string {
+  return `"${name.replaceAll('"', '""')}"`
+}
+
+function qualified(schema: string, name: string, dialect: string | undefined): string {
+  if (dialect === 'postgres') return `${quotePgIdent(schema)}.${quotePgIdent(name)}`
   return `${quoteMysqlIdent(schema)}.${quoteMysqlIdent(name)}`
 }
 
@@ -37,13 +42,22 @@ export function validateViewDraft(name: string, body: string, requireName = true
   return /^(?:select|with)\b/i.test(text) ? null : 'not-select'
 }
 
-export function createViewSql(schema: string, name: string, body: string, replace: boolean): string {
+export function createViewSql(
+  schema: string,
+  name: string,
+  body: string,
+  replace: boolean,
+  dialect?: string,
+): string {
   const statement = body.trim().replace(/;+\s*$/u, '')
-  return `${replace ? 'CREATE OR REPLACE VIEW' : 'CREATE VIEW'} ${qualified(schema, name.trim())} AS\n${statement}`
+  return `${replace ? 'CREATE OR REPLACE VIEW' : 'CREATE VIEW'} ${qualified(schema, name.trim(), dialect)} AS\n${statement}`
 }
 
 /** SHOW CREATE VIEW is `... VIEW \`name\` AS select ...`; keep everything after AS. */
 export function extractViewSelect(ddl: string): string | null {
+  const trimmed = ddl.trim()
+  // PostgreSQL returns the view body on its own (or wrapped in CREATE OR REPLACE VIEW).
+  if (/^(?:select|with)\b/i.test(trimmed)) return trimmed.replace(/;+\s*$/u, '')
   const match = /\bAS\s+(?=(?:select|with)\b)/i.exec(ddl)
   if (match === null) return null
   const body = ddl.slice(match.index + match[0].length).trim().replace(/;+\s*$/u, '')

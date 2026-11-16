@@ -26,6 +26,7 @@ import { RedisValuePanel } from '../redisview'
 import { copyText } from '../colmenu'
 import { selectColumnsSql } from '../tablesql'
 import { tableSelectSql } from '../tablesql'
+import { supportsSqlDesign } from '../tableddl'
 import { TreeMenu, placeMenu, type TreeMenuState } from './tree-menu'
 import { objectIcon } from './tree-parts'
 import { buildTreeRows, folderOf, type TreeRow } from './tree-rows'
@@ -248,7 +249,7 @@ export function DataView(props: DataViewProps): ReactElement {
       const connection = props.connections.find((item) => item.id === connectionId)
       const isRelation = object.kind === 'table' || object.kind === 'view'
       const isTable = object.kind === 'table'
-      const canManage = connection?.dialect === 'mysql' && connection.readOnly !== true
+      const canManage = connection !== undefined && supportsSqlDesign(connection.dialect) && connection.readOnly !== true
       const read = props.onReadDdl
       const items = [
         ...(isRelation
@@ -359,7 +360,7 @@ export function DataView(props: DataViewProps): ReactElement {
     (event: React.MouseEvent<HTMLButtonElement>, connectionId: string, schemaName: string): void => {
       event.preventDefault()
       const connection = props.connections.find((item) => item.id === connectionId)
-      const canManage = connection?.dialect === 'mysql' && connection.readOnly !== true
+      const canManage = connection !== undefined && supportsSqlDesign(connection.dialect) && connection.readOnly !== true
       const items = [
         ...(canManage
           ? [

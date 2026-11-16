@@ -30,7 +30,7 @@ import { ConnectionModal } from './modals/ConnectionModal'
 import { TrashModal, type TrashBusy } from './modals/TrashModal'
 import { DataView } from './views/DataView'
 import { openConsoleTab, openTableTab } from './tab-open'
-import { dropObjectSql, renameTableSql } from './tableddl'
+import { dropObjectSql, renameTableSql, supportsSqlDesign } from './tableddl'
 import { TableDesigner, type TableDesignerTarget } from './TableDesigner'
 import { TableRenameModal, type TableRenameTarget } from './TableRenameModal'
 import { CompareStructureModal, type CompareStructureTarget } from './CompareStructureModal'
@@ -528,7 +528,7 @@ export function App(props: AppProps): ReactElement {
   const openNewTable = useCallback(
     (connectionId: string, schema: string): void => {
       const connection = connections.find((item) => item.id === connectionId)
-      if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
+      if (connection === undefined || !supportsSqlDesign(connection.dialect) || connection.readOnly === true) return
       const tables = (objects[`${connectionId}:${schema}`] ?? []).filter((object) => object.kind === 'table')
       setDesigner({ connection, schema, tables })
     },
@@ -538,7 +538,7 @@ export function App(props: AppProps): ReactElement {
   const openModifyTable = useCallback(
     async (connectionId: string, schema: string, table: string): Promise<void> => {
       const connection = connections.find((item) => item.id === connectionId)
-      if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
+      if (connection === undefined || !supportsSqlDesign(connection.dialect) || connection.readOnly === true) return
       try {
         const description = await api.describe(connectionId, schema, table, 'table')
         const tables = (objects[`${connectionId}:${schema}`] ?? []).filter((object) => object.kind === 'table')
@@ -553,7 +553,7 @@ export function App(props: AppProps): ReactElement {
   const openRenameTable = useCallback(
     (connectionId: string, schema: string, table: string): void => {
       const connection = connections.find((item) => item.id === connectionId)
-      if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
+      if (connection === undefined || !supportsSqlDesign(connection.dialect) || connection.readOnly === true) return
       setRenameTarget({ connection, schema, table })
     },
     [connections],
@@ -561,7 +561,7 @@ export function App(props: AppProps): ReactElement {
 
   const renameTable = useCallback(
     async (target: TableRenameTarget, name: string): Promise<void> => {
-      await executeDdl(target.connection.id, target.schema, renameTableSql(target.schema, target.table, name))
+      await executeDdl(target.connection.id, target.schema, renameTableSql(target.connection.dialect, target.schema, target.table, name))
       await refreshAfterDdl(target.connection.id, target.schema)
       notify(t('notify.tableRenamed', { name }), 'success')
     },
@@ -587,9 +587,9 @@ export function App(props: AppProps): ReactElement {
   const dropObject = useCallback(
     async (connectionId: string, schema: string, object: { name: string; kind: string }): Promise<void> => {
       const connection = connections.find((item) => item.id === connectionId)
-      if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
+      if (connection === undefined || !supportsSqlDesign(connection.dialect) || connection.readOnly === true) return
       const name = `${schema}.${object.name}`
-      const sql = dropObjectSql(schema, object.name, object.kind === 'view' ? 'view' : 'table')
+      const sql = dropObjectSql(connection.dialect, schema, object.name, object.kind === 'view' ? 'view' : 'table')
       const ok = await askConfirm(t('confirm.dropObject', { name }), sql)
       if (!ok) return
       try {
@@ -637,7 +637,7 @@ export function App(props: AppProps): ReactElement {
   const openNewView = useCallback(
     (connectionId: string, schema: string): void => {
       const connection = connections.find((item) => item.id === connectionId)
-      if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
+      if (connection === undefined || !supportsSqlDesign(connection.dialect) || connection.readOnly === true) return
       setViewDesigner({ connection, schema })
     },
     [connections],
@@ -646,7 +646,7 @@ export function App(props: AppProps): ReactElement {
   const openModifyView = useCallback(
     async (connectionId: string, schema: string, view: string): Promise<void> => {
       const connection = connections.find((item) => item.id === connectionId)
-      if (connection === undefined || connection.dialect !== 'mysql' || connection.readOnly === true) return
+      if (connection === undefined || !supportsSqlDesign(connection.dialect) || connection.readOnly === true) return
       try {
         const result = await api.ddl(connectionId, schema, view, 'view')
         const body = extractViewSelect(result.ddl)

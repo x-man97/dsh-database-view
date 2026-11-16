@@ -337,6 +337,10 @@ export interface IndexInfo {
   columns: string[]
   unique?: boolean
   primary?: boolean
+  /** Backed by a table constraint (PostgreSQL unique/PK constraints are not freely editable). */
+  constraint?: boolean
+  /** Server definition text, used to spot partial/expression indexes. */
+  definition?: string
 }
 
 export interface ForeignKeyInfo {

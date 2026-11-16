@@ -27,6 +27,34 @@ function typeName(field: FieldDef): string {
   return TYPE_NAMES[field.dataTypeID] ?? `TYPE_${String(field.dataTypeID)}`
 }
 
+const FK_ACTION: Record<string, string> = {
+  a: 'NO ACTION',
+  r: 'RESTRICT',
+  c: 'CASCADE',
+  n: 'SET NULL',
+  d: 'SET DEFAULT',
+}
+
+interface PgIndexRow {
+  name: string
+  primary: boolean
+  unique: boolean
+  constraint: boolean
+  definition: string
+  columns: string[]
+}
+
+function indexRowsOf(rows: unknown[]): PgIndexRow[] {
+  return (rows as Array<Record<string, unknown>>).map((row) => ({
+    name: String(row.name),
+    primary: row.primary === true,
+    unique: row.unique === true,
+    constraint: row.constraint === true,
+    definition: typeof row.definition === 'string' ? row.definition : '',
+    columns: Array.isArray(row.columns) ? row.columns.map(String) : [],
+  }))
+}
+
 function quoteIdent(name: string): string {
   return `"${name.replaceAll('"', '""')}"`
 }
@@ -167,26 +195,63 @@ export class PostgresEngine implements DatabaseEngine {
     if (kind !== 'table' && kind !== 'view') return { schema, table, kind, columns: [], indexes: [] }
     const client = this.requireClient()
     const columns = await client.query(
-      `SELECT column_name AS name, data_type AS type, is_nullable AS nullable,
-              column_default AS "defaultValue", ordinal_position AS ordinal
-       FROM information_schema.columns
-       WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position`,
+      `SELECT a.attname AS name, format_type(a.atttypid, a.atttypmod) AS type,
+              NOT a.attnotnull AS nullable, pg_get_expr(d.adbin, d.adrelid) AS "defaultValue",
+              a.attnum AS ordinal, a.attidentity AS identity,
+              col_description(a.attrelid, a.attnum) AS comment
+       FROM pg_attribute a
+       JOIN pg_class c ON c.oid = a.attrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+       WHERE n.nspname = $1 AND c.relname = $2 AND a.attnum > 0 AND NOT a.attisdropped
+       ORDER BY a.attnum`,
       [schema, table],
     )
     const indexes = await client.query(
-      `SELECT indexname AS name, indexdef AS definition FROM pg_indexes
-       WHERE schemaname = $1 AND tablename = $2 ORDER BY indexname`,
-      [schema, table],
-    )
-    const pk = await client.query(
-      `SELECT a.attname AS column FROM pg_index i
+      `SELECT ic.relname AS name, i.indisprimary AS primary, i.indisunique AS "unique",
+              EXISTS (SELECT 1 FROM pg_constraint con WHERE con.conindid = i.indexrelid) AS "constraint",
+              pg_get_indexdef(i.indexrelid) AS definition,
+              ARRAY(
+                SELECT a.attname
+                FROM unnest(i.indkey::smallint[]) WITH ORDINALITY AS k(attnum, ord)
+                JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+                WHERE k.attnum > 0
+                ORDER BY k.ord
+              )::text[] AS columns
+       FROM pg_index i
+       JOIN pg_class ic ON ic.oid = i.indexrelid
        JOIN pg_class c ON c.oid = i.indrelid
        JOIN pg_namespace n ON n.oid = c.relnamespace
-       JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = ANY(i.indkey)
-       WHERE n.nspname = $1 AND c.relname = $2 AND i.indisprimary`,
+       WHERE n.nspname = $1 AND c.relname = $2
+       ORDER BY ic.relname`,
       [schema, table],
     )
-    const primaryColumns = new Set((pk.rows as Array<{ column: string }>).map((row) => row.column))
+    const indexRows = indexRowsOf(indexes.rows)
+    const primaryColumns = new Set(indexRows.find((row) => row.primary)?.columns ?? [])
+    const foreignKeys = await client.query(
+      `SELECT con.conname AS name, con.confdeltype, con.confupdtype,
+              fn.nspname AS ref_schema, f.relname AS ref_table,
+              ARRAY(
+                SELECT a.attname
+                FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord)
+                JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
+                ORDER BY k.ord
+              )::text[] AS columns,
+              ARRAY(
+                SELECT a.attname
+                FROM unnest(con.confkey) WITH ORDINALITY AS k(attnum, ord)
+                JOIN pg_attribute a ON a.attrelid = con.confrelid AND a.attnum = k.attnum
+                ORDER BY k.ord
+              )::text[] AS ref_columns
+       FROM pg_constraint con
+       JOIN pg_class c ON c.oid = con.conrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       JOIN pg_class f ON f.oid = con.confrelid
+       JOIN pg_namespace fn ON fn.oid = f.relnamespace
+       WHERE con.contype = 'f' AND n.nspname = $1 AND c.relname = $2
+       ORDER BY con.conname`,
+      [schema, table],
+    )
     return {
       schema,
       table,
@@ -194,30 +259,48 @@ export class PostgresEngine implements DatabaseEngine {
       columns: (columns.rows as Array<Record<string, unknown>>).map((row): ColumnDetail => ({
         name: String(row.name),
         typeName: String(row.type ?? ''),
-        nullable: row.nullable !== 'NO',
-        ...(row.defaultValue === null ? {} : { defaultValue: String(row.defaultValue) }),
+        nullable: row.nullable === true,
+        ...(row.defaultValue === null || row.defaultValue === undefined ? {} : { defaultValue: String(row.defaultValue) }),
+        ...(typeof row.comment === 'string' && row.comment !== '' ? { comment: row.comment } : {}),
         ...(typeof row.ordinal === 'number' ? { ordinal: row.ordinal } : {}),
         ...(primaryColumns.has(String(row.name)) ? { primaryKey: true } : {}),
+        ...(typeof row.identity === 'string' && row.identity !== '' ? { autoIncrement: true } : {}),
       })),
-      indexes: (indexes.rows as Array<{ name: string; definition: string }>).map((row): IndexInfo => {
-        const match = /\(([^)]+)\)/.exec(row.definition)
-        const columns = match === null ? [] : match[1].split(',').map((item) => item.trim().replace(/^"|"$/g, ''))
-        return {
-          name: row.name,
-          columns,
-          unique: /\bUNIQUE\b/i.test(row.definition),
-          primary: row.name.endsWith('_pkey'),
-        }
-      }),
+      indexes: indexRows.map((row): IndexInfo => ({
+        name: row.name,
+        columns: row.columns,
+        unique: row.unique,
+        primary: row.primary,
+        ...(row.constraint ? { constraint: true } : {}),
+        ...(row.definition === '' ? {} : { definition: row.definition }),
+      })),
+      foreignKeys: (foreignKeys.rows as Array<Record<string, unknown>>).map((row) => ({
+        name: String(row.name),
+        columns: Array.isArray(row.columns) ? row.columns.map(String) : [],
+        referencedSchema: String(row.ref_schema),
+        referencedTable: String(row.ref_table),
+        referencedColumns: Array.isArray(row.ref_columns) ? row.ref_columns.map(String) : [],
+        ...(typeof row.confdeltype === 'string' ? { onDelete: FK_ACTION[row.confdeltype] ?? 'NO ACTION' } : {}),
+        ...(typeof row.confupdtype === 'string' ? { onUpdate: FK_ACTION[row.confupdtype] ?? 'NO ACTION' } : {}),
+      })),
     }
   }
 
   async ddl(schema: string, table: string, kind: ObjectKind): Promise<DdlResult> {
     const client = this.requireClient()
     if (kind === 'view') {
-      const result = await client.query('SELECT pg_get_viewdef(to_regclass($1), true) AS ddl', [`${quoteIdent(schema)}.${quoteIdent(table)}`])
-      const ddl = String(result.rows[0]?.ddl ?? '')
-      if (ddl.trim() !== '') return { schema, table, kind, ddl, source: 'server', warnings: [] }
+      const result = await client.query('SELECT pg_get_viewdef(to_regclass($1), true) AS body', [`${quoteIdent(schema)}.${quoteIdent(table)}`])
+      const body = String(result.rows[0]?.body ?? '').trim()
+      if (body !== '') {
+        return {
+          schema,
+          table,
+          kind,
+          ddl: `CREATE OR REPLACE VIEW ${quoteIdent(schema)}.${quoteIdent(table)} AS\n${body}`,
+          source: 'server',
+          warnings: [],
+        }
+      }
     }
     if (kind === 'function' || kind === 'procedure') {
       const result = await client.query('SELECT pg_get_functiondef(to_regprocedure($1)) AS ddl', [`${quoteIdent(schema)}.${quoteIdent(table)}`])

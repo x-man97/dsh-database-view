@@ -9,7 +9,7 @@ import { copyText } from './colmenu'
 import { useCopyFlash } from './copyflash'
 import { useI18n } from './i18n'
 import {
-  alterTableStatements,
+  alterTableStatements as alterMysqlTableStatements,
   createTableSql,
   tableDraftFromDescription,
   validateTableDraft,
@@ -19,6 +19,7 @@ import {
   type TableForeignKeyDraft,
   type TableIndexDraft,
 } from './tableddl'
+import { alterTableStatements as alterPgTableStatements, createTableStatements as createPgTableStatements } from './tableddl-pg'
 import { Banner, Button, Modal, Select, TextInput } from './ui'
 
 export interface TableDesignerTarget {
@@ -37,7 +38,7 @@ export interface TableDesignerProps {
   onExecute: (target: TableDesignerTarget, statements: string[], tableName: string) => Promise<void>
 }
 
-const TYPE_SUGGESTIONS = [
+const MYSQL_TYPES = [
   'INT',
   'BIGINT',
   'SMALLINT',
@@ -58,6 +59,30 @@ const TYPE_SUGGESTIONS = [
   'LONGBLOB',
 ]
 
+const POSTGRES_TYPES = [
+  'integer',
+  'bigint',
+  'smallint',
+  'numeric(10,2)',
+  'real',
+  'double precision',
+  'varchar(255)',
+  'char(1)',
+  'text',
+  'boolean',
+  'date',
+  'time',
+  'timestamp',
+  'timestamptz',
+  'jsonb',
+  'uuid',
+  'bytea',
+]
+
+function typeSuggestions(dialect: string | undefined): string[] {
+  return dialect === 'postgres' ? POSTGRES_TYPES : MYSQL_TYPES
+}
+
 const ISSUE_KEYS: Record<TableDraftIssue, string> = {
   'table-name': 'designer.error.tableName',
   'no-columns': 'designer.error.noColumns',
@@ -77,13 +102,13 @@ const ISSUE_KEYS: Record<TableDraftIssue, string> = {
 
 const FOREIGN_KEY_ACTIONS = ['RESTRICT', 'CASCADE', 'SET NULL', 'NO ACTION', 'SET DEFAULT']
 
-const DESTRUCTIVE = /\b(?:drop\s+(?:column|primary\s+key|index))\b/i
+const DESTRUCTIVE = /\b(?:drop\s+(?:column|primary\s+key|index|constraint))\b/i
 
-function initialColumns(): TableColumnDraft[] {
+function initialColumns(dialect: string | undefined): TableColumnDraft[] {
   return [
     {
       name: 'id',
-      typeName: 'INT',
+      typeName: dialect === 'postgres' ? 'integer' : 'INT',
       nullable: false,
       defaultValue: '',
       comment: '',
@@ -104,7 +129,7 @@ function uniqueName(base: string, taken: string[]): string {
 export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps): ReactElement | null {
   const t = useI18n()
   const [tableName, setTableName] = useState('')
-  const [columns, setColumns] = useState<TableColumnDraft[]>(initialColumns)
+  const [columns, setColumns] = useState<TableColumnDraft[]>(() => initialColumns(undefined))
   const [indexes, setIndexes] = useState<TableIndexDraft[]>([])
   const [foreignKeys, setForeignKeys] = useState<TableForeignKeyDraft[]>([])
   const [original, setOriginal] = useState<TableDraft | null>(null)
@@ -121,7 +146,7 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
     if (target.description === undefined) {
       setOriginal(null)
       setTableName('')
-      setColumns(initialColumns())
+      setColumns(initialColumns(target.connection.dialect))
       setIndexes([])
       setForeignKeys([])
       setTimeout(() => nameRef.current?.focus(), 0)
@@ -148,8 +173,17 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
     [target?.schema, tableName, columns, indexes, foreignKeys],
   )
   const issue = target === null ? null : validateTableDraft(draft, !editing)
+  const dialect = target?.connection.dialect
   const statements =
-    issue === null ? (original === null ? [createTableSql(draft)] : alterTableStatements(original, draft)) : []
+    issue === null
+      ? original === null
+        ? dialect === 'postgres'
+          ? createPgTableStatements(draft)
+          : [createTableSql(draft)]
+        : dialect === 'postgres'
+          ? alterPgTableStatements(original, draft)
+          : alterMysqlTableStatements(original, draft)
+      : []
   const previewSql = statements.join(';\n\n')
 
   if (target === null) return null
@@ -344,7 +378,7 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
                     <td>
                       <TextInput
                         value={column.typeName}
-                        list="dshdb-mysql-types"
+                        list="dshdb-column-types"
                         aria-label={`${t('designer.column.type')} ${String(index + 1)}`}
                         onChange={(event) => updateColumn(index, { typeName: event.target.value })}
                       />
@@ -404,8 +438,8 @@ export function TableDesigner({ target, onClose, onExecute }: TableDesignerProps
               </tbody>
             </table>
           </div>
-          <datalist id="dshdb-mysql-types">
-            {TYPE_SUGGESTIONS.map((type) => (
+          <datalist id="dshdb-column-types">
+            {typeSuggestions(dialect).map((type) => (
               <option key={type} value={type} />
             ))}
           </datalist>

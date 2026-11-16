@@ -15,6 +15,9 @@ describe('createViewSql', () => {
     expect(createViewSql('app', 'active_users', 'select id from users;', true)).toBe(
       'CREATE OR REPLACE VIEW `app`.`active_users` AS\nselect id from users',
     )
+    expect(createViewSql('app', 'active_users', 'select id from users', true, 'postgres')).toBe(
+      'CREATE OR REPLACE VIEW "app"."active_users" AS\nselect id from users',
+    )
   })
 })
 
@@ -33,6 +36,10 @@ describe('extractViewSelect', () => {
 
   it('returns null when no query follows AS', () => {
     expect(extractViewSelect('CREATE TABLE `t` (`id` int)')).toBeNull()
+  })
+
+  it('keeps a bare PostgreSQL view body', () => {
+    expect(extractViewSelect(' SELECT users.id FROM users;')).toBe('SELECT users.id FROM users')
   })
 })
 

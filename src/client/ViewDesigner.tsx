@@ -57,7 +57,9 @@ export function ViewDesigner({ target, onClose, onExecute }: ViewDesignerProps):
   const editing = target?.view !== undefined
   const readOnly = target?.connection.readOnly === true
   const issue = target === null ? null : validateViewDraft(name, body, !editing)
-  const sql = issue === null && target !== null ? createViewSql(target.schema, name, body, editing) : ''
+  const sql = issue === null && target !== null
+    ? createViewSql(target.schema, name, body, editing, target.connection.dialect)
+    : ''
 
   if (target === null) return null
 

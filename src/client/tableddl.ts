@@ -43,6 +43,8 @@ export interface TableDraft {
   columns: TableColumnDraft[]
   indexes: TableIndexDraft[]
   foreignKeys: TableForeignKeyDraft[]
+  /** Name of the existing primary-key constraint, when the server reported one. */
+  primaryKeyName?: string
 }
 
 export type TableDraftIssue =
@@ -148,6 +150,7 @@ function indexSignature(index: TableIndexDraft): string {
 
 /** Build the editable draft from the structure the server described. */
 export function tableDraftFromDescription(description: TableDescription): TableDraft {
+  const primaryIndex = description.indexes.find((index) => index.primary === true)
   return {
     schema: description.schema,
     table: description.table,
@@ -162,7 +165,13 @@ export function tableDraftFromDescription(description: TableDescription): TableD
       primaryKey: column.primaryKey === true,
     })),
     indexes: description.indexes
-      .filter((index) => index.primary !== true)
+      .filter(
+        (index) =>
+          index.primary !== true &&
+          index.constraint !== true &&
+          index.columns.length > 0 &&
+          (index.definition === undefined || !/\bWHERE\b/i.test(index.definition)),
+      )
       .map((index) => ({
         originalName: index.name,
         name: index.name,
@@ -179,6 +188,7 @@ export function tableDraftFromDescription(description: TableDescription): TableD
       onDelete: foreignKey.onDelete ?? 'RESTRICT',
       onUpdate: foreignKey.onUpdate ?? 'RESTRICT',
     })),
+    ...(primaryIndex === undefined ? {} : { primaryKeyName: primaryIndex.name }),
   }
 }
 
@@ -345,10 +355,25 @@ export function alterTableSql(original: TableDraft, next: TableDraft): string {
   return alterTableStatements(original, next).join(';\n\n')
 }
 
-export function dropObjectSql(schema: string, table: string, kind: ObjectKind): string {
+/** Dialects whose object designer this client can generate SQL for. */
+export function supportsSqlDesign(dialect: string | undefined): boolean {
+  return dialect === 'mysql' || dialect === 'postgres'
+}
+
+function quotePgIdent(name: string): string {
+  return `"${name.replaceAll('"', '""')}"`
+}
+
+export function dropObjectSql(dialect: string | undefined, schema: string, table: string, kind: ObjectKind): string {
+  if (dialect === 'postgres') {
+    return `DROP ${kind === 'view' ? 'VIEW' : 'TABLE'} ${quotePgIdent(schema)}.${quotePgIdent(table)}`
+  }
   return `DROP ${kind === 'view' ? 'VIEW' : 'TABLE'} ${qualified(schema, table)}`
 }
 
-export function renameTableSql(schema: string, table: string, nextName: string): string {
+export function renameTableSql(dialect: string | undefined, schema: string, table: string, nextName: string): string {
+  if (dialect === 'postgres') {
+    return `ALTER TABLE ${quotePgIdent(schema)}.${quotePgIdent(table)} RENAME TO ${quotePgIdent(nextName.trim())}`
+  }
   return `RENAME TABLE ${qualified(schema, table)} TO ${qualified(schema, nextName.trim())}`
 }

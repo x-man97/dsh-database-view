@@ -259,11 +259,16 @@ describe('foreign keys', () => {
 
 describe('drop and rename', () => {
   it('drops tables and views with the right keyword', () => {
-    expect(dropObjectSql('app', 'users', 'table')).toBe('DROP TABLE `app`.`users`')
-    expect(dropObjectSql('app', 'users_view', 'view')).toBe('DROP VIEW `app`.`users_view`')
+    expect(dropObjectSql('mysql', 'app', 'users', 'table')).toBe('DROP TABLE `app`.`users`')
+    expect(dropObjectSql('mysql', 'app', 'users_view', 'view')).toBe('DROP VIEW `app`.`users_view`')
+    expect(dropObjectSql('postgres', 'app', 'users', 'table')).toBe('DROP TABLE "app"."users"')
+    expect(dropObjectSql('postgres', 'app', 'users_view', 'view')).toBe('DROP VIEW "app"."users_view"')
   })
 
   it('renames inside the same schema', () => {
-    expect(renameTableSql('app', 'users', ' people ')).toBe('RENAME TABLE `app`.`users` TO `app`.`people`')
+    expect(renameTableSql('mysql', 'app', 'users', ' people ')).toBe('RENAME TABLE `app`.`users` TO `app`.`people`')
+    expect(renameTableSql('postgres', 'app', 'users', 'people')).toBe(
+      'ALTER TABLE "app"."users" RENAME TO "people"',
+    )
   })
 })
