@@ -43,6 +43,7 @@ import { SqlHighlight } from './sqlhighlight'
 import { useI18n } from './i18n'
 import { pickStatement, statementAtCaret } from './sqlselection'
 import { splitStatements } from './multistatement'
+import { sqlDialectOf } from '../shared/dialect'
 import { readAllowedNumber, readFlag, readText, writeFlag, writeNumber, writeText } from './prefs'
 import { shortcutHit, shortcutLabel } from './keymap'
 import type { ShortcutId } from '../shared/keymap'
@@ -794,7 +795,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
     setExportOpen(false)
     const body = text.trim()
     if (body === '') return
-    const parts = splitStatements(body)
+    const parts = splitStatements(body, sqlDialectOf(connection?.dialect))
     if (parts.length === 0) return
     const isWrite = parts.some((part) => looksLikeWrite(part))
     if (isWrite && settings?.confirmDestructive === true) {

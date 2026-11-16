@@ -10,6 +10,7 @@ import type {
   ServerInfo,
 } from '../shared/types.js'
 import type { ConfigStore } from './config.js'
+import { isRedisReadCommand } from '../shared/redisread.js'
 import { DbError } from './errors.js'
 import type { SecretStore } from './secrets.js'
 
@@ -182,69 +183,10 @@ export async function keyInfos(client: RedisClient, keys: string[]): Promise<Red
   return infos
 }
 
-const READ_ONLY_COMMANDS = new Set([
-  'get',
-  'mget',
-  'strlen',
-  'type',
-  'ttl',
-  'pttl',
-  'exists',
-  'scan',
-  'keys',
-  'dbsize',
-  'info',
-  'ping',
-  'echo',
-  'time',
-  'randomkey',
-  'lrange',
-  'llen',
-  'lpos',
-  'smembers',
-  'scard',
-  'sismember',
-  'sscan',
-  'hget',
-  'hmget',
-  'hgetall',
-  'hlen',
-  'hscan',
-  'hkeys',
-  'hvals',
-  'zrange',
-  'zrevrange',
-  'zrangebyscore',
-  'zcard',
-  'zscan',
-  'zscore',
-  'xrange',
-  'xrevrange',
-  'xlen',
-  'getrange',
-  'object',
-  'memory',
-  'bitcount',
-  'geopos',
-  'xread',
-  'xinfo',
-  'lindex',
-  'zcount',
-  'zlexcount',
-  'zrank',
-  'zrevrank',
-  'zmscore',
-  'hstrlen',
-  'hexists',
-  'hrandfield',
-  'getbit',
-  'bitpos',
-  'geodist',
-  'geohash',
-  'geosearch',
-  'pfcount',
-  'srandmember',
-])
+/** Whether a command only reads data and may run on a read-only connection. */
+export function isReadOnlyCommand(command: string): boolean {
+  return isRedisReadCommand(command)
+}
 
 // FLUSHDB/FLUSHALL wipe a whole logical database; keep them denied even when writes are allowed.
 const DENIED_COMMANDS = new Set(['shutdown', 'monitor', 'subscribe', 'psubscribe', 'sync', 'psync', 'replconf', 'flushdb', 'flushall'])
@@ -568,7 +510,7 @@ export class RedisManager {
       throw new DbError('read-only', `该命令被插件禁止执行：${command}`)
     }
     const session = await this.ensureSession(connId, db)
-    const readOnlyCommand = READ_ONLY_COMMANDS.has(command.toLowerCase())
+    const readOnlyCommand = isReadOnlyCommand(command)
     if (!readOnlyCommand && (session.readOnly || !allowWrite)) {
       throw new DbError('read-only', session.readOnly ? '该连接已标记为只读，拒绝写命令' : '当前操作不允许写命令')
     }

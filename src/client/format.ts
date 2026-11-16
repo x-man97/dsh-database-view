@@ -1,4 +1,5 @@
 import { DIALECT_LABEL } from '../shared/presets'
+import { isRedisReadCommand } from '../shared/redisread'
 import { t } from './i18n'
 import type { CellValue, Dialect, ObjectKind } from '../shared/types'
 
@@ -186,64 +187,14 @@ export function looksLikeDdl(sql: string): boolean {
     .some((statement) => DDL_STATEMENT.test(unwrapExplainAnalyze(statement)))
 }
 
-const REDIS_READ = new Set([
-  'get',
-  'mget',
-  'strlen',
-  'type',
-  'ttl',
-  'pttl',
-  'exists',
-  'scan',
-  'keys',
-  'dbsize',
-  'info',
-  'ping',
-  'echo',
-  'time',
-  'randomkey',
-  'lrange',
-  'llen',
-  'lpos',
-  'smembers',
-  'scard',
-  'sismember',
-  'sscan',
-  'srandmember',
-  'hget',
-  'hmget',
-  'hgetall',
-  'hlen',
-  'hscan',
-  'hkeys',
-  'hvals',
-  'zrange',
-  'zrevrange',
-  'zrangebyscore',
-  'zcard',
-  'zscan',
-  'zscore',
-  'xrange',
-  'xrevrange',
-  'xlen',
-  'xinfo',
-  'object',
-  'memory',
-  'getrange',
-  'bitcount',
-  'geopos',
-  'geodist',
-  'georadius_ro',
-])
-
 function redisCommandName(command: string): string {
-  const match = /^\s*([a-zA-Z]+)/.exec(command)
+  const match = /^\s*([a-zA-Z][a-zA-Z0-9_]*)/.exec(command)
   return match?.[1]?.toLowerCase() ?? ''
 }
 
 export function looksLikeRedisWrite(command: string): boolean {
   const name = redisCommandName(command)
-  return name !== '' && !REDIS_READ.has(name)
+  return name !== '' && !isRedisReadCommand(name)
 }
 
 export function objectKindLabel(kind: ObjectKind): string {

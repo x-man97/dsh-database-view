@@ -1,0 +1,193 @@
+import { blockCommentEnd, type ScriptDialect } from '../shared/sqlcomment'
+
+/**
+ * Whether a backslash inside the literal starting at `quoteIndex` escapes the
+ * next character. MySQL always does; standard SQL treats it as data. The
+ * PostgreSQL `E'...'` form is the one standard-dialect exception.
+ */
+export function backslashEscapes(input: string, quoteIndex: number, quote: string, dialect: ScriptDialect): boolean {
+  if (quote === '`') return false
+  if (dialect === 'mysql') return true
+  if (dialect !== 'postgres' || quote !== "'") return false
+  const prefix = input[quoteIndex - 1]
+  if (prefix !== 'e' && prefix !== 'E') return false
+  const before = input[quoteIndex - 2]
+  return before === undefined || !/[A-Za-z0-9_$]/u.test(before)
+}
+
+/**
+ * The end (exclusive) of the Oracle alternative-quoted literal starting at
+ * `index`, or null when this is not one. The shape is `[n]q'<open>text<close>'`;
+ * bracket pairs have their own closing character, and anything else closes with
+ * the same character it opened with. A missing terminator is left to the normal
+ * scanner so malformed input still reaches the server.
+ */
+export function oracleQuotedLiteralEnd(input: string, index: number): number | null {
+  const previous = input[index - 1]
+  if (previous === 'n' || previous === 'N') {
+    const before = input[index - 2]
+    if (before !== undefined && /[A-Za-z0-9_$]/u.test(before)) return null
+  } else if (previous !== undefined && /[A-Za-z0-9_$]/u.test(previous)) {
+    return null
+  }
+  if (input[index + 1] !== "'") return null
+  const open = input[index + 2]
+  if (open === undefined) return null
+  const close = open === '[' ? ']' : open === '{' ? '}' : open === '<' ? '>' : open === '(' ? ')' : open
+  const end = input.indexOf(`${close}'`, index + 3)
+  return end === -1 ? null : end + 2
+}
+
+/**
+ * Whether the `--` at `index - 2` opens a comment. Standard SQL always does;
+ * MySQL additionally requires whitespace (or the end of the text) after it,
+ * which keeps expressions such as `select 5--3` intact.
+ */
+export function dashStartsComment(input: string, next: number, dialect: ScriptDialect): boolean {
+  if (dialect !== 'mysql') return true
+  const char = input[next]
+  return char === undefined || /\s/u.test(char)
+}
+
+/**
+ * The PostgreSQL dollar-quote opener at `index` (`$$`, `$body$`), or null.
+ *
+ * A `$` glued to the end of an identifier belongs to that identifier:
+ * PostgreSQL only starts a dollar quote when the delimiter follows whitespace,
+ * punctuation or the start of the text. Tags follow identifier rules, so `$1$`
+ * stays a parameter and never opens a quote.
+ */
+export function dollarDelimiterAt(input: string, index: number): string | null {
+  if (input[index] !== '$') return null
+  if (index > 0 && /[A-Za-z0-9_$]/.test(input[index - 1] ?? '')) return null
+  let cursor = index + 1
+  while (cursor < input.length && /[A-Za-z0-9_]/.test(input[cursor] ?? '')) cursor += 1
+  if (input[cursor] !== '$') return null
+  if (cursor > index + 1 && /[0-9]/.test(input[index + 1] ?? '')) return null
+  return input.slice(index, cursor + 1)
+}
+
+/**
+ * The end (exclusive) of the SQL Server bracket identifier starting at `index`,
+ * or null when it is not closed. `]]` escapes a closing bracket inside the name.
+ * A missing terminator is left to the normal scanner.
+ */
+export function bracketIdentifierEnd(input: string, index: number): number | null {
+  if (input[index] !== '[') return null
+  let cursor = index + 1
+  while (cursor < input.length) {
+    if (input[cursor] === ']') {
+      if (input[cursor + 1] === ']') {
+        cursor += 2
+        continue
+      }
+      return cursor + 1
+    }
+    cursor += 1
+  }
+  return null
+}
+
+/**
+ * Replace string literals and comments with spaces of the same length, so a
+ * caller can scan the result for keywords without matching text inside a
+ * literal. Double quotes and backticks are identifiers to table inference but
+ * strings to paging, so the caller chooses whether to mask them.
+ */
+export function maskNonCode(text: string, dialect: ScriptDialect, maskQuotedIdentifiers: boolean, keepExecutableComments = false): string {
+  let out = ''
+  let index = 0
+  while (index < text.length) {
+    const char = text[index] ?? ''
+    if (char === '-' && text[index + 1] === '-' && dashStartsComment(text, index + 2, dialect)) {
+      const end = text.indexOf('\n', index)
+      const stop = end === -1 ? text.length : end
+      out += ' '.repeat(stop - index)
+      index = stop
+      continue
+    }
+    if (char === '#' && dialect === 'mysql') {
+      const end = text.indexOf('\n', index)
+      const stop = end === -1 ? text.length : end
+      out += ' '.repeat(stop - index)
+      index = stop
+      continue
+    }
+    if (char === '/' && text[index + 1] === '*' && keepExecutableComments && dialect === 'mysql' && text[index + 2] === '!') {
+      // MySQL runs the body of `/*! ... */`; keep it visible to write detection.
+      // Mask the version digits (one space per digit keeps offsets stable), or
+      // `/*!50000INTO OUTFILE ... */` has no word boundary before `INTO`.
+      out += '/*!'
+      index += 3
+      while (index < text.length && /\d/u.test(text[index] ?? '')) {
+        out += ' '
+        index += 1
+      }
+      continue
+    }
+    if (char === '/' && text[index + 1] === '*') {
+      const close = blockCommentEnd(text, index, dialect)
+      const stop = close === -1 ? text.length : close
+      out += ' '.repeat(stop - index)
+      index = stop
+      continue
+    }
+    if ((char === 'q' || char === 'Q') && dialect === 'oracle') {
+      const end = oracleQuotedLiteralEnd(text, index)
+      if (end !== null) {
+        out += ' '.repeat(end - index)
+        index = end
+        continue
+      }
+    }
+    if (char === '$' && dialect === 'postgres') {
+      const delimiter = dollarDelimiterAt(text, index)
+      if (delimiter !== null) {
+        const close = text.indexOf(delimiter, index + delimiter.length)
+        if (close !== -1) {
+          const end = close + delimiter.length
+          out += ' '.repeat(end - index)
+          index = end
+          continue
+        }
+      }
+    }
+    if (char === '[' && (dialect === 'mssql' || dialect === 'sqlite') && maskQuotedIdentifiers) {
+      const end = bracketIdentifierEnd(text, index)
+      if (end !== null) {
+        out += ' '.repeat(end - index)
+        index = end
+        continue
+      }
+    }
+    const masked = char === "'" || (maskQuotedIdentifiers && (char === '"' || char === '`'))
+    if (masked) {
+      const quote = char
+      const escapes = backslashEscapes(text, index, quote, dialect)
+      index += 1
+      out += ' '
+      while (index < text.length) {
+        const next = text[index] ?? ''
+        index += 1
+        out += ' '
+        if (next === '\\' && quote !== '`' && escapes && index < text.length) {
+          index += 1
+          out += ' '
+          continue
+        }
+        if (next === quote) {
+          if (text[index] === quote) {
+            index += 1
+            out += ' '
+            continue
+          }
+          break
+        }
+      }
+      continue
+    }
+    out += char
+    index += 1
+  }
+  return out
+}
