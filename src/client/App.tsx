@@ -34,6 +34,7 @@ import { dropObjectSql, renameTableSql } from './tableddl'
 import { TableDesigner, type TableDesignerTarget } from './TableDesigner'
 import { TableRenameModal, type TableRenameTarget } from './TableRenameModal'
 import { CompareStructureModal, type CompareStructureTarget } from './CompareStructureModal'
+import { CompareDataModal, type CompareDataTarget } from './CompareDataModal'
 import { ViewDesigner, type ViewDesignerTarget } from './ViewDesigner'
 import { extractViewSelect } from './viewddl'
 import { tableSelectSql } from './tablesql'
@@ -125,6 +126,7 @@ export function App(props: AppProps): ReactElement {
   const [designer, setDesigner] = useState<TableDesignerTarget | null>(null)
   const [renameTarget, setRenameTarget] = useState<TableRenameTarget | null>(null)
   const [compareTarget, setCompareTarget] = useState<CompareStructureTarget | null>(null)
+  const [compareDataTarget, setCompareDataTarget] = useState<CompareDataTarget | null>(null)
   const [viewDesigner, setViewDesigner] = useState<ViewDesignerTarget | null>(null)
 
   const notify = useCallback((text: string, tone: 'info' | 'success' | 'error' = 'info') => {
@@ -623,6 +625,15 @@ export function App(props: AppProps): ReactElement {
     [connections],
   )
 
+  const openCompareData = useCallback(
+    (connectionId: string, schema: string, table: string): void => {
+      const connection = connections.find((item) => item.id === connectionId)
+      if (connection === undefined || connection.dialect === 'redis') return
+      setCompareDataTarget({ connection, schema, table })
+    },
+    [connections],
+  )
+
   const openNewView = useCallback(
     (connectionId: string, schema: string): void => {
       const connection = connections.find((item) => item.id === connectionId)
@@ -806,6 +817,7 @@ export function App(props: AppProps): ReactElement {
               onDropObject={dropObject}
               onDdlConsole={openDdlConsole}
               onCompareTable={openCompareTable}
+              onCompareData={openCompareData}
               onNewView={openNewView}
               onModifyView={openModifyView}
             />
@@ -933,6 +945,7 @@ export function App(props: AppProps): ReactElement {
       <TableDesigner target={designer} onClose={() => setDesigner(null)} onExecute={applyTableDdl} />
       <TableRenameModal target={renameTarget} onClose={() => setRenameTarget(null)} onRename={renameTable} />
       <CompareStructureModal target={compareTarget} onClose={() => setCompareTarget(null)} />
+      <CompareDataModal target={compareDataTarget} onClose={() => setCompareDataTarget(null)} />
       <ViewDesigner target={viewDesigner} onClose={() => setViewDesigner(null)} onExecute={applyViewDdl} />
       <ConfirmDialog request={confirm?.request ?? null} onConfirm={() => resolveConfirm(true)} onCancel={() => resolveConfirm(false)} />
       <Toast toast={toast} onDismiss={() => setToast(null)} />
