@@ -308,8 +308,9 @@
 - `334013a` feat(console): 支持把编辑器 SQL 保存为脚本文件
 - `57d5388` feat(console): 支持导入 .sql 文件到编辑器
 
-## 修复（125）
+## 修复（126）
 
+- `422d2b8` fix(client): keep tab state and unblock large table loads
 - `fb25d96` fix(client): survive live reload and align overlay editor carets
 - `88440f3` fix(client): 补全排序忽略继承频率键
 - `f092102` fix(client): Markdown 导出展平单独回车
@@ -578,8 +579,9 @@
 - `5f4e78c` docs: 补上树筛选命中数的说明
 - `44061d4` docs: 去掉键表格说明里重复的排序描述
 
-## 杂项（26）
+## 杂项（27）
 
+- `ea05086` chore: release 0.7.2
 - `51f6af6` chore: release 0.7.1
 - `2dcd085` chore: release 0.7.0
 - `2a6d693` chore: rebuild lib bundles after subsystem port
