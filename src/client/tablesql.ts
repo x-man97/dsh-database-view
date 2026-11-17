@@ -3,7 +3,9 @@
  * WHERE box and the per-column filters. They live here rather than inside the
  * tab so they can be unit tested without rendering React.
  */
+import type { ScriptDialect } from '../shared/sqlcomment'
 import type { CellValue, ClientConnection, ColumnInfo, Row } from '../shared/types'
+import { maskNonCode } from './sqllex'
 
 /** A column filter: `like` is the text typed into the filter row, `eq` is an
  * exact value picked from a cell, `isnull` comes from clicking a NULL cell. */
@@ -177,21 +179,61 @@ export function insertStatements(
 }
 
 function unquoteIdentifier(part: string): string {
-  return part.trim().replace(/^[`"[]/u, '').replace(/[`"\]]$/u, '')
+  const text = part.trim()
+  if (text.length >= 2 && text.startsWith('`') && text.endsWith('`')) return text.slice(1, -1).replaceAll('``', '`')
+  if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) return text.slice(1, -1).replaceAll('""', '"')
+  if (text.length >= 2 && text.startsWith('[') && text.endsWith(']')) return text.slice(1, -1).replaceAll(']]', ']')
+  return text
 }
+
+/** Split a qualified name on dots that are not inside an identifier quote. */
+function qualifierParts(text: string): string[] {
+  const parts: string[] = []
+  let current = ''
+  let close = ''
+  for (const char of text) {
+    if (close !== '') {
+      current += char
+      if (char === close) close = ''
+      continue
+    }
+    if (char === '`' || char === '"' || char === '[') {
+      close = char === '[' ? ']' : char
+      current += char
+      continue
+    }
+    if (char === '.') {
+      parts.push(current)
+      current = ''
+      continue
+    }
+    current += char
+  }
+  parts.push(current)
+  return parts.map(unquoteIdentifier)
+}
+
+// Quoted names may contain dots and spaces; an unquoted part is a plain word.
+const TABLE_IDENT = '(?:`[^`]*`|"[^"]*"|\\[[^\\]]*\\]|[\\w$#]+)'
+const TABLE_TARGET = new RegExp(`\\b(?:from|join|update|into)\\s+(${TABLE_IDENT}(?:\\s*\\.\\s*${TABLE_IDENT})*)`, 'iu')
 
 /**
  * The table a statement reads from or writes to, used by the console's SQL
- * export. Returns null for statements without a plain table (functions,
- * multi-statement scripts, SELECTs over subqueries only).
+ * export and its "open table" action. Returns null for statements without a
+ * plain table (functions, multi-statement scripts, SELECTs over subqueries
+ * only). With a dialect, literals and comments are ignored so `FROM` inside
+ * them cannot be mistaken for the target.
  */
-export function tableFromStatement(statement: string): { schema: string; table: string } | null {
-  const match =
-    /\b(?:from|join|update|into)\s+((?:[`"\[]?[\w$#]+[`"\]]?\s*\.\s*)?[`"\[]?[\w$#]+[`"\]]?)/iu.exec(statement)
+export function tableFromStatement(statement: string, dialect?: ScriptDialect): { schema: string; table: string } | null {
+  const code = dialect === undefined ? statement : maskNonCode(statement, dialect, false)
+  const match = TABLE_TARGET.exec(code)
   if (match === null) return null
-  const parts = match[1].split('.').map(unquoteIdentifier)
-  if (parts.length >= 2) return { schema: parts[parts.length - 2] ?? '', table: parts[parts.length - 1] ?? '' }
-  return { schema: '', table: parts[0] ?? '' }
+  const parts = qualifierParts(match[1] ?? '')
+  if (parts.length === 0) return null
+  if (parts.length === 1) return { schema: '', table: parts[0] ?? '' }
+  // A three-part name (catalog.schema.table) keeps the last two; the table tab
+  // works in the connection's current database.
+  return { schema: parts[parts.length - 2] ?? '', table: parts[parts.length - 1] ?? '' }
 }
 
 export function filterExpression(

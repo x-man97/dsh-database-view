@@ -116,6 +116,27 @@ describe('tableFromStatement', () => {
     expect(tableFromStatement('select 1 + 1')).toBeNull()
     expect(tableFromStatement('begin')).toBeNull()
   })
+
+  it('keeps the last two parts of a three-part name', () => {
+    expect(tableFromStatement('select * from mydb.dbo.orders')).toEqual({ schema: 'dbo', table: 'orders' })
+  })
+
+  it('splits on dots outside identifier quotes', () => {
+    expect(tableFromStatement('select * from `my.schema`.`my table`')).toEqual({ schema: 'my.schema', table: 'my table' })
+    expect(tableFromStatement('select * from [my db].[my table]')).toEqual({ schema: 'my db', table: 'my table' })
+    expect(tableFromStatement('select * from "my.schema"."orders"')).toEqual({ schema: 'my.schema', table: 'orders' })
+  })
+
+  it('ignores FROM inside literals and comments when the dialect is known', () => {
+    expect(tableFromStatement("select 'from fake.table' as note from real.orders", 'mysql')).toEqual({
+      schema: 'real',
+      table: 'orders',
+    })
+    expect(tableFromStatement('-- from fake.table\nselect * from real.orders', 'mysql')).toEqual({
+      schema: 'real',
+      table: 'orders',
+    })
+  })
 })
 
 describe('insertStatement', () => {

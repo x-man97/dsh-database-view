@@ -54,6 +54,8 @@ import { TABLE_PAGE_KEY, readPageSize, writePageSize } from './pagesize'
 import { readFlag, readText, writeFlag, writeText } from './prefs'
 
 const PAGE_SIZES = [100, 200, 500, 1000, 2000, 5000]
+/** Idle delay before the background row count; keeps it off the page's path. */
+const COUNT_IDLE_MS = 500
 const FILTERS_OPEN_KEY = 'dsh-database-view.table.filters-open.v1'
 const ORDER_KEY = 'dsh-database-view.table-order.v1'
 
@@ -73,14 +75,15 @@ function failureMessage(error: Failure): string {
  * A column filter: `like` is the text typed into the filter row, `eq` is an
  * exact value picked from a cell, `isnull` comes from clicking a NULL cell.
  */
-async function runSql(id: string, sql: string, maxRows: number): Promise<QueryResult> {
+async function runSql(id: string, sql: string, maxRows: number, stmtKey?: string): Promise<QueryResult> {
+  const request = { id, sql, maxRows, ...(stmtKey === undefined ? {} : { stmtKey }) }
   try {
-    return await api.query({ id, sql, maxRows })
+    return await api.query(request)
   } catch (error) {
     // A tab opened from a cold app has no live connection yet; open it once.
     if (error instanceof ApiError && error.code === 'not-connected') {
       await api.connect(id)
-      return await api.query({ id, sql, maxRows })
+      return await api.query(request)
     }
     throw error
   }
@@ -208,6 +211,23 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const whereRef = useRef<HTMLInputElement | null>(null)
   /** Latest load wins: an older page must not overwrite a newer one. */
   const loadToken = useRef(0)
+  /**
+   * The pager count runs in the background. Its statement key lets a newer
+   * load (or closing the tab) cancel it before it queues other queries.
+   */
+  const countKey = useRef<string | null>(null)
+  const countTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancelCount = useCallback((): void => {
+    if (countTimer.current !== null) {
+      clearTimeout(countTimer.current)
+      countTimer.current = null
+    }
+    const key = countKey.current
+    countKey.current = null
+    // Older hosts (and partial test stubs) may not expose cancel.
+    if (key !== null) void Promise.resolve(api.cancel?.(key)).catch(() => undefined)
+  }, [])
+  useEffect(() => cancelCount, [cancelCount])
   /** Remembers what the last load asked for so the error banner can retry it. */
   const lastLoad = useRef<{
     found: ClientConnection
@@ -247,6 +267,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const load = useCallback(
     async (found: ClientConnection, target: { page: number; size: number; where: string; orderBy: string; recount: boolean }): Promise<void> => {
       const token = ++loadToken.current
+      cancelCount()
       lastLoad.current = { found, target }
       setLoading(true)
       setError(null)
@@ -259,17 +280,6 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         const orderSql = orderByForPaging(dialect, orderBy)
         const offset = target.page * target.size
         const pageSql = `SELECT * FROM ${from}${whereSql}${orderSql} ${pageClause(dialect, target.size, offset)}`
-        // The total is only a pager label, so it runs alongside the page instead of after it.
-        const countPromise = target.recount
-          ? runSql(params.connectionId, `SELECT COUNT(*) FROM ${from}${whereSql}`, 1).then(
-              (counted) => {
-                const first = counted.rows[0]?.[0]
-                const value = typeof first === 'number' ? first : Number(first)
-                return Number.isFinite(value) ? value : undefined
-              },
-              () => undefined,
-            )
-          : undefined
         const result = await runSql(params.connectionId, pageSql, target.size)
         if (token !== loadToken.current) return
         setColumns(result.columns)
@@ -278,13 +288,35 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         setSqlText(result.sql === '' ? pageSql : result.sql)
         setPage(target.page)
         setSnapshotReady(true)
-        if (countPromise !== undefined) {
-          // Already running alongside the page query; a failed count just hides the total.
-          const counted = await countPromise
-          if (token === loadToken.current) {
-            setTotal(counted)
-            setCountUnknown(counted === undefined)
-          }
+        if (target.recount) {
+          // Count only after the page is on screen: with one session per
+          // connection a full COUNT(*) sent first would queue the rows behind
+          // a long scan. The short idle delay also lets the structure request
+          // go out first and gives the user a chance to navigate away.
+          const key = `table-count-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+          countTimer.current = setTimeout(() => {
+            countTimer.current = null
+            if (token !== loadToken.current) return
+            countKey.current = key
+            void runSql(params.connectionId, `SELECT COUNT(*) FROM ${from}${whereSql}`, 1, key)
+              .then(
+                (counted) => {
+                  if (token !== loadToken.current) return
+                  const first = counted.rows[0]?.[0]
+                  const value = typeof first === 'number' ? first : Number(first)
+                  setTotal(Number.isFinite(value) ? value : undefined)
+                  setCountUnknown(!Number.isFinite(value))
+                },
+                () => {
+                  if (token !== loadToken.current) return
+                  setTotal(undefined)
+                  setCountUnknown(true)
+                },
+              )
+              .finally(() => {
+                if (countKey.current === key) countKey.current = null
+              })
+          }, COUNT_IDLE_MS)
         }
       } catch (caught) {
         if (token !== loadToken.current) return
@@ -293,7 +325,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         if (token === loadToken.current) setLoading(false)
       }
     },
-    [params.connectionId, params.schema, params.table],
+    [cancelCount, params.connectionId, params.schema, params.table],
   )
 
   useEffect(() => {

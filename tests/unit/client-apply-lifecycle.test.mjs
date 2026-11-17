@@ -10,7 +10,9 @@ import { apply } from '../../src/client/index.tsx'
  */
 function fakeClient() {
   const tabDisposers = []
-  const registerTab = vi.fn(() => {
+  const definitions = []
+  const registerTab = vi.fn((definition) => {
+    definitions.push(definition)
     const dispose = vi.fn()
     tabDisposers.push(dispose)
     return dispose
@@ -47,10 +49,23 @@ function fakeClient() {
     if (typeof dispose === 'function') effectCleanup = dispose
     return vi.fn()
   })
-  return { ctx, registerTab, tabDisposers, cleanup: () => effectCleanup() }
+  return { ctx, registerTab, tabDisposers, definitions, cleanup: () => effectCleanup() }
 }
 
 describe('client apply lifecycle', () => {
+  it('keeps table and console tabs mounted so switching tabs does not drop their state', () => {
+    const { ctx, definitions } = fakeClient()
+
+    apply(ctx)
+
+    const byKind = new Map(definitions.map((definition) => [definition.kind, definition]))
+    expect(byKind.get('database')?.keepMounted).toBe(true)
+    expect(byKind.get('database-table')?.keepMounted).toBe(true)
+    expect(byKind.get('database-console')?.keepMounted).toBe(true)
+    expect(byKind.get('database-table')?.multiple).toBe(true)
+    expect(byKind.get('database-console')?.multiple).toBe(true)
+  })
+
   it('releases every tab registration so a live reload can register again', () => {
     const { ctx, registerTab, tabDisposers, cleanup } = fakeClient()
 

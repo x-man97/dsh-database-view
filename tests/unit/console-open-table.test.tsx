@@ -122,6 +122,28 @@ describe('open the target table from the console', () => {
     await waitFor(() => expect(open).toHaveBeenCalledWith({ connectionId: 'mysql-1', schema: 'shop', table: 'v_orders', kind: 'view' }))
   })
 
+  it('opens the listed table name when the query case differs', async () => {
+    const open = vi.fn()
+    setTableTabOpener(open)
+    mocks.schemas.mockResolvedValue({ schemas: [{ name: 'HR' }] })
+    mocks.objects.mockResolvedValue({ objects: [{ name: 'EMPLOYEES', kind: 'table' }] })
+    render(<ConsoleTab useTabInfo={tab} />)
+    await screen.findByLabelText('数据源')
+    await waitForConsoleSource(mocks)
+
+    const editor = document.querySelector('textarea')
+    if (editor === null) throw new Error('missing SQL editor')
+    fireEvent.change(editor, { target: { value: 'SELECT * FROM hr.employees' } })
+
+    const button = (await screen.findByRole('button', { name: '打开数据表' })) as HTMLButtonElement
+    await waitFor(() => expect(button.disabled).toBe(false))
+    fireEvent.click(button)
+
+    await waitFor(() =>
+      expect(open).toHaveBeenCalledWith({ connectionId: 'mysql-1', schema: 'HR', table: 'EMPLOYEES', kind: 'table' }),
+    )
+  })
+
   it('is disabled while the statement names no table', async () => {
     render(<ConsoleTab useTabInfo={tab} />)
     await screen.findByLabelText('数据源')

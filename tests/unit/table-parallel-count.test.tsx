@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   status: vi.fn(),
   query: vi.fn(),
   connect: vi.fn(),
+  cancel: vi.fn(),
 }))
 
 vi.mock('../../src/client/api', () => {
@@ -18,7 +19,7 @@ vi.mock('../../src/client/api', () => {
   }
   return {
     ApiError,
-    api: { status: mocks.status, query: mocks.query, connect: mocks.connect },
+    api: { status: mocks.status, query: mocks.query, connect: mocks.connect, cancel: mocks.cancel },
   }
 })
 
@@ -75,17 +76,29 @@ function countResult(request: { sql: string }) {
   }
 }
 
+const tab = () => ({
+  tab: { navigation: { params: { connectionId: mysql.id, schema: 'shop', table: 'orders' } } },
+})
+
+function countCalls(): Array<{ sql: string; stmtKey?: string }> {
+  return mocks.query.mock.calls
+    .map((call) => call[0] as { sql: string; stmtKey?: string })
+    .filter((request) => request.sql.startsWith('SELECT COUNT'))
+}
+
 describe('table page and row count', () => {
   afterEach(() => {
     cleanup()
+    vi.useRealTimers()
   })
 
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.status.mockResolvedValue({ config: { connections: [mysql], settings, drivers: [] }, drivers: [], env: {} })
+    mocks.cancel.mockResolvedValue(true)
   })
 
-  it('starts counting while the page is still running', async () => {
+  it('loads the page before counting so a slow count cannot delay the rows', async () => {
     let release: (value: unknown) => void = () => undefined
     const pendingCount = new Promise((resolve) => {
       release = resolve
@@ -95,25 +108,37 @@ describe('table page and row count', () => {
       return Promise.resolve(pageResult(request))
     })
 
-    render(
-      <TableTab
-        useTabInfo={() => ({
-          tab: { navigation: { params: { connectionId: mysql.id, schema: 'shop', table: 'orders' } } },
-        })}
-      />,
-    )
+    render(<TableTab useTabInfo={tab} />)
 
-    // The page arrives first, but the count was already issued: it did not wait
-    // for the page query to settle.
+    // The rows are on screen while the count has not even been sent.
     await screen.findByText('手机数码')
     const issued = mocks.query.mock.calls.map((call) => (call[0] as { sql: string }).sql)
-    expect(issued).toHaveLength(2)
-    expect(issued[0]).toContain('COUNT(*)')
-    expect(issued[1]).toContain('SELECT * FROM')
+    expect(issued[0]).toContain('SELECT * FROM')
+    expect(countCalls()).toHaveLength(0)
+
+    // After the idle delay the count goes out on the side.
+    await waitFor(() => expect(countCalls()).toHaveLength(1), { timeout: 3000 })
     expect(screen.queryByText('/42')).toBeNull()
 
-    release(countResult({ sql: issued[0] ?? '' }))
+    release(countResult({ sql: countCalls()[0]?.sql ?? '' }))
     await waitFor(() => expect(screen.getByText('/42')).toBeTruthy())
+  })
+
+  it('cancels the background count when a newer page query starts', async () => {
+    mocks.query.mockImplementation((request: { sql: string }) => {
+      if (request.sql.startsWith('SELECT COUNT')) return new Promise(() => undefined)
+      return Promise.resolve(pageResult(request))
+    })
+
+    render(<TableTab useTabInfo={tab} />)
+    await screen.findByText('手机数码')
+    await waitFor(() => expect(countCalls()).toHaveLength(1), { timeout: 3000 })
+
+    const key = countCalls()[0]?.stmtKey
+    expect(key).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }))
+    await waitFor(() => expect(mocks.cancel).toHaveBeenCalledWith(key))
   })
 
   it('hides the total when counting fails', async () => {
@@ -122,16 +147,10 @@ describe('table page and row count', () => {
       return Promise.resolve(pageResult(request))
     })
 
-    render(
-      <TableTab
-        useTabInfo={() => ({
-          tab: { navigation: { params: { connectionId: mysql.id, schema: 'shop', table: 'orders' } } },
-        })}
-      />,
-    )
+    render(<TableTab useTabInfo={tab} />)
 
     await screen.findByText('手机数码')
-    await waitFor(() => expect(screen.queryByText(/^\//)).toBeNull())
+    await waitFor(() => expect(screen.queryByText(/^\//)).toBeNull(), { timeout: 3000 })
     expect(await screen.findByText('行数未知')).toBeTruthy()
   })
 })

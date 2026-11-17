@@ -1439,11 +1439,12 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
    */
   const resolveTarget = useCallback(
     (text: string): { schema: string; table: string } | null => {
-      const parsed = tableFromStatement(text)
+      const dialect = connection?.dialect === 'redis' ? undefined : connection?.dialect
+      const parsed = tableFromStatement(text, dialect)
       if (parsed === null) return null
       return parsed.schema === '' ? { schema: schema !== '' ? schema : defaultSchema, table: parsed.table } : parsed
     },
-    [defaultSchema, schema],
+    [connection?.dialect, defaultSchema, schema],
   )
   const executedTarget = useMemo(
     () => resolveTarget(sourceSql !== '' ? sourceSql : base),
@@ -1478,18 +1479,27 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
   /**
    * The tree knows whether an object is a view; here we only have the table name,
    * so ask the cached object list before opening the tab with the right kind.
+   * Oracle folds unquoted names to upper case, so the typed name is matched
+   * against the listed objects to reopen the table under its real name.
    */
   const openEditorTable = async (): Promise<void> => {
     const target = editorTarget()
     if (target === null || selectedId === '') return
+    const knownSchema =
+      schemas.find((item) => item.name.toLowerCase() === target.schema.toLowerCase())?.name ?? target.schema
+    let table = target.table
     let kind: 'table' | 'view' = 'table'
     try {
-      const listed = await api.objects(selectedId, target.schema)
-      if (listed.objects.some((object) => object.name === target.table && object.kind === 'view')) kind = 'view'
+      const listed = await api.objects(selectedId, knownSchema)
+      const found = listed.objects.find((object) => object.name.toLowerCase() === target.table.toLowerCase())
+      if (found !== undefined) {
+        table = found.name
+        if (found.kind === 'view') kind = 'view'
+      }
     } catch {
       // The tab still opens; only the DDL button falls back to table semantics.
     }
-    openTableTab({ connectionId: selectedId, schema: target.schema, table: target.table, kind })
+    openTableTab({ connectionId: selectedId, schema: knownSchema, table, kind })
   }
   const noTableNote = (): void => {
     setExportNote(t('console.noTargetTable'))

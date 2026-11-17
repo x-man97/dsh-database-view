@@ -160,18 +160,23 @@ export function apply(ctx: ClientContext): void {
           ],
         }),
         // One page per table: `multiple` keeps each double-click's record apart.
+        // Keeping it mounted preserves a running query and pending edits while
+        // the user reads another sidebar tab.
         host.sidebarRightTabs.register({
           id: TABLE_TAB_ID,
           kind: TABLE_TAB_KIND,
           title: () => t('nav.table'),
           multiple: true,
+          keepMounted: true,
         }),
         // Each console open gets its own tab, so every connection can run its own query.
+        // Results and the editor survive switching tabs; only closing cancels a run.
         host.sidebarRightTabs.register({
           id: CONSOLE_TAB_ID,
           kind: CONSOLE_TAB_KIND,
           title: () => t('nav.console'),
           multiple: true,
+          keepMounted: true,
         }),
       ]
       host.slots.inject('sidebar.right.pane.tab', () => {
