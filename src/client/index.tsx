@@ -140,44 +140,51 @@ export function apply(ctx: ClientContext): void {
   // Inject lazily so hosts without the native sidebar do not fail activation.
   ctx.inject(['sidebarRightTabs', 'sidebarRight'], (host) => {
     host.effect(() => {
-      host.sidebarRightTabs.register({
-        id: TAB_ID,
-        kind: TAB_KIND,
-        title: () => t('nav.database'),
-        keepMounted: true,
-        guide: [
-          {
-            id: TAB_KIND,
-            order: 38,
-            title: () => t('nav.database'),
-            description: () => t('nav.database'),
-            icon: GuideIcon,
-          },
-        ],
-      })
-      // One page per table: `multiple` keeps each double-click's record apart.
-      host.sidebarRightTabs.register({
-        id: TABLE_TAB_ID,
-        kind: TABLE_TAB_KIND,
-        title: () => t('nav.table'),
-        multiple: true,
-      })
-      // Each console open gets its own tab, so every connection can run its own query.
-      host.sidebarRightTabs.register({
-        id: CONSOLE_TAB_ID,
-        kind: CONSOLE_TAB_KIND,
-        title: () => t('nav.console'),
-        multiple: true,
-      })
+      // The tab registry owns its registrations until the returned disposer
+      // runs; without holding them a live client reload (HMR) re-registers the
+      // same ids, throws, and never reaches the pane slot registrations below.
+      const tabs = [
+        host.sidebarRightTabs.register({
+          id: TAB_ID,
+          kind: TAB_KIND,
+          title: () => t('nav.database'),
+          keepMounted: true,
+          guide: [
+            {
+              id: TAB_KIND,
+              order: 38,
+              title: () => t('nav.database'),
+              description: () => t('nav.database'),
+              icon: GuideIcon,
+            },
+          ],
+        }),
+        // One page per table: `multiple` keeps each double-click's record apart.
+        host.sidebarRightTabs.register({
+          id: TABLE_TAB_ID,
+          kind: TABLE_TAB_KIND,
+          title: () => t('nav.table'),
+          multiple: true,
+        }),
+        // Each console open gets its own tab, so every connection can run its own query.
+        host.sidebarRightTabs.register({
+          id: CONSOLE_TAB_ID,
+          kind: CONSOLE_TAB_KIND,
+          title: () => t('nav.console'),
+          multiple: true,
+        }),
+      ]
       host.slots.inject('sidebar.right.pane.tab', () => {
         host.slots.register({ name: 'sidebar.right.pane.tab', key: TAB_ID }, DatabaseTabBody)
         host.slots.register({ name: 'sidebar.right.pane.tab', key: TABLE_TAB_ID }, TableTabBody)
         host.slots.register({ name: 'sidebar.right.pane.tab', key: CONSOLE_TAB_ID }, ConsoleTabBody)
+        return undefined
       })
       host.slots.inject('sidebar.right.pane.tab.title', () => {
         host.slots.register({ name: 'sidebar.right.pane.tab.title', key: TAB_ID }, DatabaseTabChip)
         host.slots.register({ name: 'sidebar.right.pane.tab.title', key: TABLE_TAB_ID }, TableTabChip)
         host.slots.register({ name: 'sidebar.right.pane.tab.title', key: CONSOLE_TAB_ID }, ConsoleTabChip)
+        return undefined
       })
       setTableTabOpener((params: TableTabParams) => {
         host.sidebarRight.openTab(TABLE_TAB_KIND, { params })
@@ -186,6 +193,9 @@ export function apply(ctx: ClientContext): void {
         host.sidebarRight.openTab(CONSOLE_TAB_KIND, { params })
       })
       return () => {
+        for (const dispose of tabs) {
+          if (typeof dispose === 'function') dispose()
+        }
         setTableTabOpener(undefined)
         setConsoleTabOpener(undefined)
       }

@@ -1763,7 +1763,12 @@ pre.dshdb-view-sql {
   caret-color: var(--dsw-alias-label-primary);
   white-space: pre-wrap;
   overflow-wrap: break-word;
+  /* The highlight layer under it has no scrollbar; a visible one here would
+   * narrow the textarea and wrap long lines at different columns, which shows
+   * up as a caret sitting away from its highlighted text. */
+  scrollbar-width: none;
 }
+.dshdb-sql-input::-webkit-scrollbar { display: none; }
 .dshdb-sql-input::placeholder {
   color: var(--dsw-alias-label-dimmed);
   -webkit-text-fill-color: var(--dsw-alias-label-dimmed);
