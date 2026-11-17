@@ -4,8 +4,11 @@
 
 由 `npm run changelog` 根据 `git log` 生成，不要手工编辑。
 
-## 新功能（298）
+## 新功能（301）
 
+- `f412be6` feat(client): drop schemas from the tree and toolbar
+- `8104ebe` feat(client): create schemas from the data source tree
+- `5a871f2` feat(client): cache table views and edit full cell values
 - `9cba9d8` feat: port upstream script splitter, export safety and redis read list
 - `5ffa7f1` feat: highlight and complete SQL in table view filters
 - `2083bc3` feat: toggle connection from the toolbar power action
@@ -574,8 +577,9 @@
 - `5f4e78c` docs: 补上树筛选命中数的说明
 - `44061d4` docs: 去掉键表格说明里重复的排序描述
 
-## 杂项（24）
+## 杂项（25）
 
+- `2dcd085` chore: release 0.7.0
 - `2a6d693` chore: rebuild lib bundles after subsystem port
 - `8f3dcd4` chore: release 0.6.0
 - `0cb206a` chore: release 0.5.0
