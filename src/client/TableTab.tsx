@@ -32,6 +32,7 @@ import { cellValueView, isJsonColumn, type CellValueView } from './cellvalue'
 import { looksLikeJson } from './jsonhighlight'
 import { readTableSnapshot, tableSnapshotKey, writeTableSnapshot } from './tablecache'
 import { refreshConnections, sameConnectionConfig, useLiveConnection, withConnection } from './connectionstate'
+import { useTableTabTitle } from './tabletabtitle'
 import { tableDumpText } from './tabledump'
 import { SqlHighlight } from './sqlhighlight'
 import { SqlFilterInput } from './SqlFilterInput'
@@ -2085,19 +2086,17 @@ export function TableTab(props: TableTabProps): ReactElement {
   return <TableGrid key={key} params={params} />
 }
 
-/** The chip text of a table tab: data-source.database.table, or nothing to name. */
+/** The chip text of a table tab: `table[source]`, with the database when ambiguous. */
 export function TableTabTitle(props: TableTabProps): ReactElement {
   const t = useI18n()
   const info = (props.useTabInfo ?? noTabInfo)()
   const params = readTableTabParams(info?.tab?.navigation?.params)
-  const connection = useLiveConnection(params?.connectionId ?? '')
+  const { label, full } = useTableTabTitle(params)
   if (params === undefined) return <span>{t('nav.table')}</span>
-  // Same-named tables in different sources/databases must stay distinguishable.
-  const qualified = [connection?.name, params.schema, params.table].filter((part) => part !== undefined && part !== '').join('.')
   return (
-    <span className="dshdb-tabtitle" title={qualified}>
+    <span className="dshdb-tabtitle" title={full}>
       <TableIcon size={12} />
-      {qualified}
+      {label}
     </span>
   )
 }

@@ -78,7 +78,7 @@ describe('live connection state shared between tabs', () => {
     })
   })
 
-  it('names a table tab with source, database and table', async () => {
+  it('names a unique table tab with its source', async () => {
     render(
       <>
         <TableTabTitle useTabInfo={tab} />
@@ -86,7 +86,7 @@ describe('live connection state shared between tabs', () => {
       </>,
     )
     await screen.findByText('Alice')
-    await waitFor(() => expect(screen.getAllByText('演示 MySQL.shop.users').length).toBeGreaterThan(0))
+    await waitFor(() => expect(screen.getByText('users[演示 MySQL]')).toBeTruthy())
   })
 
   it('turns editing off when another tab makes the source read-only', async () => {
