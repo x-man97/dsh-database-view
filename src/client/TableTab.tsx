@@ -836,27 +836,23 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     },
     [],
   )
-  // A double-click opens the editor for a writable table. JSON documents keep
-  // their highlighting there; when the structure is still loading, wait for it
-  // so the first double-click does not drop into the read-only preview.
+  // A double-click opens the full-value dialog for JSON in preview mode; the
+  // dialog's 编辑 button starts the editor. Plain cells edit inline, waiting for
+  // the structure when it has not arrived yet.
   const openCellByDoubleClick = useCallback(
     (rowIndex: number, column: ColumnInfo): void => {
       if (!writableTableRef.current || pendingDeletesRef.current.has(rowIndex)) return
       const value = cellValueOf(rowIndex, column)
-      const json = isJsonColumn(column) || (typeof value === 'string' && looksLikeJson(value))
-      const open = (): void => {
-        if (!writableTableRef.current || descriptionRef.current === null || pendingDeletesRef.current.has(rowIndex)) return
-        if (json) openCellValue(rowIndex, column, value, true)
-        else startCellEdit(rowIndex, column)
+      if (isJsonColumn(column) || (typeof value === 'string' && looksLikeJson(value))) {
+        openCellValue(rowIndex, column, value, false)
+        return
       }
       if (descriptionRef.current !== null) {
-        open()
+        startCellEdit(rowIndex, column)
         return
       }
       void loadDescription().then((described) => {
-        // Without a structure no DML can be staged; keep the preview reachable.
-        if (described === null) openCellValue(rowIndex, column, value, false)
-        else open()
+        if (described !== null) startCellEdit(rowIndex, column)
       })
     },
     [cellValueOf, loadDescription, openCellValue, startCellEdit],

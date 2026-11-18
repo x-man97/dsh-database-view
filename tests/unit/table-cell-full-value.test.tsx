@@ -69,11 +69,17 @@ describe('table full-value editor', () => {
     )
   })
 
-  it('opens a JSON column in the highlighted editor and stages the edit', async () => {
+  it('opens a JSON cell in the preview, then the highlighted editor from it', async () => {
     render(<TableTab useTabInfo={tab} />)
     await screen.findByText('payload')
 
     fireEvent.doubleClick(screen.getByText(RAW))
+    const preview = await screen.findByLabelText('单元格完整值')
+    expect(preview.textContent).toBe(PRETTY)
+    expect(screen.queryByLabelText('单元格完整值编辑')).toBeNull()
+    expect(document.querySelector('.dshdb-jtok-key')?.textContent).toBe('"a"')
+
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
     const editor = (await screen.findByLabelText('单元格完整值编辑')) as HTMLTextAreaElement
     expect(editor.value).toBe(PRETTY)
     expect(document.querySelector('.dshdb-jtok-key')?.textContent).toBe('"a"')
@@ -104,15 +110,17 @@ describe('table full-value editor', () => {
     expect(await screen.findByLabelText('单元格完整值编辑')).toBeTruthy()
   })
 
-  it('opens the JSON editor when the structure is still loading', async () => {
+  it('opens the JSON preview while the structure is still loading', async () => {
     let release: ((value: unknown) => void) | undefined
     mocks.describe.mockReturnValueOnce(new Promise((resolve) => { release = resolve }))
     render(<TableTab useTabInfo={tab} />)
     await screen.findByText(RAW)
 
     fireEvent.doubleClick(screen.getByText(RAW))
-    // Waiting for the structure must not fall back to the read-only preview.
-    expect(screen.queryByLabelText('单元格完整值')).toBeNull()
+    expect(await screen.findByLabelText('单元格完整值')).toBeTruthy()
+    expect(screen.queryByLabelText('单元格完整值编辑')).toBeNull()
+    // No structure yet, so the dialog cannot offer its 编辑 button.
+    expect(screen.queryByRole('button', { name: '编辑' })).toBeNull()
 
     await act(async () => {
       release?.({
@@ -126,8 +134,7 @@ describe('table full-value editor', () => {
         indexes: [],
       })
     })
-    const editor = (await screen.findByLabelText('单元格完整值编辑')) as HTMLTextAreaElement
-    expect(editor.value).toBe(PRETTY)
+    expect(screen.queryByLabelText('单元格完整值编辑')).toBeNull()
   })
 
   it('sizes the JSON editor like the preview panel', async () => {
@@ -135,12 +142,12 @@ describe('table full-value editor', () => {
     await screen.findByText('payload')
 
     fireEvent.doubleClick(screen.getByText(RAW))
-    const editor = await screen.findByLabelText('单元格完整值编辑')
-    const editorHeight = (editor.closest('.dshdb-cellvalue-editor') as HTMLElement).style.height
+    const preview = (await screen.findByLabelText('单元格完整值')) as HTMLElement
+    const previewHeight = preview.style.height
 
-    fireEvent.click(screen.getByRole('button', { name: '取消' }))
-    const preview = await screen.findByLabelText('单元格完整值')
-    expect((preview as HTMLElement).style.height).toBe(editorHeight)
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+    const editor = await screen.findByLabelText('单元格完整值编辑')
+    expect((editor.closest('.dshdb-cellvalue-editor') as HTMLElement).style.height).toBe(previewHeight)
   })
 
   it('saves an untouched document without marking the row dirty', async () => {
@@ -148,6 +155,8 @@ describe('table full-value editor', () => {
     await screen.findByText('payload')
 
     fireEvent.doubleClick(screen.getByText(RAW))
+    await screen.findByLabelText('单元格完整值')
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
     await screen.findByLabelText('单元格完整值编辑')
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
 

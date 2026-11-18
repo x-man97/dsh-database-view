@@ -597,7 +597,7 @@ export const CSS = `
   margin: 0;
   padding: 10px 12px;
   box-sizing: border-box;
-  max-height: 52vh;
+  max-height: 66vh;
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

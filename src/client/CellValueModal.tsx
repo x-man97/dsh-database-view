@@ -41,10 +41,10 @@ export function CellValueModal({ view, onClose, onSave, editing = false }: CellV
 
   const json = view.json || looksLikeJson(draft)
   // Edit and preview must read as the same panel: size both from the text the
-  // dialog opened with, capped like the preview's old max-height.
+  // dialog opened with, so long documents get most of the window height.
   const lines = view.text.split('\n').length
-  const viewportMax = Math.round((typeof window === 'undefined' ? 800 : window.innerHeight) * 0.52)
-  const paneHeight = Math.min(viewportMax, Math.max(160, Math.ceil(lines * 18.6) + 26))
+  const viewportMax = Math.round((typeof window === 'undefined' ? 800 : window.innerHeight) * 0.66)
+  const paneHeight = Math.min(viewportMax, Math.max(220, Math.ceil(lines * 18.6) + 26))
   const copy = async (): Promise<void> => {
     flash.flash(await copyText(mode ? draft : view.text))
   }
