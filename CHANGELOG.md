@@ -4,8 +4,9 @@
 
 由 `npm run changelog` 根据 `git log` 生成，不要手工编辑。
 
-## 新功能（301）
+## 新功能（302）
 
+- `ddda758` feat(client): compact table tab titles with duplicate-aware schema
 - `f412be6` feat(client): drop schemas from the tree and toolbar
 - `8104ebe` feat(client): create schemas from the data source tree
 - `5a871f2` feat(client): cache table views and edit full cell values
@@ -308,8 +309,11 @@
 - `334013a` feat(console): 支持把编辑器 SQL 保存为脚本文件
 - `57d5388` feat(console): 支持导入 .sql 文件到编辑器
 
-## 修复（126）
+## 修复（129）
 
+- `f465cce` fix(client): preview full cell values and enlarge the dialog
+- `21896cd` fix(client): keep cell editing stable and open JSON directly
+- `58354ca` fix(client): share connections and read-only state across tabs
 - `422d2b8` fix(client): keep tab state and unblock large table loads
 - `fb25d96` fix(client): survive live reload and align overlay editor carets
 - `88440f3` fix(client): 补全排序忽略继承频率键
@@ -579,8 +583,9 @@
 - `5f4e78c` docs: 补上树筛选命中数的说明
 - `44061d4` docs: 去掉键表格说明里重复的排序描述
 
-## 杂项（27）
+## 杂项（28）
 
+- `4eee471` chore: release 0.7.3
 - `ea05086` chore: release 0.7.2
 - `51f6af6` chore: release 0.7.1
 - `2dcd085` chore: release 0.7.0

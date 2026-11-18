@@ -1,7 +1,7 @@
 {
   "id": "dsh-database-view",
   "name": "Database View",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "main": "./lib/index.js",
   "description": "Database View for DeepSeek Harness: native drivers, SSH/TLS, schema browsing, inline table editing and SQL console.",
   "engines": {
