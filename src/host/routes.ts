@@ -220,6 +220,9 @@ async function handle(deps: RouteDeps, request: IncomingMessage, response: Serve
           driverPacks: deps.nativeDrivers?.list() ?? [],
           env: envStatus(deps),
           prefetch: deps.prefetch?.progress() ?? [],
+          // Sessions are shared by every client tab; without this list a tab
+          // restored after a reload would show a connected source as offline.
+          connected: [...deps.sql.connectedIds(), ...deps.redis.connectedIds()],
         },
       }
       sendJson(response, 200, snapshot)

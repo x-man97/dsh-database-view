@@ -22,6 +22,7 @@ import type {
   SchemaInfo,
 } from '../shared/types'
 import { ApiError, api } from './api'
+import { publishConnections, useSharedConnections, withConnection } from './connectionstate'
 import { DataGrid, type CellMenuTarget } from './DataGrid'
 import { formatCell, formatMs, looksLikeDdl, looksLikeRedisWrite, looksLikeWrite } from './format'
 import { annotateHistory, clearHistory, pushHistory, readHistory, readPins, togglePin, type HistoryEntry } from './history'
@@ -138,22 +139,6 @@ function failureText(error: unknown): Failure {
 const EXPORT_BATCH = 2000
 const EXPORT_LIMIT = 50000
 
-/**
- * Run one call that needs an open connection, opening it once when the tab was
- * created before a connection existed (a cold app has no live connection).
- */
-async function withConnection<T>(id: string, action: () => Promise<T>): Promise<T> {
-  try {
-    return await action()
-  } catch (error) {
-    if (error instanceof ApiError && error.code === 'not-connected') {
-      await api.connect(id)
-      return await action()
-    }
-    throw error
-  }
-}
-
 async function queryWithRetry(id: string, sql: string, maxRows: number, allowWrite: boolean, stmtKey: string, schema = ''): Promise<QueryResult> {
   return withConnection(id, () =>
     api.query({ id, sql, maxRows, allowWrite, stmtKey, ...(schema === '' ? {} : { schema }) }),
@@ -167,6 +152,8 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
   const [settings, setSettings] = useState<DbSettings | null>(null)
   const [selectedId, setSelectedId] = useState(initialConnectionId ?? '')
   const [loadError, setLoadError] = useState('')
+  // Read-only and connection edits made in another tab apply here too.
+  const shared = useSharedConnections()
 
   /** The SQL schema (MySQL database) the console runs in; '' keeps the login default. */
   const [schema, setSchema] = useState(initialSchema ?? '')
@@ -418,6 +405,7 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
       try {
         const status = await api.status()
         if (!alive) return
+        publishConnections(status.config.connections, status.connected)
         setConnections(status.config.connections)
         setSettings(status.config.settings)
         setConsoleActionOrder(status.config.settings.consoleActions)
@@ -434,6 +422,12 @@ function ConsoleBody({ initialConnectionId, initialSchema, initialSql }: { initi
       alive = false
     }
   }, [])
+
+  // A data-source edit in the panel (read-only, database, rename) must reach
+  // this console without reopening it.
+  useEffect(() => {
+    if (shared.connections !== null) setConnections(shared.connections)
+  }, [shared.connections])
 
   const toggleStatementPin = useCallback((entry: HistoryEntry): void => {
     togglePin(historyKind, entry.statement)

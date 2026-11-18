@@ -60,6 +60,7 @@ function deps() {
     secrets: {},
     drivers: { statuses: () => [] },
     sql: {
+      connectedIds: () => ['m1'],
       test: async (draft) => {
         calls.test.push(draft)
         return { ok: true, server: 'MySQL 8.0', latencyMs: 3 }
@@ -73,6 +74,7 @@ function deps() {
       },
     },
     redis: {
+      connectedIds: () => [],
       connect: async (id) => {
         calls.redisConnect.push(id)
         return { version: '7.2.4', user: 'default' }
@@ -232,5 +234,7 @@ describe('POST /status over HTTP', () => {
 
     expect(result.status).toBe(200)
     expect(result.body).toMatchObject({ ok: true, data: { prefetch: [{ connectionId: 'm1', total: 3, done: 1 }] } })
+    // Tabs restore their online markers from this list, not from local state.
+    expect(result.body.data.connected).toEqual(['m1'])
   })
 })

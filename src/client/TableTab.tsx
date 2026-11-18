@@ -31,6 +31,7 @@ import { DdlModal } from './DdlModal'
 import { cellValueView, isJsonColumn, type CellValueView } from './cellvalue'
 import { looksLikeJson } from './jsonhighlight'
 import { readTableSnapshot, tableSnapshotKey, writeTableSnapshot } from './tablecache'
+import { refreshConnections, sameConnectionConfig, useLiveConnection, withConnection } from './connectionstate'
 import { tableDumpText } from './tabledump'
 import { SqlHighlight } from './sqlhighlight'
 import { SqlFilterInput } from './SqlFilterInput'
@@ -77,16 +78,8 @@ function failureMessage(error: Failure): string {
  */
 async function runSql(id: string, sql: string, maxRows: number, stmtKey?: string): Promise<QueryResult> {
   const request = { id, sql, maxRows, ...(stmtKey === undefined ? {} : { stmtKey }) }
-  try {
-    return await api.query(request)
-  } catch (error) {
-    // A tab opened from a cold app has no live connection yet; open it once.
-    if (error instanceof ApiError && error.code === 'not-connected') {
-      await api.connect(id)
-      return await api.query(request)
-    }
-    throw error
-  }
+  // A tab opened from a cold app has no live connection yet; open it once.
+  return withConnection(id, () => api.query(request))
 }
 
 function PagerButton({
@@ -116,6 +109,12 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const cacheKey = tableSnapshotKey(params.connectionId, params.schema, params.table, objectKind, params.where ?? '')
   const cached = useMemo(() => readTableSnapshot(cacheKey), [cacheKey])
   const [connection, setConnection] = useState<ClientConnection | null>(cached?.connection ?? null)
+  /** The saved config as every tab sees it; a snapshot may predate an edit. */
+  const liveConnection = useLiveConnection(params.connectionId)
+  /** data-source.database.table; same-named tables must stay distinguishable. */
+  const qualifiedLabel = [connection?.name, params.schema, params.table]
+    .filter((part) => part !== undefined && part !== '')
+    .join('.')
   const [columns, setColumns] = useState<ColumnInfo[]>(cached?.columns ?? [])
   const [rows, setRows] = useState<Row[]>(cached?.rows ?? [])
   const [total, setTotal] = useState<number | undefined>(cached?.total)
@@ -328,6 +327,15 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     [cancelCount, params.connectionId, params.schema, params.table],
   )
 
+  // The data source may be edited (read-only, host, name) in another tab while
+  // this one stays open; follow the live config instead of the snapshot's copy.
+  useEffect(() => {
+    if (liveConnection === undefined) return
+    setConnection((previous) =>
+      previous !== null && sameConnectionConfig(previous, liveConnection) ? previous : liveConnection,
+    )
+  }, [liveConnection])
+
   useEffect(() => {
     // A restored snapshot already shows the rows; reopening the tab must not
     // query the server again.
@@ -343,8 +351,9 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     setError(null)
     void (async () => {
       try {
-        const status = await api.status()
-        const found = status.config.connections.find((item) => item.id === params.connectionId)
+        const connections = await refreshConnections()
+        if (connections === null) throw new ApiError('network', '无法读取数据源配置，请稍后重试')
+        const found = connections.find((item) => item.id === params.connectionId)
         if (found === undefined) throw new ApiError('not-found', '该数据源已不存在，请重新连接后再打开数据表')
         if (found.dialect === 'redis') throw new ApiError('unsupported', '数据表只能在关系型数据源中打开')
         if (cancelled) return
@@ -642,11 +651,17 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   }
   const submitDml = async (): Promise<void> => {
     if (dmlStatements.length === 0) return
+    if (connection === null || connection.readOnly === true) {
+      setRowError(t('table.readonlyWrite'))
+      return
+    }
     setRowSaving(true)
     setRowError('')
     try {
       for (const sql of dmlStatements) {
-        await api.query({ id: params.connectionId, sql, maxRows: 1, allowWrite: true })
+        await withConnection(params.connectionId, () =>
+          api.query({ id: params.connectionId, sql, maxRows: 1, allowWrite: true }),
+        )
       }
       setPendingNew([])
       setPendingUpdates({})
@@ -756,7 +771,9 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     if (connection === null) return
     setDdlBusy(true)
     try {
-      const result = await api.ddl(params.connectionId, params.schema, params.table, objectKind)
+      const result = await withConnection(params.connectionId, () =>
+        api.ddl(params.connectionId, params.schema, params.table, objectKind),
+      )
       setDdl({
         title: `${params.schema}.${params.table} 的${objectKind === 'view' ? '视图定义' : '建表语句'}`,
         text: result.ddl,
@@ -1394,9 +1411,9 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   return (
     <div className="dshdb-qtab" onKeyDown={handleShortcuts}>
       <div className="dshdb-qbar">
-        <span className="dshdb-qtable" title={`${params.schema}.${params.table}`}>
+        <span className="dshdb-qtable" title={qualifiedLabel}>
           <TableIcon size={13} />
-          {params.table}
+          {qualifiedLabel}
         </span>
         {connection?.readOnly === true ? (
           <Tag tone="warn" title="这条连接是只读的，写语句会被拒绝">
@@ -2044,20 +2061,19 @@ export function TableTab(props: TableTabProps): ReactElement {
   return <TableGrid key={key} params={params} />
 }
 
-/** The chip text of a table tab: the table's name, or nothing to name. */
+/** The chip text of a table tab: data-source.database.table, or nothing to name. */
 export function TableTabTitle(props: TableTabProps): ReactElement {
   const t = useI18n()
   const info = (props.useTabInfo ?? noTabInfo)()
   const params = readTableTabParams(info?.tab?.navigation?.params)
+  const connection = useLiveConnection(params?.connectionId ?? '')
   if (params === undefined) return <span>{t('nav.table')}</span>
-  // The chip is narrow: name the table, keep the qualified name in the tip and
-  // in the body header.
-  const label = params.table
-  const qualified = params.schema === '' ? params.table : `${params.schema}.${params.table}`
+  // Same-named tables in different sources/databases must stay distinguishable.
+  const qualified = [connection?.name, params.schema, params.table].filter((part) => part !== undefined && part !== '').join('.')
   return (
     <span className="dshdb-tabtitle" title={qualified}>
       <TableIcon size={12} />
-      {label}
+      {qualified}
     </span>
   )
 }

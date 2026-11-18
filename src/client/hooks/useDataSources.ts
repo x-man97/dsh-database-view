@@ -27,6 +27,12 @@ import type {
   TableDescription,
 } from '../../shared/types'
 import { api, ApiError } from '../api'
+import {
+  connectConnection,
+  disconnectConnection,
+  publishConnections,
+  useSharedConnections,
+} from '../connectionstate'
 import { useI18n } from '../i18n'
 import { objectKindLabel } from '../format'
 
@@ -179,8 +185,9 @@ export function useDataSources(notify: Notify): DataSources {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [loadError, setLoadError] = useState('')
   const [selectedId, setSelectedId] = useState('')
-  const [servers, setServers] = useState<Record<string, ServerInfo>>({})
-  const [connectingId, setConnectingId] = useState('')
+  // Live sessions and the connecting spinner belong to every tab, so a table
+  // tab may open them and the tree still shows the source online.
+  const { servers, connectingId } = useSharedConnections()
 
   const [schemas, setSchemas] = useState<Record<string, SchemaInfo[]>>({})
   const [objects, setObjects] = useState<Record<string, SchemaObject[]>>({})
@@ -212,6 +219,8 @@ export function useDataSources(notify: Notify): DataSources {
   const refresh = useCallback(async () => {
     try {
       const data = await api.status()
+      // Every tab reads the same saved config and live-session list.
+      publishConnections(data.config.connections, data.connected)
       setSnapshot({
         connections: data.config.connections,
         trash: data.config.trash,
@@ -316,7 +325,6 @@ export function useDataSources(notify: Notify): DataSources {
       const stored = readText(LAST_CONNECTION_KEY)
       const preferred = snapshot.connections.find((connection) => connection.id === stored)
       setSelectedId((preferred ?? snapshot.connections[0])?.id ?? '')
-      setServers({})
       setDetail(null)
       setRedisDetail(null)
       setSelectedKey('')
@@ -617,10 +625,8 @@ export function useDataSources(notify: Notify): DataSources {
     async (connectionId: string): Promise<void> => {
       const connection = connections.find((item) => item.id === connectionId)
       if (!connection) return
-      setConnectingId(connectionId)
       try {
-        const connected = await api.connect(connectionId)
-        setServers((previous) => ({ ...previous, [connectionId]: connected }))
+        await connectConnection(connectionId)
         notify(t('notify.connectSuccess'), 'success')
         if (connection.dialect === 'redis') {
           await loadRedisDatabases(connectionId)
@@ -635,8 +641,6 @@ export function useDataSources(notify: Notify): DataSources {
         }
       } catch (error) {
         notify(`连接失败：${errorText(error)}`, 'error')
-      } finally {
-        setConnectingId('')
       }
     },
     [connections, loadSchemas, loadRedisDatabases, loadRedisKeys, redisDbs, notify],
@@ -645,12 +649,7 @@ export function useDataSources(notify: Notify): DataSources {
   const disconnect = useCallback(
     async (connectionId: string): Promise<void> => {
       try {
-        await api.disconnect(connectionId)
-        setServers((previous) => {
-          const next = { ...previous }
-          delete next[connectionId]
-          return next
-        })
+        await disconnectConnection(connectionId)
         setDetail(null)
         setRedisDetail(null)
         setRedisDetailDb(-1)

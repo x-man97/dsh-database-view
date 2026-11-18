@@ -73,6 +73,8 @@ export interface StatusSnapshot {
   env: EnvStatus
   /** Background description walks currently running on the host. */
   prefetch: PrefetchProgress[]
+  /** Data sources whose session is open on the host, shared by every tab. */
+  connected?: string[]
 }
 
 export const api = {

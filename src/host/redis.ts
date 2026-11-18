@@ -246,6 +246,17 @@ export class RedisManager {
     return false
   }
 
+  /** Data sources with at least one live logical-database session. */
+  connectedIds(): string[] {
+    const ids = new Set<string>()
+    for (const [key, session] of this.sessions) {
+      if (session.client.status !== 'ready' && session.client.status !== 'connect') continue
+      const separator = key.indexOf('\u0000')
+      if (separator > 0) ids.add(key.slice(0, separator))
+    }
+    return [...ids]
+  }
+
   private connection(connId: string): ConnectionConfig {
     const conn = this.config.connection(connId)
     if (conn === undefined) throw new DbError('not-found', `连接不存在：${connId}`)

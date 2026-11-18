@@ -590,9 +590,12 @@ export function App(props: AppProps): ReactElement {
   const openTableFromTree = useCallback(
     (connectionId: string, schema: string, object: { name: string; kind: string }): void => {
       selectConnection(connectionId)
+      // A table tab needs a live session for its first read; opening the data
+      // source here also refreshes the tree instead of failing the tab.
+      if (servers[connectionId] === undefined) void connect(connectionId)
       openTableTab({ connectionId, schema, table: object.name, kind: object.kind === 'view' ? 'view' : 'table' })
     },
-    [selectConnection],
+    [connect, selectConnection, servers],
   )
   const openConsoleTabFromTree = useCallback(
     (connectionId: string): void => {
