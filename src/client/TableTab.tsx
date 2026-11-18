@@ -143,6 +143,34 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const [orderText, setOrderText] = useState(() => cached?.orderText ?? readText(orderStorageKey))
   const [filters, setFilters] = useState<ColumnFilters>(cached?.filters ?? {})
   const [filtersOpen, setFiltersOpen] = useState(() => readFlag(FILTERS_OPEN_KEY, false))
+  /**
+   * Structure is read asynchronously; a double-click may land before it
+   * arrives. The ref lets that click wait for it instead of falling back to
+   * the read-only preview.
+   */
+  const descriptionRef = useRef(description)
+  descriptionRef.current = description
+  const pendingDeletesRef = useRef(pendingDeletes)
+  pendingDeletesRef.current = pendingDeletes
+  const descriptionRequest = useRef<Promise<TableDescription | null> | null>(null)
+  const loadDescription = useCallback((): Promise<TableDescription | null> => {
+    if (descriptionRef.current !== null) return Promise.resolve(descriptionRef.current)
+    if (typeof api.describe !== 'function') return Promise.resolve(null)
+    if (descriptionRequest.current !== null) return descriptionRequest.current
+    const request = api
+      .describe(params.connectionId, params.schema, params.table, objectKind)
+      .then((described) => {
+        descriptionRef.current = described
+        setDescription(described)
+        return described
+      })
+      .catch(() => null)
+    descriptionRequest.current = request
+    void request.then(() => {
+      if (descriptionRequest.current === request) descriptionRequest.current = null
+    })
+    return request
+  }, [objectKind, params.connectionId, params.schema, params.table])
   const [order, setOrder] = useState<number[] | null>(null)
   // The ordering saved with the tab is only applied after the first page tells us
   // which columns exist; a column that was dropped or renamed is simply dropped.
@@ -359,10 +387,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
         if (cancelled) return
         setConnection(found)
         await load(found, { page: 0, size: pageSize, where: params.where ?? '', orderBy: '', recount: true })
-        const described = typeof api.describe === 'function'
-          ? await api.describe(found.id, params.schema, params.table, objectKind).catch(() => null)
-          : null
-        if (!cancelled) setDescription(described)
+        await loadDescription()
       } catch (caught) {
         if (!cancelled) setError(failureText(caught))
       }
@@ -370,23 +395,15 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     return () => {
       cancelled = true
     }
-  }, [cached, load, objectKind, pageSize, params.connectionId, params.schema, params.table, params.where])
+  }, [cached, load, loadDescription, objectKind, pageSize, params.connectionId, params.schema, params.table, params.where])
 
   // A restored snapshot normally carries the structure it was read with; only
   // the description that failed the first time is fetched again.
   useEffect(() => {
-    const describe = api.describe
-    if (cached === undefined || cached.description !== null || typeof describe !== 'function') return undefined
-    let cancelled = false
-    void describe(params.connectionId, params.schema, params.table, objectKind)
-      .then((described) => {
-        if (!cancelled) setDescription(described)
-      })
-      .catch(() => undefined)
-    return () => {
-      cancelled = true
-    }
-  }, [cached, objectKind, params.connectionId, params.schema, params.table])
+    if (cached === undefined || cached.description !== null) return undefined
+    void loadDescription()
+    return undefined
+  }, [cached, loadDescription])
 
   // Keep the snapshot in step with what the tab shows: page changes, filters,
   // DML reloads and imports all land here. It is only written after a
@@ -437,11 +454,11 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   const editableColumns = useMemo(() => description?.columns ?? [], [description])
   const keyColumns = editableColumns.filter((column) => column.primaryKey === true)
   const effectiveKey = keyColumns.length > 0 ? keyColumns : editableColumns
-  const canMutate =
-    connection !== null &&
-    connection.readOnly !== true &&
-    objectKind === 'table' &&
-    description !== null
+  /** A table whose data may be changed, even before its structure has loaded. */
+  const writableTable = connection !== null && connection.readOnly !== true && objectKind === 'table'
+  const writableTableRef = useRef(writableTable)
+  writableTableRef.current = writableTable
+  const canMutate = writableTable && description !== null
   const selectedIndex = selectedRows.size === 1 ? [...selectedRows][0] : undefined
   const selectedRow = selectedIndex === undefined ? undefined : displayRows[selectedIndex]
 
@@ -459,7 +476,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     setPendingNew((previous) => [...previous, {}])
   }
   const startCellEdit = useCallback((rowIndex: number, column: ColumnInfo): void => {
-    if (!canMutate || pendingDeletes.has(rowIndex)) return
+    if (!writableTableRef.current || descriptionRef.current === null || pendingDeletesRef.current.has(rowIndex)) return
     const row = displayRows[rowIndex]
     if (row === undefined) return
     const index = displayColumns.findIndex((entry) => entry.name === column.name)
@@ -468,7 +485,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
     const current = pending === DEFAULT_VALUE ? '' : pending ?? loaded
     setRowError('')
     setCellEdit({ rowIndex, column: column.name, value: current === null ? '' : String(current) })
-  }, [canMutate, displayColumns, displayRows, pendingDeletes, pendingUpdates])
+  }, [displayColumns, displayRows, pendingUpdates])
   const stageCellValue = useCallback(
     (rowIndex: number, column: string, value: string): void => {
       const row = displayRows[rowIndex]
@@ -811,27 +828,38 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
   )
   const openCellValue = useCallback(
     (rowIndex: number, column: ColumnInfo, value: CellValue, editing: boolean): void => {
-      const editable = canMutate && !pendingDeletes.has(rowIndex)
+      const editable = writableTableRef.current && descriptionRef.current !== null && !pendingDeletesRef.current.has(rowIndex)
       setRowError('')
       setCellView(cellValueView(column.name, value, isJsonColumn(column)))
       setCellValueTarget(editable ? { rowIndex, column } : null)
       setCellValueEditing(editable && editing)
     },
-    [canMutate, pendingDeletes],
+    [],
   )
-  // JSON documents are unreadable in a one-line input: double-clicking one
-  // opens the full-value editor, where they keep their highlighting.
+  // A double-click opens the editor for a writable table. JSON documents keep
+  // their highlighting there; when the structure is still loading, wait for it
+  // so the first double-click does not drop into the read-only preview.
   const openCellByDoubleClick = useCallback(
     (rowIndex: number, column: ColumnInfo): void => {
-      if (!canMutate || pendingDeletes.has(rowIndex)) return
+      if (!writableTableRef.current || pendingDeletesRef.current.has(rowIndex)) return
       const value = cellValueOf(rowIndex, column)
-      if (isJsonColumn(column) || (typeof value === 'string' && looksLikeJson(value))) {
-        openCellValue(rowIndex, column, value, true)
+      const json = isJsonColumn(column) || (typeof value === 'string' && looksLikeJson(value))
+      const open = (): void => {
+        if (!writableTableRef.current || descriptionRef.current === null || pendingDeletesRef.current.has(rowIndex)) return
+        if (json) openCellValue(rowIndex, column, value, true)
+        else startCellEdit(rowIndex, column)
+      }
+      if (descriptionRef.current !== null) {
+        open()
         return
       }
-      startCellEdit(rowIndex, column)
+      void loadDescription().then((described) => {
+        // Without a structure no DML can be staged; keep the preview reachable.
+        if (described === null) openCellValue(rowIndex, column, value, false)
+        else open()
+      })
     },
-    [canMutate, cellValueOf, openCellValue, pendingDeletes, startCellEdit],
+    [cellValueOf, loadDescription, openCellValue, startCellEdit],
   )
   const gridCellClass = useCallback(
     (): string | undefined => (filtersOpen ? 'dshdb-cell-filterable' : undefined),
@@ -1852,7 +1880,7 @@ function TableGrid({ params }: { params: TableTabParams }): ReactElement {
               onCancel: cancelCell,
             },
           })}
-          {...(canMutate ? { onCellDoubleClick: openCellByDoubleClick } : {})}
+          {...(writableTable ? { onCellDoubleClick: openCellByDoubleClick } : {})}
         />
       )}
 

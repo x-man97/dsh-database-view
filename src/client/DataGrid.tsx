@@ -565,10 +565,26 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
                 ) : null}
                 <td className="dshdb-num">{rowNo}</td>
                 {columns.map((column, columnIndex) => {
+                  const loaded: CellValue = row[columnIndex] ?? null
+                  const pending = pendingCellValue?.(rowIndex, column.name, loaded)
+                  const value: CellValue = pending === undefined ? loaded : pending
+                  // One format per cell: the same text feeds the tooltip and the body.
+                  const text = formatCell(value)
+                  const shown = text.length > CELL_TEXT_LIMIT ? `${text.slice(0, CELL_TEXT_LIMIT)}…` : text
                   const editing = cellEdit?.rowIndex === rowIndex && cellEdit.column === column.name
                   if (editing) {
+                    // The ghost keeps the cell's old width while the absolutely
+                    // positioned input overlays it, so editing never reflows columns.
                     return (
-                      <td key={`${column.name}-${columnIndex}`} className="dshdb-cell-editing">
+                      <td
+                        key={`${column.name}-${columnIndex}`}
+                        className={
+                          ['dshdb-cell-editing', numericColumn(column) ? 'dshdb-cell-num' : '']
+                            .filter((entry) => entry !== '')
+                            .join(' ') || undefined
+                        }
+                      >
+                        <span className="dshdb-cell-ghost" aria-hidden="true">{shown}</span>
                         <input
                           className="dshdb-cell-input"
                           aria-label={`${rowNo} ${column.name}`}
@@ -589,12 +605,6 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
                       </td>
                     )
                   }
-                  const loaded: CellValue = row[columnIndex] ?? null
-                  const pending = pendingCellValue?.(rowIndex, column.name, loaded)
-                  const value: CellValue = pending === undefined ? loaded : pending
-                  // One format per cell: the same text feeds the tooltip and the body.
-                  const text = formatCell(value)
-                  const shown = text.length > CELL_TEXT_LIMIT ? `${text.slice(0, CELL_TEXT_LIMIT)}…` : text
                   const changed = editedCells?.(rowIndex, column.name) === true
                   const selected = selectedRange !== null && rangeContains(selectedRange, rowIndex, columnIndex)
                   const anchored =
@@ -652,9 +662,11 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
               </td>
               {columns.map((column, columnIndex) => {
                 const editing = pending.editing?.column === column.name
+                const cellClass = numericColumn(column) ? 'dshdb-cell-num' : undefined
                 if (editing) {
                   return (
-                    <td key={`insert-${column.name}-${columnIndex}`} className="dshdb-cell-editing">
+                    <td key={`insert-${column.name}-${columnIndex}`} className={`dshdb-cell-editing${cellClass === undefined ? '' : ` ${cellClass}`}`}>
+                      <span className="dshdb-cell-ghost" aria-hidden="true">{pending.values[column.name] ?? ''}</span>
                       <input
                         className="dshdb-cell-input"
                         aria-label={`${t('table.newRow')} ${rowIndex + 1} ${column.name}`}
@@ -676,7 +688,7 @@ export const DataGrid = memo(function DataGrid(props: DataGridProps): ReactEleme
                   )
                 }
                 return (
-                  <td key={`insert-${column.name}-${columnIndex}`} className="dshdb-cell-editing" onDoubleClick={() => pending.onStartEdit(column.name)}>
+                  <td key={`insert-${column.name}-${columnIndex}`} className={cellClass} onDoubleClick={() => pending.onStartEdit(column.name)}>
                     {(pending.values[column.name] ?? '') === ''
                       ? <span className="dshdb-null">—</span>
                       : <span>{pending.values[column.name]}</span>}

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ status: vi.fn(), query: vi.fn(), connect: vi.fn(), describe: vi.fn() }))
@@ -102,6 +102,45 @@ describe('table full-value editor', () => {
     fireEvent.contextMenu(screen.getByText(RAW))
     fireEvent.click(await screen.findByRole('menuitem', { name: '编辑完整值…' }))
     expect(await screen.findByLabelText('单元格完整值编辑')).toBeTruthy()
+  })
+
+  it('opens the JSON editor when the structure is still loading', async () => {
+    let release: ((value: unknown) => void) | undefined
+    mocks.describe.mockReturnValueOnce(new Promise((resolve) => { release = resolve }))
+    render(<TableTab useTabInfo={tab} />)
+    await screen.findByText(RAW)
+
+    fireEvent.doubleClick(screen.getByText(RAW))
+    // Waiting for the structure must not fall back to the read-only preview.
+    expect(screen.queryByLabelText('单元格完整值')).toBeNull()
+
+    await act(async () => {
+      release?.({
+        schema: 'shop',
+        table: 'docs',
+        kind: 'table',
+        columns: [
+          { name: 'id', typeName: 'int', primaryKey: true, nullable: false },
+          { name: 'payload', typeName: 'json', nullable: true },
+        ],
+        indexes: [],
+      })
+    })
+    const editor = (await screen.findByLabelText('单元格完整值编辑')) as HTMLTextAreaElement
+    expect(editor.value).toBe(PRETTY)
+  })
+
+  it('sizes the JSON editor like the preview panel', async () => {
+    render(<TableTab useTabInfo={tab} />)
+    await screen.findByText('payload')
+
+    fireEvent.doubleClick(screen.getByText(RAW))
+    const editor = await screen.findByLabelText('单元格完整值编辑')
+    const editorHeight = (editor.closest('.dshdb-cellvalue-editor') as HTMLElement).style.height
+
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    const preview = await screen.findByLabelText('单元格完整值')
+    expect((preview as HTMLElement).style.height).toBe(editorHeight)
   })
 
   it('saves an untouched document without marking the row dirty', async () => {

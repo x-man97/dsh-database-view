@@ -40,6 +40,11 @@ export function CellValueModal({ view, onClose, onSave, editing = false }: CellV
   if (view === null) return null
 
   const json = view.json || looksLikeJson(draft)
+  // Edit and preview must read as the same panel: size both from the text the
+  // dialog opened with, capped like the preview's old max-height.
+  const lines = view.text.split('\n').length
+  const viewportMax = Math.round((typeof window === 'undefined' ? 800 : window.innerHeight) * 0.52)
+  const paneHeight = Math.min(viewportMax, Math.max(160, Math.ceil(lines * 18.6) + 26))
   const copy = async (): Promise<void> => {
     flash.flash(await copyText(mode ? draft : view.text))
   }
@@ -92,7 +97,7 @@ export function CellValueModal({ view, onClose, onSave, editing = false }: CellV
       }
     >
       {mode ? (
-        <div className="dshdb-sql-editor dshdb-cellvalue-editor">
+        <div className="dshdb-sql-editor dshdb-cellvalue-editor" style={{ height: paneHeight }}>
           <pre className="dshdb-sql-highlight" aria-hidden="true">
             {json ? <JsonHighlight text={draft} /> : draft}
           </pre>
@@ -119,7 +124,7 @@ export function CellValueModal({ view, onClose, onSave, editing = false }: CellV
           />
         </div>
       ) : (
-        <pre className="dshdb-cellvalue" aria-label="单元格完整值">
+        <pre className="dshdb-cellvalue" style={{ height: paneHeight }} aria-label="单元格完整值">
           {view.json ? <JsonHighlight text={view.text} /> : view.text}
         </pre>
       )}

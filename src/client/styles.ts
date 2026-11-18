@@ -596,6 +596,7 @@ export const CSS = `
 .dshdb-cellvalue {
   margin: 0;
   padding: 10px 12px;
+  box-sizing: border-box;
   max-height: 52vh;
   overflow: auto;
   white-space: pre-wrap;
@@ -611,11 +612,12 @@ export const CSS = `
 
 /* Full-value editor: the console's transparent textarea over a highlighted pre,
  * sized so JSON keeps its colors while the cell is being rewritten. */
+.dshdb-cellvalue-editor { box-sizing: border-box; }
 .dshdb-cellvalue-editor .dshdb-sql-highlight,
 .dshdb-cellvalue-editor .dshdb-sql-input {
-  height: 220px;
-  min-height: 160px;
-  max-height: 52vh;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
   padding: 10px 12px;
   font-family: var(--ds-font-family-code, ui-monospace, Menlo, Consolas, monospace);
   font-size: 12px;
@@ -724,6 +726,40 @@ export const CSS = `
 .dshdb-grid .dshdb-cell-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+/* Inline cell editor: an absolutely positioned input over a hidden copy of the
+ * old text. The copy keeps the column width (and the text alignment) stable
+ * while the value is being rewritten. */
+.dshdb-grid td.dshdb-cell-editing {
+  position: relative;
+  padding: 0;
+}
+.dshdb-cell-editing .dshdb-cell-ghost {
+  display: block;
+  padding: 0 8px;
+  visibility: hidden;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.dshdb-grid .dshdb-cell-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 7px;
+  border: 1px solid var(--dsw-alias-state-business-primary);
+  border-radius: 0;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  line-height: 20px;
+  text-align: inherit;
+  outline: none;
+}
+.dshdb-grid .dshdb-cell-num .dshdb-cell-input {
+  text-align: right;
 }
 
 .dshdb-grid .dshdb-num {
